@@ -1,0 +1,37 @@
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+#ifndef CANGJIE_CHIR_TRANSFORMATION_REDUNDANT_FUTURE_REMOVAL_H
+#define CANGJIE_CHIR_TRANSFORMATION_REDUNDANT_FUTURE_REMOVAL_H
+
+#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Package.h"
+#include "cangjie/CHIR/Value.h"
+
+namespace Cangjie::CHIR {
+/**
+ * CHIR Opt Pass: replace future object with closure call in spawn expression.
+ */
+class RedundantFutureRemoval {
+public:
+    /**
+     * @brief Main process to do future remove in spawn expression.
+     * @param package package to do optimization.
+     * @param isDebug flag whether print debug log.
+     */
+    static void RunOnPackage(const Ptr<const Package>& package, bool isDebug);
+
+private:
+    static void RunOnFunc(const Ptr<Func>& func, bool isDebug);
+
+    static std::pair<LocalVar*, Apply*> CheckSpawnWithFuture(Expression& expr);
+
+    static void RewriteSpawnWithOutFuture(Spawn& spawnExpr, LocalVar& futureValue, Apply& apply);
+};
+
+}
+
+#endif

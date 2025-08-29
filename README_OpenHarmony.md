@@ -80,3 +80,7 @@ cangjie_compiler/
 | zlib | zlib/libpng License | 扩展库中的压缩库基于该软件封装实现 | 扩展库(compress.zlib) | 集成到仓颉二进制发布包中 |
 | libboundscheck | Mulan Permissive Software License Version 2 | 编译器等相关代码基于该软件实现 | 编译器、标准库、扩展库 | 集成到仓颉二进制发布包中 |
 | OpenSSL | Apache License V2.0 | 扩展库中的 HTTP 和 TLS 封装该软件的接口 | 扩展库(net.http、net.tls) | 作为构建工具使用，不会集成到仓颉二进制包 |
+
+## 参与贡献
+
+欢迎开发者们提供任何形式的贡献，包括但不限于代码、文档、issue 等。

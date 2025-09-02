@@ -38,8 +38,10 @@ This repository provides the source code of the Cangjie compiler. The overall ar
 
 ```text
 cangjie_compiler/
-├── build.py                    # Compiler source build script
 ├── cmake                       # CMake folder for build helper scripts
+├── demangler                   # Symbol demangling
+├── doc                         # documentations
+├── figures                     # figures for documentations
 ├── include                     # Header files
 ├── integration_build           # Cangjie SDK Integration Build Script
 ├── schema                      # FlatBuffers Schema serialization data structure files
@@ -49,7 +51,6 @@ cangjie_compiler/
 │   ├── CHIR                    # Compiler intermediate representation, optimization and analysis
 │   ├── CodeGen                 # Code generation, translates CHIR to LLVMIR
 │   ├── ConditionalCompilation  # Conditional compilation
-│   ├── Demangle                # Symbol demangling
 │   ├── Driver                  # Compiler driver, launches frontend and invokes backend commands
 │   ├── Frontend                # Compiler instance class, organizes compilation process
 │   ├── FrontendTool            # Compiler instance class for external tools

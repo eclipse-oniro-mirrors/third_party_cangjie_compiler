@@ -38,8 +38,10 @@
 
 ```text
 /cangjie_compiler
-├── build.py                    # 编译器源码构建脚本
 ├── cmake                       # cmake文件夹，用于保存构建辅助脚本
+├── demangler                   # 符号还原
+├── doc                         # 文档
+├── figures                     # 文档相关图片
 ├── include                     # 头文件文件夹
 ├── integration_build           # 仓颉SDK集成构建脚本
 ├── schema                      # 用于保存 FlatBuffers Schema 序列化数据结构文件
@@ -49,7 +51,6 @@
 │   ├── CHIR                    # 编译器中间层，该阶段对代码进行优化分析
 │   ├── CodeGen                 # 代码生成，将 CHIR 翻译为 LLVMIR
 │   ├── ConditionalCompilation  # 条件编译
-│   ├── Demangle                # 符号还原
 │   ├── Driver                  # 编译器流程驱动，用于启动前端以及调用后端命令
 │   ├── Frontend                # 编译器实例类，组织编译器流程
 │   ├── FrontendTool            # 提供给周边工具的编译器实例类

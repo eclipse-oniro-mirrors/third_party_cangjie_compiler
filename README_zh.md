@@ -85,7 +85,13 @@ llvm 其他工具链以及更详细的后端工具说明，可以参考[llvm 命
 
 ## 约束
 
-支持在 Ubuntu/MacOS(x86_64, aarch64) 环境中对仓颉编译器进行构建。更详细的环境及工具依赖请参阅 [构建依赖工具](https://gitcode.com/Cangjie/cangjie_build/blob/dev/docs/env_zh.md)。
+当前暂不支持 Windows 环境内构建仓颉编译器产物，需要在 Linux 环境内通过交叉编译方式生成可在 Windows 平台运行的编译器产物，详见[仓颉 SDK 集成构建指导书](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md)。未来支持计划具体见[平台支持计划](#平台支持计划)。
+
+## 平台支持计划
+- 构建平台演进：计划于2025年底支持 Windows Native 构建出编译器产物。
+- 编译器运行平台演进：计划于2026年支持 ohos（鸿蒙PC） 平台运行编译器。
+- 仓颉应用运行平台演进：计划于2025年底支持仓颉应用在 ohos-arm32 平台运行。
+
 
 ## 编译构建
 
@@ -190,7 +196,7 @@ python3 build.py --help
 | flatbuffers         | Apache License V2.0                         | 仓颉的 cjo 文件和宏实现依赖该软件进行序列化和反序列化                                                             | 编译器和标准库(std.ast)      | 集成到仓颉二进制发布包中         |
 | libboundscheck      | Mulan Permissive Software License Version 2 | 编译器等相关代码基于该软件实现                                                                           | 编译器、标准库、扩展库           | 集成到仓颉二进制发布包中         |
 
-mingw-w64 以及其他构建依赖使用情况可参考[构建依赖工具](https://gitcode.com/Cangjie/cangjie_build/blob/dev/docs/env_zh.md)及[仓颉 SDK 集成构建指导书](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md)。
+其他构建依赖使用情况可参考[构建依赖工具](https://gitcode.com/Cangjie/cangjie_build/blob/dev/docs/env_zh.md)及[仓颉 SDK 集成构建指导书](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md)。
 
 ## 参与贡献
 

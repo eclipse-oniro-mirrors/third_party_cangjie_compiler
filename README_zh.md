@@ -42,7 +42,7 @@
 
 llvm 其他工具链以及更详细的后端工具说明，可以参考[llvm 命令指南](https://llvm.org/docs/CommandGuide/)。
 
-- **OS**：仓颉编译器及 LLVM 相关工具链当前支持在如下平台运行 Windows x86-64、Linux x86-64/AArch64、Mac x86/arm64，鸿蒙平台正在开发中。同时，除可 native 编译出上述平台产物外，仓颉编译器还支持交叉编译出 ohos-aarch64 平台二进制产物，详细请参考[仓颉SDK集成构建指导书](https://gitcode.com/Cangjie/cangjie_build#%E4%BB%93%E9%A2%89sdk%E9%9B%86%E6%88%90%E6%9E%84%E5%BB%BA%E6%8C%87%E5%AF%BC%E4%B9%A6)。
+- **OS**：仓颉编译器及 LLVM 相关工具链当前支持在如下平台运行 Windows x86-64、Linux x86-64/AArch64、Mac x86/arm64，鸿蒙平台正在开发中。同时，除可 native 编译出上述平台产物外，仓颉编译器还支持交叉编译出 ohos-aarch64 平台二进制产物，详细请参考[仓颉SDK集成构建指导书](https://gitcode.com/Cangjie/cangjie_build#%E4%BB%93%E9%A2%89sdk%E9%9B%86%E6%88%90%E6%9E%84%E5%BB%BA%E6%8C%87%E5%AF%BC%E4%B9%A6)和[平台支持计划](#平台支持计划)。
 
 ## 目录结构
 
@@ -90,7 +90,7 @@ llvm 其他工具链以及更详细的后端工具说明，可以参考[llvm 命
 ## 平台支持计划
 - 构建平台演进：计划于2025年底支持 Windows Native 构建出编译器产物。
 - 编译器运行平台演进：计划于2026年支持 ohos（鸿蒙PC） 平台运行编译器。
-- 仓颉应用运行平台演进：计划于2025年底支持仓颉应用在 ohos-arm32 平台运行。
+- 仓颉应用运行平台演进：计划于2025.9.30支持 ohos-arm32 核心功能，但暂时不包括反射、部分优化功能。
 
 
 ## 编译构建

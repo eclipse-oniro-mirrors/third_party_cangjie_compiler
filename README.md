@@ -42,7 +42,7 @@ This repository provides the source code for the Cangjie compiler, which consist
 
 For more details on the LLVM toolchain and backend tools, refer to the [LLVM Command Guide](https://llvm.org/docs/CommandGuide/).
 
-- **OS**: The Cangjie compiler and LLVM toolchain currently support Windows x86-64, Linux x86-64/AArch64, and Mac x86/arm64. HarmonyOS support is under development. In addition to native compilation, the Cangjie compiler supports cross-compiling binaries for the ohos-aarch64 platform. For details, see the Cangjie SDK Integration and Build Guide](https://gitcode.com/Cangjie/cangjie_build).
+- **OS**: The Cangjie compiler and LLVM toolchain currently support Windows x86-64, Linux x86-64/AArch64, and Mac x86/arm64. HarmonyOS support is under development. In addition to native compilation, the Cangjie compiler supports cross-compiling binaries for the ohos-aarch64 platform. For details, see the [Cangjie SDK Integration and Build Guide](https://gitcode.com/Cangjie/cangjie_build) and [Platform Support Roadmap](#platform-support-roadmap).
 
 ## Directory Structure
 
@@ -92,7 +92,7 @@ Currently, building Cangjie compiler artifacts directly in the Windows environme
 
 - Compiler Runtime Platform Evolution: Planned support for running the compiler on the ohos (HarmonyOS PC) platform in 2026.
 
-- Cangjie Application Runtime Platform Evolution: Planned support for running Cangjie applications on the ohos-arm32 platform by the end of 2025.
+- Cangjie Application Runtime Platform Evolution: Planned support for ohos-arm32 core features on 2025-09-30, but reflection and certain optimization features will not be included for the time being.
 
 ## Building from Source
 

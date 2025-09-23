@@ -20,10 +20,12 @@
         "ram": "",
         "deps": {
             "components": [
+                "mingw-w64",
                 "llvm-project",
                 "flatbuffers",
                 "bounds_checking_function"
-            ]
+            ],
+            "third_party": []
         },
         "build": {
             "sub_component": [],

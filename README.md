@@ -197,7 +197,7 @@ This project is licensed under [Apache-2.0 with Runtime Library Exception](./LIC
 | flatbuffers         | Apache License V2.0                  | Used for serialization/deserialization of cjo files and macros                                                                          | Compiler & StdLib(std.ast)  | Integrated into the Cangjie binary release  |
 | libboundscheck      | Mulan Permissive Software License V2 | Used for safe function implementations in the compiler and related code                                                                 | Compiler, StdLib, Extension | Integrated into the Cangjie binary release  |
 
-For details on other build dependencies, see [Build Dependencies](https://gitcode.com/Cangjie/cangjie_build/blob/dev/docs/env_zh.md) and the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md).
+For details on other build dependencies, see [Build Dependencies](https://gitcode.com/Cangjie/cangjie_build/blob/main/docs/env_zh.md) and the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/main/README_zh.md).
 
 ## Contribution
 

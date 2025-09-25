@@ -42,7 +42,7 @@ This repository provides the source code for the Cangjie compiler, which consist
 
 For more details on the LLVM toolchain and backend tools, refer to the [LLVM Command Guide](https://llvm.org/docs/CommandGuide/).
 
-- **OS**: The Cangjie compiler and LLVM toolchain currently support Windows x86-64, Linux x86-64/AArch64, and Mac x86/arm64. HarmonyOS support is under development. In addition to native compilation, the Cangjie compiler supports cross-compiling binaries for the ohos-aarch64 platform. For details, see the [Cangjie SDK Integration and Build Guide](https://gitcode.com/Cangjie/cangjie_build) and [Platform Support Roadmap](#platform-support-roadmap).
+- **OS**: The Cangjie compiler and LLVM toolchain currently support Windows x86-64, Linux x86-64/AArch64, and Mac x86/arm64. OHOS support is under development. In addition to native compilation, the Cangjie compiler supports cross-compiling binaries for the ohos-aarch64 platform. For details, see the [Cangjie SDK Integration and Build Guide](https://gitcode.com/Cangjie/cangjie_build) and [Platform Support Roadmap](#platform-support-roadmap).
 
 ## Directory Structure
 
@@ -88,11 +88,12 @@ cangjie_compiler/
 Currently, building Cangjie compiler artifacts directly in the Windows environment is not supported. Instead, you need to generate compiler artifacts that can run on Windows through cross-compilation in a Linux environment. For details, see the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md). For future support plans, refer to the [Platform Support Roadmap](#platform-support-roadmap).
 
 ## Platform Support Roadmap
-- Build Platform Evolution: Planned support for Windows Native builds of compiler artifacts by the end of 2025.
 
-- Compiler Runtime Platform Evolution: Planned support for running the compiler on the ohos (HarmonyOS PC) platform in 2026.
+- Build Platform Evolution: Planned support for Windows Native builds of compiler artifacts in 2025 Q4.
 
-- Cangjie Application Runtime Platform Evolution: Planned support for ohos-arm32 core features on 2025-09-30, but reflection and certain optimization features will not be included for the time being.
+- Compiler Runtime Platform Evolution: Planned support for running the compiler on the OHOS(PC) platform in 2026 Q2.
+
+- Cangjie Application Runtime Platform Evolution: Planned support for OHOS-ARM32 core features on 2025 Q3, but reflection and dynamic loading、some compiler Optimization, such as LTO（Link-Time Optimization） features will not be included for the time being.
 
 ## Building from Source
 

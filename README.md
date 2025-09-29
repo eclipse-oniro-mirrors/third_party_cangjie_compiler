@@ -4,7 +4,11 @@
 
 Cangjie is a general-purpose programming language designed for all-scenario application development, balancing development efficiency and runtime performance while providing a great programming experience. Cangjie features concise and efficient syntax, multi-paradigm programming, and type safety. For more information, please refer to the [Cangjie Language Development Guide](https://cangjie-lang.cn/docs?url=%2F1.0.0%2Fuser_manual%2Fsource_zh_cn%2Ffirst_understanding%2Fbasic.html) and the [Cangjie Programming Language White Paper](https://cangjie-lang.cn/docs?url=%2F0.53.18%2Fwhite_paper%2Fsource_zh_cn%2Fcj-wp-abstract.html).
 
-This repository provides the source code for the Cangjie compiler, which consists of two main parts: the compiler frontend and modified open-source LLVM components. The latter includes the LLVM backend, opt optimizer, llc, ld linker, and debugger. For details on third-party dependencies, see the [Third-Party Library Documentatio](./third_party/README.md). The overall architecture is shown below:
+This repository provides the source code for the Cangjie compiler, which consists of two main parts: the compiler frontend and modified open-source LLVM components. The latter includes the LLVM backend, opt optimizer, llc, ld linker, and debugger. For details on third-party dependencies, see the [Third-Party Library Documentatio](./third_party/README.md). 
+
+## Architecture
+
+The overall architecture is shown below:
 
 ![Architecture Diagram](figures/Compiler_Architecture_Diagram.png)
 
@@ -93,7 +97,7 @@ Currently, building Cangjie compiler artifacts directly in the Windows environme
 
 - Compiler Runtime Platform Evolution: Planned support for running the compiler on the OHOS(PC) platform in 2026 Q2.
 
-- Cangjie Application Runtime Platform Evolution: Planned support for OHOS-ARM32 core features on 2025 Q3, but reflection and dynamic loading、some compiler Optimization, such as LTO（Link-Time Optimization） features will not be included for the time being.
+- Cangjie Application Runtime Platform Evolution: Planned support for OHOS-ARM32 core features on 2025 Q3, reflection and dynamic loading、some compiler Optimization features will support on 2025 Q4.
 
 ## Building from Source
 

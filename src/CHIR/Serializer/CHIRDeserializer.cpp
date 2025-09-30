@@ -678,8 +678,6 @@ InvokeStaticWithException* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(
     auto args = GetValue<Value>(obj->base()->base()->operands());
     auto rtti = args[0];
     args.erase(args.begin());
-    // auto methodName = obj->methodName()->str();
-    // auto methodTy = GetType<FuncType>(obj->methodType());
     auto resultTy = GetType<Type>(obj->base()->base()->resultTy());
     // Exceptions
     auto sucBlock = GetValue<Block>(obj->base()->successors()->Get(0));

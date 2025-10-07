@@ -4,5 +4,7 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 file(GLOB TEST_SRC *.cpp)
 set(SEMA_SRC ${SEMA_SRC} ${TEST_SRC} PARENT_SCOPE)

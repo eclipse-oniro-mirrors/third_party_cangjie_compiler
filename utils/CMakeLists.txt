@@ -4,6 +4,8 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 # copy envsetup file to output folder
 if(WIN32)
     set(SCRIPT_SUFFIX bat ps1 sh)

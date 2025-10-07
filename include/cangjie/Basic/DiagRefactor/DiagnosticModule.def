@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 ERROR(module_diag_begin, "")
 // file system error
 ERROR(module_read_file_to_buffer_failed, "read file '%s' failed, reason: '%s'")

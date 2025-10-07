@@ -4,6 +4,8 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 if(CMAKE_CROSSCOMPILING AND WIN32)
     # When cross-compiling cjc.exe to Windows, the symlink created on Linux is unusable on Windows, so just make a copy.
     execute_process(COMMAND ${CMAKE_COMMAND} -E copy ${LINK_TARGET} ${LINK_NAME} WORKING_DIRECTORY ${WORKING_DIR})

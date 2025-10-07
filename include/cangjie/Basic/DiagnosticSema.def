@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 ERROR(sema_diag_begin, "")
 ERROR(sema_diag_report_error_message, "%s")
 NOTE(sema_diag_report_note_message, "%s")

@@ -4,6 +4,8 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 # This if branch is used by --product=libs, which just builds std lib.
 # Standard library cangjie-std-ast need these targets.
 

@@ -4,6 +4,8 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 set(MINGW_PACKAGE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/binary/windows-x86_64-mingw.tar.gz)
 
 if(NOT EXISTS ${MINGW_PACKAGE_PATH})

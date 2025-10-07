@@ -4,5 +4,7 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 file(GLOB CHECKER_SRC *.cpp)
 set(CHIR_OPT_SRC ${CHIR_OPT_SRC} ${CHECKER_SRC} PARENT_SCOPE)

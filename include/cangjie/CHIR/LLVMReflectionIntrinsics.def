@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 REFLECTION_KIND_TO_RUNTIME_FUNCTION(IS_INTERFACE, isInterface, CJ_MCC_IsInterface)
 REFLECTION_KIND_TO_RUNTIME_FUNCTION(IS_CLASS, isClass, CJ_MCC_IsClass)
 REFLECTION_KIND_TO_RUNTIME_FUNCTION(IS_PRIMITIVE, isPrimitive, CJ_MCC_IsPrimitive)

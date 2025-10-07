@@ -1,4 +1,4 @@
-# Cangjie Programming Language Compiler
+# Cangjie Programming Language Compiler(beta feature)
 
 ## Introduction
 

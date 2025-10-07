@@ -4,6 +4,8 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 externalproject_get_property(cjnative BINARY_DIR)
 set(LLVM_GC_BINARY_DIR "${BINARY_DIR}")
 find_package(Python3 COMPONENTS Interpreter REQUIRED)

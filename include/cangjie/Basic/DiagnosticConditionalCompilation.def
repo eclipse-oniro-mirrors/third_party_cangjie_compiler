@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 ERROR(conditional_compilation_diag_begin, "")
 ERROR(conditional_compilation_not_support_op, "conditional compilation '%s' not support this op '%s'")
 ERROR(conditional_compilation_not_support_this_condition, "conditional compilation have not supported this condition: '%s'")

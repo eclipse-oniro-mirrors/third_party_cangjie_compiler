@@ -4,6 +4,8 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 # cmake -P
 # CopyIfDifferent.cmake (arg 2)
 # ${FROM_DIRECTORY} (arg 3) - copy source

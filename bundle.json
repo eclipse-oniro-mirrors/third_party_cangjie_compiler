@@ -1,7 +1,7 @@
 {
     "name": "@ohos/cangjie_compiler",
     "description": "Cangjie compiler provides compilation of Cangjie language source code into executables, along with built-in debugging and optimization support",
-    "version": "6.0",
+    "version": "6.1",
     "license": "Apache-2.0 with Runtime Library Exceptions",
     "publishAs": "code-segment",
     "segment": {

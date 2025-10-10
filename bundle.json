@@ -5,14 +5,14 @@
     "license": "Apache-2.0 with Runtime Library Exceptions",
     "publishAs": "code-segment",
     "segment": {
-        "destPath": "third_party/cangjie/cangjie_compiler"
+        "destPath": "third_party/cangjie_compiler"
     },
     "dirs": {},
     "scripts": {},
     "licensePath": "./LICENSE",
     "component": {
         "name": "cangjie_compiler",
-        "subsystem": "arkcompiler",
+        "subsystem": "thirdparty",
         "syscap": [],
         "features": [],
         "adapted_system_type": [ "standard" ],

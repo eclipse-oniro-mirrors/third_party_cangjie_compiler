@@ -21,6 +21,9 @@
 namespace Cangjie::CHIR {
 class ClassDef : public CustomTypeDef {
     friend class CustomDefTypeConverter;
+    friend class CHIRDeserializer;
+    friend class CHIRSerializer;
+
 public:
     // ===--------------------------------------------------------------------===//
     // Base Infomation
@@ -46,6 +49,7 @@ public:
     // ===--------------------------------------------------------------------===//
     ClassType* GetSuperClassTy() const;
     ClassDef* GetSuperClassDef() const;
+    bool HasSuperClass() const;
     void SetSuperClassTy(ClassType& ty);
 
     // ===--------------------------------------------------------------------===//

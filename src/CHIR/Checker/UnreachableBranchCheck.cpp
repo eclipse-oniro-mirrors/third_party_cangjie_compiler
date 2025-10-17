@@ -11,7 +11,7 @@
 using namespace Cangjie::CHIR;
 
 UnreachableBranchCheck::UnreachableBranchCheck(
-    ConstAnalysisWrapper* constAnalysisWrapper, DiagAdapter& diag, std::string& packageName)
+    ConstAnalysisWrapper* constAnalysisWrapper, DiagAdapter& diag, const std::string& packageName)
     : diag(diag), analysisWrapper(constAnalysisWrapper), currentPackageName(packageName)
 {
 }
@@ -120,6 +120,10 @@ void UnreachableBranchCheck::RunOnFunc(const Ptr<Func> func)
     // we should check the generic func, not the instantiated func.
     if (func->TestAttr(Attribute::GENERIC_INSTANTIATED)) {
         return;
+    }
+    bool isCommonFunctionWithoutBody = func->TestAttr(Attribute::SKIP_ANALYSIS);
+    if (isCommonFunctionWithoutBody) {
+        return; // Nothing to visit
     }
     auto result = analysisWrapper->CheckFuncResult(func);
     CJC_ASSERT(result);

@@ -30,10 +30,17 @@ struct MemberVarInfo {
     AttributeInfo attributeInfo;
     DebugLocation loc;
     AnnoInfo annoInfo;
+    FuncBase* initializerFunc = nullptr; /**< Func with initializer evaluation if any */
+    const CustomTypeDef* outerDef = nullptr;
 
     bool TestAttr(Attribute attr) const
     {
         return attributeInfo.TestAttr(attr);
+    }
+
+    bool IsImmutable() const
+    {
+        return attributeInfo.TestAttr((Attribute::READONLY)) || attributeInfo.TestAttr(Attribute::CONST);
     }
 };
 
@@ -85,7 +92,7 @@ public:
     void AppendAttributeInfo(const AttributeInfo& info);
     void EnableAttr(Attribute attr);
     bool TestAttr(Attribute attr) const;
-
+    void DisableAttr(Attribute attr);
     // ===--------------------------------------------------------------------===//
     // Super Parent
     // ===--------------------------------------------------------------------===//
@@ -193,6 +200,8 @@ public:
     std::vector<MemberVarInfo> GetDirectInstanceVars() const;
     void SetDirectInstanceVars(const std::vector<MemberVarInfo>& vars);
 
+    FuncBase* GetVarInitializationFunc() const;
+    void SetVarInitializationFunc(FuncBase* func);
     // ===--------------------------------------------------------------------===//
     // Annotation
     // ===--------------------------------------------------------------------===//
@@ -288,6 +297,7 @@ protected:
     AnnoInfo annoInfo;                            /**< struct/class/enum annoInfo */
     VTableType vtable;
     std::vector<ExtendDef*> extends;
+    FuncBase* varInitializationFunc = nullptr; /**< Func for initializing instance variables with initializers */
 };
 } // namespace Cangjie::CHIR
 #endif

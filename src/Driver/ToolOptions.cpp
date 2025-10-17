@@ -210,7 +210,10 @@ void SetOptions(SetFuncType setOptionHandler, const DriverOptions& driverOptions
 #ifdef CANGJIE_DISABLE_STACK_GROW_FEATURE
     setOptionHandler("--cj-stack-grow=false");
 #else
-    SetOptionIf(setOptionHandler, driverOptions.target.env == Triple::Environment::OHOS, "--cj-stack-grow=false");
+    SetOptionIf(setOptionHandler,
+        driverOptions.target.env == Triple::Environment::OHOS ||
+        driverOptions.target.env == Triple::Environment::ANDROID,
+        "--cj-stack-grow=false");
 #endif
     if (driverOptions.targetCPU.has_value() && !driverOptions.targetCPU.value().empty()) {
         setOptionHandler("-mcpu=" + driverOptions.targetCPU.value());
@@ -273,6 +276,9 @@ void SetLTOOptions(SetFuncType setOptionHandler, const DriverOptions& driverOpti
     setOptionHandler("--cj-lto-opt");
     setOptionHandler("--allow-multiple-definition");
     setOptionHandler("--plugin-opt=no-opaque-pointers");
+    if (driverOptions.IsCompileAsExeEnabled()) {
+        setOptionHandler("--compile-as-exe");
+    }
 }
 
 void SetPgoOptions(SetFuncType setOptionHandler, const DriverOptions& driverOptions)

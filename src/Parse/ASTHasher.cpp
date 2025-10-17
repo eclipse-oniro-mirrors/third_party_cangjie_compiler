@@ -169,7 +169,7 @@ struct ASTHasherImpl {
 
     template <int whatTypeToHash = 0> void CombineHash(const Token& tok)
     {
-        SUPERHash<whatTypeToHash>(tok.kind, tok.Begin(), tok.Value());
+        SUPERHash<whatTypeToHash>(static_cast<unsigned char>(tok.kind), tok.Begin(), tok.Value());
     }
 
     template <int whatTypeToHash = 0> void CombineHash(const StringPart& sp)
@@ -274,8 +274,10 @@ struct ASTHasherImpl {
 
         // attrs below are set before sema
         auto nonSemaAttr = {Attribute::ABSTRACT, Attribute::CONSTRUCTOR, Attribute::DEFAULT,
-            Attribute::ENUM_CONSTRUCTOR, Attribute::INTERNAL, Attribute::FOREIGN, Attribute::GENERIC, Attribute::GLOBAL,
-            Attribute::INTRINSIC, Attribute::JAVA_APP, Attribute::MACRO_EXPANDED_NODE, Attribute::MACRO_FUNC,
+            Attribute::ENUM_CONSTRUCTOR, Attribute::INTERNAL, Attribute::FOREIGN, Attribute::COMMON,
+            Attribute::PLATFORM, Attribute::GENERIC, Attribute::GLOBAL,
+            Attribute::INTRINSIC, Attribute::JAVA_APP, Attribute::JAVA_MIRROR, Attribute::OBJ_C_MIRROR,
+            Attribute::OBJ_C_MIRROR_SUBTYPE, Attribute::MACRO_EXPANDED_NODE, Attribute::MACRO_FUNC,
             Attribute::MUT, Attribute::NUMERIC_OVERFLOW, Attribute::OPERATOR, Attribute::PRIVATE, Attribute::PUBLIC,
             Attribute::PROTECTED, Attribute::STATIC, Attribute::TOOL_ADD, Attribute::UNSAFE};
 
@@ -311,7 +313,11 @@ struct ASTHasherImpl {
         HashNode<whatTypeToHash>(anno);
         // ignore annotation argument and expression positions
         SUPERHash<NON_POSITION>(static_cast<int64_t>(anno.kind), anno.identifier.Val(), anno.args,
-            static_cast<int64_t>(anno.overflowStrategy), anno.attrs, anno.definedPackage, anno.condExpr);
+                        static_cast<int64_t>(anno.overflowStrategy), anno.definedPackage, anno.condExpr,
+            anno.isCompileTimeVisible, anno.attrCommas);
+        for (auto& att : anno.attrs) {
+            CombineHash(att);
+        }
     }
 
     template <int whatTypeToHash> void HashDecl(const Decl& decl)
@@ -367,11 +373,12 @@ struct ASTHasherImpl {
                     static_cast<uint8_t>(item.kind), item.prefixPaths, item.identifier.Val(), item.aliasName.Val());
             }
         }
+        SUPERHash<whatTypeToHash>(im.hasDoubleColon);
     }
     template <int whatTypeToHash> void HashPackageSpec(const PackageSpec& ps)
     {
         HashNode<whatTypeToHash>(ps);
-        SUPERHash<whatTypeToHash>(ps.prefixPaths, ps.packageName, ps.hasMacro);
+        SUPERHash<whatTypeToHash>(ps.prefixPaths, ps.packageName, ps.hasMacro, ps.hasDoubleColon);
     }
     template <int whatTypeToHash> void HashMatchCase(const MatchCase& mc)
     {
@@ -607,7 +614,7 @@ struct ASTHasherImpl {
     }
     template <int whatTypeToHash> void HashSubscriptExpr(const SubscriptExpr& se)
     {
-        HashExpr<whatTypeToHash>(se); // no need to hash op
+        HashExpr<whatTypeToHash>(se); // no need to hash op; also commaPos does not have debug info on it
         SUPERHash<whatTypeToHash>(se.baseExpr, se.leftParenPos, se.indexExprs);
     }
     template <int whatTypeToHash> void HashUnaryExpr(const UnaryExpr& ue)
@@ -805,6 +812,11 @@ struct ASTHasherImpl {
             case AnnotationKind::CALLING_CONV:
             case AnnotationKind::INTRINSIC:
             case AnnotationKind::JAVA:
+            case AnnotationKind::JAVA_MIRROR:
+            case AnnotationKind::JAVA_IMPL:
+            case AnnotationKind::OBJ_C_MIRROR:
+            case AnnotationKind::OBJ_C_IMPL:
+            case AnnotationKind::FOREIGN_NAME:
             case AnnotationKind::WHEN:
             case AnnotationKind::DEPRECATED:
                 return true;
@@ -836,6 +848,11 @@ struct ASTHasherImpl {
             case AnnotationKind::CALLING_CONV:
             case AnnotationKind::INTRINSIC:
             case AnnotationKind::JAVA:
+            case AnnotationKind::JAVA_MIRROR:
+            case AnnotationKind::JAVA_IMPL:
+            case AnnotationKind::OBJ_C_MIRROR:
+            case AnnotationKind::OBJ_C_IMPL:
+            case AnnotationKind::FOREIGN_NAME:
                 // if anno.kind == WHEN, anno can only be in MacroDecl
             case AnnotationKind::WHEN:
                 // annotations combined in body hash are basically the complementary of that combined in mangle name,

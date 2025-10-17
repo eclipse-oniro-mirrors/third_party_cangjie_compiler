@@ -91,6 +91,10 @@ public:
             VisitVar(*v);
         }
         for (auto v : package.GetGlobalFuncs()) {
+            bool isCommonFunctionWithoutBody = v->TestAttr(Attribute::SKIP_ANALYSIS);
+            if (isCommonFunctionWithoutBody) {
+                continue; // Nothing to visit
+            }
             if (v->Get<WrappedRawMethod>() != nullptr && v->TestAttr(Attribute::IMPORTED)) {
                 continue;
             }
@@ -132,6 +136,10 @@ private:
             VisitTypeDef(*def);
         }
         if (auto fun = DynamicCast<Func>(&func)) {
+            bool isCommonFunctionWithoutBody = fun->TestAttr(Attribute::SKIP_ANALYSIS);
+            if (isCommonFunctionWithoutBody) {
+                return; // Nothing to visit
+            }
             VisitBG(*fun->GetBody());
         }
     }
@@ -801,7 +809,8 @@ void ToCHIR::RemoveUnusedImports(bool removeSrcCodeImported)
         ReplaceSrcCodeImportedValueWithSymbol();
     }
     UnusedImportRemover unusedImportRemover{
-        kind == IncreKind::INCR, opts, implicitFuncs};
+        kind == IncreKind::INCR || opts.outputMode == GlobalOptions::OutputMode::CHIR,
+        opts, implicitFuncs};
     unusedImportRemover.Remove(*GetPackage());
     CreateExtendDefForImportedCustomTypeDef(*GetPackage(), builder, kind == IncreKind::INCR);
     DumpCHIRDebug("RemoveUnusedImports");

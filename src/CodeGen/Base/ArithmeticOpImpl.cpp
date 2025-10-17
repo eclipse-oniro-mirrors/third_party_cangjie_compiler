@@ -162,12 +162,14 @@ llvm::Value* GenerateIntegerConvExpr(IRBuilder2& irBuilder, const CHIRBinaryExpr
 
     auto targetTy = leftArg->GetType();
     auto srcTy = rightArg->GetType();
+    auto targetTyKind = irBuilder.GetTypeKindFromType(*targetTy);
+    auto srcTyKind = irBuilder.GetTypeKindFromType(*srcTy);
     CJC_ASSERT(targetTy && srcTy);
     // convert signed integer to signed integer.
     if (targetTy->IsInteger() && StaticCast<CHIR::IntType*>(targetTy)->IsSigned() && srcTy->IsInteger() &&
         StaticCast<CHIR::IntType*>(srcTy)->IsSigned()) {
         // target type is bigger than source type.
-        if (targetTy->GetTypeKind() > srcTy->GetTypeKind()) {
+        if (targetTyKind > srcTyKind) {
             return irBuilder.CreateSExt(
                 srcValue, CGType::GetOrCreate(irBuilder.GetCGModule(), targetTy)->GetLLVMType());
         }
@@ -177,11 +179,11 @@ llvm::Value* GenerateIntegerConvExpr(IRBuilder2& irBuilder, const CHIRBinaryExpr
 
     // convert unsigned integer to signed integer.
     if (targetTy->IsInteger() && StaticCast<CHIR::IntType*>(targetTy)->IsSigned()) {
-        if (targetTy->GetTypeKind() == INTEGER_CONVERT_MAP.at(srcTy->GetTypeKind())) {
+        if (targetTyKind == INTEGER_CONVERT_MAP.at(srcTyKind)) {
             return srcValue;
         }
         // Target type is bigger than source type.
-        if (targetTy->GetTypeKind() > INTEGER_CONVERT_MAP.at(srcTy->GetTypeKind())) {
+        if (targetTyKind > INTEGER_CONVERT_MAP.at(srcTyKind)) {
             return irBuilder.CreateZExt(
                 srcValue, CGType::GetOrCreate(irBuilder.GetCGModule(), targetTy)->GetLLVMType());
         }
@@ -191,11 +193,11 @@ llvm::Value* GenerateIntegerConvExpr(IRBuilder2& irBuilder, const CHIRBinaryExpr
 
     // convert signed integer to unsigned integer.
     if (srcTy->IsInteger() && StaticCast<CHIR::IntType*>(srcTy)->IsSigned()) {
-        if (INTEGER_CONVERT_MAP.at(targetTy->GetTypeKind()) == srcTy->GetTypeKind()) {
+        if (INTEGER_CONVERT_MAP.at(targetTyKind) == srcTyKind) {
             return srcValue;
         }
         // target type is bigger than source type.
-        if (INTEGER_CONVERT_MAP.at(targetTy->GetTypeKind()) > srcTy->GetTypeKind()) {
+        if (INTEGER_CONVERT_MAP.at(targetTyKind) > srcTyKind) {
             return irBuilder.CreateZExt(
                 srcValue, CGType::GetOrCreate(irBuilder.GetCGModule(), targetTy)->GetLLVMType());
         }
@@ -205,7 +207,7 @@ llvm::Value* GenerateIntegerConvExpr(IRBuilder2& irBuilder, const CHIRBinaryExpr
 
     // convert unsigned integer to unsigned integer.
     // target type is bigger than source type.
-    if (targetTy->GetTypeKind() > srcTy->GetTypeKind()) {
+    if (targetTyKind > srcTyKind) {
         return irBuilder.CreateZExt(srcValue, CGType::GetOrCreate(irBuilder.GetCGModule(), targetTy)->GetLLVMType());
     }
     // target type is smaller than source type.

@@ -99,6 +99,12 @@ bool IsBoxSelf(const CHIR::Type& ty, CGModule& cgMod)
     }
     return false;
 }
+
+bool IsParaInitFunc(const CHIR::Value& chirFunc)
+{
+    auto chirFuncName = chirFunc.GetIdentifierWithoutPrefix();
+    return chirFuncName.find(MANGLE_CANGJIE_PREFIX + MANGLE_FUNC_PARA_INIT_PREFIX) == 0;
+}
 } // namespace
 
 void DIBuilder::CreateCompileUnit(const std::string& pkgName)
@@ -224,8 +230,10 @@ void DIBuilder::SetSubprogram(const CHIR::Func* func, llvm::Function* function)
     auto funcTy = DeRef(*func->GetType());
     bool lineInfoOnly = !enabled && enableLineInfo;
     auto funcName = lineInfoOnly ? "" : func->GetIdentifierWithoutPrefix();
-    auto funcIdentifier =
-        lineInfoOnly ? "" : GenerateGenericFuncName(func->GetSrcCodeIdentifier(), func->GetOriginalGenericTypeParams());
+    // the name of parameter init function is useless for debug, and may cause duplicate identifier error
+    auto funcIdentifier = lineInfoOnly || IsParaInitFunc(*func)
+        ? "" 
+        : GenerateGenericFuncName(func->GetSrcCodeIdentifier(), func->GetOriginalGenericTypeParams());
     auto& position = func->GetDebugLocation();
     auto diFile = GetOrCreateFile(position);
     bool isGV = funcName.find(MANGLE_CANGJIE_PREFIX + MANGLE_GLOBAL_VARIABLE_INIT_PREFIX) == 0;
@@ -907,7 +915,10 @@ void DIBuilder::CreateMethodType(
     auto diFile = GetOrCreateFile(customDef.GetDebugLocation());
     for (auto method : allMethods) {
         bool hasThis = !method->TestAttr(CHIR::Attribute::STATIC);
-        auto name = GenerateGenericFuncName(method->GetSrcCodeIdentifier(), method->GetOriginalGenericTypeParams());
+        // the name of parameter init function is useless for debug, and may cause duplicate identifier error
+        auto name = IsParaInitFunc(*method)
+            ? "" 
+            : GenerateGenericFuncName(method->GetSrcCodeIdentifier(), method->GetOriginalGenericTypeParams());
         auto subprogramTy = CreateFuncType(StaticCast<CHIR::FuncType*>(method->GetType()), false, hasThis);
         auto& position = method->GetDebugLocation();
         llvm::DINode::DIFlags flags = llvm::DINode::FlagPrototyped;

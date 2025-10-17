@@ -38,6 +38,8 @@ namespace CodeGen {
 class IRBuilder2;
 class CGValue;
 
+std::vector<llvm::Metadata*> UnwindGenericRelateType(llvm::LLVMContext& llvmCtx, const CHIR::Type& ty);
+
 inline std::string GenNameForBB(const std::string& name, [[maybe_unused]] uint64_t extraInfo = 0)
 {
     return name;
@@ -230,8 +232,8 @@ inline bool IsAtomicIntrinsic(const CHIR::IntrinsicKind& intrinsicKind)
         intrinsicKind <= CHIR::IntrinsicKind::ATOMIC_FETCH_XOR;
 }
 
-int64_t GetIntMaxOrMin(const CHIR::IntType::TypeKind& typeKind, bool isMax);
-uint64_t GetUIntMax(const CHIR::IntType::TypeKind& typeKind);
+int64_t GetIntMaxOrMin(IRBuilder2& irBuilder, const CHIR::IntType& ty, bool isMax);
+uint64_t GetUIntMax(IRBuilder2& irBuilder, const CHIR::IntType& ty);
 
 inline bool IsPassedByReference(llvm::Type* type)
 {

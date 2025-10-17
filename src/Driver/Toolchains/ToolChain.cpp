@@ -172,7 +172,13 @@ void ToolChain::CheckOtherDependeniesOfStaticLib(
             driverOptions.target.os == Triple::OSType::LINUX && driverOptions.target.env != Triple::Environment::OHOS) {
             otherLibs.emplace("-lclang_rt-builtins");
         }
-        dynamicLibraries.emplace("-lgcc_s");
+        if (driverOptions.target.os == Triple::OSType::LINUX &&
+            driverOptions.target.env == Triple::Environment::ANDROID) {
+            otherLibs.emplace("-lc++");
+            otherLibs.emplace("-lunwind");
+        } else {
+            dynamicLibraries.emplace("-lgcc_s");
+        }
     }
 }
 void ToolChain::AppendObjectsFromCompiled(Tool& tool, const std::vector<TempFileInfo>& objFiles,
@@ -273,6 +279,8 @@ TempFileInfo ToolChain::GetOutputFileInfo(const std::vector<TempFileInfo>& objFi
 std::string ToolChain::GetArchFolderName(const Triple::ArchType& arch) const
 {
     switch (arch) {
+        case Triple::ArchType::ARM32:
+            return "lib";
         case Triple::ArchType::X86_64:
         case Triple::ArchType::AARCH64:
             return "lib64";
@@ -318,7 +326,7 @@ void ToolChain::GenerateRuntimePath(Tool& tool)
     }
 }
 
-std::string ToolChain::FindCangjieLLVMToolPath(const std::string toolName) const
+std::string ToolChain::FindCangjieLLVMToolPath(const std::string& toolName) const
 {
     std::string toolPath = FindToolPath(
         toolName, std::vector<std::string>{FileUtil::JoinPath(driver.cangjieHome, "third_party/llvm/bin")});
@@ -328,7 +336,7 @@ std::string ToolChain::FindCangjieLLVMToolPath(const std::string toolName) const
     return toolPath;
 }
 
-std::string ToolChain::FindUserToolPath(const std::string toolName) const
+std::string ToolChain::FindUserToolPath(const std::string& toolName) const
 {
     // ComputeBinPaths makes some guesses on --sysroot option for protential available search paths. It has lower
     // precedence than toolchain paths so users may always use -B to specifiy which path to search first.

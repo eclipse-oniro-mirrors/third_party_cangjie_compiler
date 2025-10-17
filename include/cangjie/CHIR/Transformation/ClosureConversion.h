@@ -145,7 +145,6 @@ private:
     void CreateMemberVarInAutoEnvWrapper(ClassDef& autoEnvWrapperDef);
     Func* CreateGenericMethodInAutoEnvWrapper(ClassDef& autoEnvWrapperDef);
     void CreateInstMethodInAutoEnvWrapper(ClassDef& autoEnvWrapperDef, Func& genericFunc);
-    void ConvertTypeFromGenericBaseToInstBase(std::vector<Type*>& types);
 
 
     std::unordered_map<std::string, ClassDef*> genericAutoEnvBaseDefs;

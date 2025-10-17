@@ -349,12 +349,7 @@ FuncType* DynamicDispatchWithException::GetMethodType() const
     return virMethodCtx.originalFuncType;
 }
 
-size_t DynamicDispatchWithException::GetVirtualMethodOffset() const
-{
-    return virMethodCtx.offset;
-}
-
-ClassType* DynamicDispatchWithException::GetInstSrcParentCustomTypeOfMethod(CHIRBuilder& builder) const
+std::vector<VTableSearchRes> DynamicDispatchWithException::GetVirtualMethodInfo(CHIRBuilder& builder) const
 {
     auto thisTypeDeref = thisType->StripAllRefs();
     if (thisTypeDeref->IsThis()) {
@@ -368,14 +363,47 @@ ClassType* DynamicDispatchWithException::GetInstSrcParentCustomTypeOfMethod(CHIR
     FuncCallType funcCallType{virMethodCtx.srcCodeIdentifier, instFuncType, instantiatedTypeArgs};
     auto res = GetFuncIndexInVTable(*thisTypeDeref, funcCallType, IsInvokeStaticBase(), builder);
     CJC_ASSERT(!res.empty());
-    for (auto& r : res) {
-        if (r.offset == virMethodCtx.offset) {
+    return res;
+}
+
+const std::vector<GenericType*>& DynamicDispatchWithException::GetGenericTypeParams() const
+{
+    return virMethodCtx.genericTypeParams;
+}
+
+size_t DynamicDispatchWithException::GetVirtualMethodOffset(CHIRBuilder* builder) const
+{
+    auto offset = Get<VirMethodOffset>();
+    if (offset.has_value()) {
+        return offset.value();
+    } else {
+        CJC_NULLPTR_CHECK(builder);
+        return GetVirtualMethodInfo(*builder)[0].offset;
+    }
+}
+
+ClassType* DynamicDispatchWithException::GetInstSrcParentCustomTypeOfMethod(CHIRBuilder& builder) const
+{
+    for (auto& r : GetVirtualMethodInfo(builder)) {
+        if (r.offset == GetVirtualMethodOffset()) {
             CJC_NULLPTR_CHECK(r.instSrcParentType);
             return r.instSrcParentType;
         }
     }
     CJC_ABORT();
     return nullptr;
+}
+
+AttributeInfo DynamicDispatchWithException::GetVirtualMethodAttr(CHIRBuilder& builder) const
+{
+    for (auto& r : GetVirtualMethodInfo(builder)) {
+        if (r.offset == GetVirtualMethodOffset()) {
+            CJC_NULLPTR_CHECK(r.instSrcParentType);
+            return r.attr;
+        }
+    }
+    CJC_ABORT();
+    return AttributeInfo{};
 }
 
 InvokeWithException::InvokeWithException(
@@ -403,10 +431,9 @@ std::string InvokeWithException::ToString([[maybe_unused]] size_t indent) const
     ss << ThisTypeToString(thisType).AddDelimiterOrNot(", ").Str();
     ss << GetMethodName();
     ss << InstTypeArgsToString(instantiatedTypeArgs) << ": ";
-    // Method type: the return type is not sure.
-    ss << ParamTypesToString(*GetMethodType()) << ", ";
-    ss << StringWrapper(", ").AppendOrClear(ExprWithExceptionOperandsToString(GetArgs(), GetSuccessors())).Str();
-    ss << ")(offset: " << virMethodCtx.offset << ")";
+    ss << GetMethodType()->ToString() << ", ";
+    ss << ExprWithExceptionOperandsToString(GetArgs(), GetSuccessors());
+    ss << ")";
     ss << CommentToString();
     return ss.str();
 }
@@ -435,11 +462,10 @@ std::string InvokeStaticWithException::ToString([[maybe_unused]] size_t indent) 
     ss << ThisTypeToString(thisType).AddDelimiterOrNot(", ").Str();
     ss << GetMethodName();
     ss << InstTypeArgsToString(instantiatedTypeArgs) << ": ";
-    // Method type: the return type is not sure.
-    ss << ParamTypesToString(*GetMethodType()) << ", ";
+    ss << GetMethodType()->ToString() << ", ";
     ss << GetRTTIValue()->GetIdentifier();
     ss << StringWrapper(", ").AppendOrClear(ExprWithExceptionOperandsToString(GetArgs(), GetSuccessors())).Str();
-    ss << ")(offset: " << virMethodCtx.offset << ")";
+    ss << ")";
     ss << CommentToString();
     return ss.str();
 }
@@ -464,6 +490,11 @@ ExprKind IntOpWithException::GetOpKind() const
     return opKind;
 }
 
+std::string IntOpWithException::GetOpKindName() const
+{
+    return ExprKindMgr::Instance()->GetKindName(static_cast<size_t>(opKind)) + "WithException";
+}
+
 Value* IntOpWithException::GetLHSOperand() const
 {
     return GetOperand(0);
@@ -485,7 +516,7 @@ Cangjie::OverflowStrategy IntOpWithException::GetOverflowStrategy() const
 std::string IntOpWithException::ToString([[maybe_unused]] size_t indent) const
 {
     std::stringstream ss;
-    ss << ExprKindMgr::Instance()->GetKindName(static_cast<size_t>(opKind)) << "WithException";
+    ss << GetOpKindName();
     ss << "(";
     ss << ExprWithExceptionOperandsToString(GetOperands(), GetSuccessors());
     ss << ")";

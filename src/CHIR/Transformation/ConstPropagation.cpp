@@ -29,6 +29,10 @@ void ConstPropagation::RunOnPackage(const Ptr<const Package>& package, bool isDe
 
 void ConstPropagation::RunOnFunc(const Ptr<const Func>& func, bool isDebug, bool isCJLint)
 {
+    bool isCommonFunctionWithoutBody = func->TestAttr(Attribute::SKIP_ANALYSIS);
+    if (isCommonFunctionWithoutBody) {
+        return; // Nothing to check
+    }
     auto result = analysisWrapper->CheckFuncResult(func);
     CJC_ASSERT(result);
 
@@ -99,6 +103,9 @@ void ConstPropagation::RunOnFunc(const Ptr<const Func>& func, bool isDebug, bool
     for (auto& [terminator, v] : targetSuccMap) {
         RewriteTerminator(terminator, v.first, v.second, isDebug);
     }
+    if (!targetSuccMap.empty()) {
+        funcsNeedRemoveBlocks.push_back(func.get());
+    }
 }
 
 const OptEffectCHIRMap& ConstPropagation::GetEffectMap() const
@@ -106,6 +113,10 @@ const OptEffectCHIRMap& ConstPropagation::GetEffectMap() const
     return effectMap;
 }
 
+const std::vector<const Func*>& ConstPropagation::GetFuncsNeedRemoveBlocks() const
+{
+    return funcsNeedRemoveBlocks;
+}
 Ptr<LiteralValue> ConstPropagation::GenerateConstExpr(
     const Ptr<Type>& type, const Ptr<const ConstValue>& constVal, bool isCJLint)
 {

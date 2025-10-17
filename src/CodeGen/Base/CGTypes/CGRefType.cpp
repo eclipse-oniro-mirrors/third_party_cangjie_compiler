@@ -37,7 +37,8 @@ void CGRefType::GenContainedCGTypes()
 
 void CGRefType::CalculateSizeAndAlign()
 {
-    size = sizeof(void*);
-    align = alignof(void*);
+    llvm::DataLayout layOut = cgMod.GetLLVMModule()->getDataLayout();
+    size = layOut.getTypeAllocSize(llvmType);
+    align = layOut.getABITypeAlignment(llvmType);
 }
 } // namespace Cangjie::CodeGen

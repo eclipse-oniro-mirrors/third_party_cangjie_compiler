@@ -739,6 +739,7 @@ OwnedPtr<SubscriptExpr> PartialInstantiation::InstantiateSubscriptExpr(
     for (auto& it : se.indexExprs) {
         expr->indexExprs.push_back(InstantiateExpr(it.get(), visitor));
     }
+    expr->commaPos = se.commaPos;
     expr->rightParenPos = se.rightParenPos;
     expr->isTupleAccess = se.isTupleAccess;
     return expr;
@@ -1490,6 +1491,7 @@ OwnedPtr<Annotation> PartialInstantiation::InstantiateAnnotation(const Annotatio
     ret->definedPackage = annotation.definedPackage;
     ret->identifier = annotation.identifier;
     ret->attrs = annotation.attrs;
+    ret->attrCommas = annotation.attrCommas;
     ret->adAnnotation = annotation.adAnnotation;
     ret->rsquarePos = annotation.rsquarePos;
     ret->lsquarePos = annotation.lsquarePos;

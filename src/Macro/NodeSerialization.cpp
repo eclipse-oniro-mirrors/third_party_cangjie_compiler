@@ -977,6 +977,14 @@ flatbuffers::Offset<NodeFormat::MacroExpandDecl> NodeWriter::SerializeMacroExpan
     return NodeFormat::CreateMacroExpandDecl(builder, base, invocation);
 }
 
+flatbuffers::Offset<NodeFormat::Decl> NodeWriter::SerializeMacroExpandParamOfDecl(const Decl* decl)
+{
+    auto macroExpandParam = RawStaticCast<const MacroExpandParam*>(decl);
+    auto fbMacroExpandParam = SerializeMacroExpandParam(macroExpandParam);
+    return NodeFormat::CreateDecl(
+        builder, SerializeDeclBase(macroExpandParam), NodeFormat::AnyDecl_MACRO_EXPAND_PARAM, fbMacroExpandParam.Union());
+}
+
 flatbuffers::Offset<NodeFormat::FuncParam> NodeWriter::SerializeMacroExpandParam(AstMacroExpandParam mep)
 {
     auto macroExpandParam = RawStaticCast<const MacroExpandParam*>(mep);
@@ -1062,7 +1070,14 @@ flatbuffers::Offset<NodeFormat::MacroInvocation> NodeWriter::MacroInvocationCrea
     auto argsTokens = TokensVectorCreateHelper(macroInvocation.args);
     auto args = builder.CreateVector(argsTokens);
 
-    auto decl = SerializeDecl(macroInvocation.decl.get());
+    flatbuffers::Offset<NodeFormat::Decl> decl;
+    if (macroInvocation.decl != nullptr) {
+        if (macroInvocation.decl->astKind == ASTKind::MACRO_EXPAND_PARAM) {
+            decl = SerializeMacroExpandParamOfDecl(macroInvocation.decl.get());
+        } else {
+            decl = SerializeDecl(macroInvocation.decl.get());
+        }
+    }
     auto hasParenthesis = macroInvocation.hasParenthesis;
     auto isCompileTimeVisible = macroInvocation.isCompileTimeVisible;
     return NodeFormat::CreateMacroInvocation(builder, fullName, identifier, &identifierPos, &leftSquarePos,

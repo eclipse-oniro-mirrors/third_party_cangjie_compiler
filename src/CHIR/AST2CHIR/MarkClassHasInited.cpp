@@ -49,7 +49,7 @@ void ReAssignHasInitedToTrue(Ptr<Func> initFunc, CHIRBuilder& builder, std::vect
         if (!terminator || terminator->GetExprKind() != ExprKind::EXIT) {
             continue;
         }
-        auto parent = terminator->GetParent();
+        auto parent = terminator->GetParentBlock();
         auto terminatorAnnos = terminator->MoveAnnotation();
         terminator->RemoveSelfFromBlock();
         auto trueVal = builder.CreateConstantExpression<BoolLiteral>(boolTy, parent, true);

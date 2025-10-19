@@ -13,7 +13,11 @@ using namespace Cangjie;
 
 class ToolchainTest : public ::testing::Test {
 protected:
-    void SetUp() override {}
+    void SetUp() override
+    {
+    }
 };
 
-TEST_F(ToolchainTest, Init) {}
+TEST_F(ToolchainTest, Init)
+{
+}

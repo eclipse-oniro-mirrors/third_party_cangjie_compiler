@@ -40,6 +40,7 @@
 #include "cangjie/CHIR/Transformation/UselessAllocateElimination.h"
 #include "cangjie/CHIR/Visitor/Visitor.h"
 #include "cangjie/Driver/TempFileManager.h"
+#include "cangjie/Utils/CheckUtils.h"
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
 #include "cangjie/MetaTransformation/MetaTransform.h"
 #endif
@@ -108,11 +109,9 @@ static std::string GetRawMangledName(const Value& value)
 {
     if (auto func = DynamicCast<const Func*>(&value); func) {
         return func->GetRawMangledName();
-    } else if (auto var = DynamicCast<const GlobalVar*>(&value); var) {
-        return var->GetRawMangledName();
     } else {
-        InternalError("Get raw mangled name failed");
-        return "";
+        auto var = VirtualCast<const GlobalVar*>(&value);
+        return var->GetRawMangledName();
     }
 }
 
@@ -166,43 +165,6 @@ static void UpdateOptEffectMapBecauseOfInit(OptEffectCHIRMap& oldMap, OptEffectS
     }
 }
 
-static bool IsSrcFuncAndBoxFunc(const Value& srcValue, const Value& boxValue)
-{
-    const auto srcFunc = DynamicCast<const Func*>(&srcValue);
-    const auto boxFunc = DynamicCast<const Func*>(&boxValue);
-    if (srcFunc == nullptr || boxFunc == nullptr) {
-        return false;
-    }
-    if (srcFunc->GetSrcCodeIdentifier() != boxFunc->GetSrcCodeIdentifier()) {
-        return false;
-    }
-    if (boxFunc->GetRawMangledName() != "$BOX" || srcFunc->GetParentRawMangledName().empty()) {
-        return false;
-    }
-    return true;
-}
-
-static void UpdateOptEffectMapBecauseOfBox(OptEffectCHIRMap& oldMap, OptEffectStrMap& newMap)
-{
-    auto mapIt = oldMap.begin();
-    while (mapIt != oldMap.end()) {
-        std::unordered_set<std::string> effectedNodePatch;
-        auto effectedIt = mapIt->second.begin();
-        while (effectedIt != mapIt->second.end()) {
-            if (IsSrcFuncAndBoxFunc(*mapIt->first, **effectedIt)) {
-                effectedNodePatch.emplace(VirtualCast<Func*>(mapIt->first)->GetParentRawMangledName());
-                effectedIt = mapIt->second.erase(effectedIt);
-            } else {
-                ++effectedIt;
-            }
-        }
-        if (!effectedNodePatch.empty()) {
-            auto keyName = GetRawMangledName(*mapIt->first);
-            newMap[keyName].merge(effectedNodePatch);
-        }
-        ++mapIt;
-    }
-}
 
 static void DropOutIllegalString(OptEffectStrMap& newMap)
 {
@@ -229,7 +191,7 @@ static void UpdateEffectMapToString(OptEffectCHIRMap& oldMap, OptEffectStrMap& n
     Utils::ProfileRecorder recorder("CHIR", "UpdateEffectMapToString");
     FlattenEffectMap(oldMap);
     UpdateOptEffectMapBecauseOfInit(oldMap, newMap);
-    UpdateOptEffectMapBecauseOfBox(oldMap, newMap);
+
     for (auto& mapIt : oldMap) {
         auto keyName = GetRawMangledName(*mapIt.first);
         if (!keyName.empty()) {
@@ -254,8 +216,18 @@ void ToCHIR::DumpCHIRDebug(const std::string& suffix)
         return;
     }
     CJC_NULLPTR_CHECK(chirPkg);
-    const std::string extension = "chir";
-    std::string fileName = std::to_string(debugFileIndex++) + "_" + suffix + "." + extension;
+    CJC_ASSERT(!CHIR_READABLE_FILE_EXTENSION.empty());
+    const std::string extension = CHIR_READABLE_FILE_EXTENSION.front() == '.' ? CHIR_READABLE_FILE_EXTENSION.substr(1)
+                                                                              : CHIR_READABLE_FILE_EXTENSION;
+    // do not dump when not debugging compute annotations
+    if (!opts.computeAnnotationsDebug && isComputingAnnos) {
+        return;
+    }
+    std::string fileName = std::to_string(debugFileIndex++) + "_";
+    if (isComputingAnnos) {
+        fileName += "ComputeAnnotations_";
+    }
+    fileName += suffix + "." + extension;
     std::string debugDir;
     if (FileUtil::IsDir(outputPath)) {
         debugDir = FileUtil::JoinPath(outputPath, chirPkg->GetName() + "_CHIR_Debug");
@@ -283,7 +255,7 @@ void ToCHIR::DoClosureConversion()
 {
     Utils::ProfileRecorder recorder("CHIR", "ClosureConversion");
     CJC_NULLPTR_CHECK(builder.GetObjectTy()->GetClassDef());
-    auto closure = ClosureConversion(*chirPkg, builder, opts, srcCodeImportedFuncMap);
+    auto closure = ClosureConversion(*chirPkg, builder, opts, srcCodeImportedFuncs);
     closure.Convert();
     uselessClasses = closure.GetUselessClassDef();
     uselessLambda = closure.GetUselessLambda();
@@ -408,7 +380,7 @@ void ToCHIR::Devirtualization(DevirtualizationInfo& devirtInfo)
     TypeValue::SetCHIRBuilder(&builder);
     AnalysisWrapper<TypeAnalysis, TypeDomain> typeAnalysisWrapper(builder);
     typeAnalysisWrapper.RunOnPackage(
-        chirPkg, opts.chirDebugOptimizer, ci.isCJLint, threadNum, devirtInfo.GetReturnTypeMap());
+        chirPkg, opts.chirDebugOptimizer, threadNum, devirtInfo.GetReturnTypeMap());
     auto devirt = CHIR::Devirtualization(&typeAnalysisWrapper, devirtInfo);
     devirt.RunOnFuncs(funcs, builder, opts.chirDebugOptimizer);
 
@@ -455,7 +427,7 @@ bool ToCHIR::RunVarInitChecking()
 {
     Utils::ProfileRecorder recorder("CHIR Opt", "VarInitCheck");
     auto vic = CHIR::VarInitCheck(&diag);
-    vic.RunOnPackage(chirPkg, false, opts.GetJobs());
+    vic.RunOnPackage(chirPkg, opts.GetJobs());
     return diag.GetErrorCount() == 0;
 }
 
@@ -488,7 +460,7 @@ void ToCHIR::RunFunctionInline(DevirtualizationInfo& devirtInfo)
         }
         // 1. $toAny is a function needed by reflection, it's used by runtime and it mustn't be optimized
         // 2. annotation factory functions mustn't be optimized
-        if ((func->GetSrcCodeIdentifier() == "$toAny" && func->TestAttr(Attribute::COMPILER_ADD)) ||
+        if (func->GetSrcCodeIdentifier() == "$toAny" ||
             func->GetFuncKind() == FuncKind::ANNOFACTORY_FUNC) {
             continue;
         }
@@ -522,7 +494,7 @@ void ToCHIR::RunMergingBlocks(const std::string& firstName, const std::string& s
 void ToCHIR::RunConstantAnalysis()
 {
     Utils::ProfileRecorder recorder("CHIR Opt", "Constant Analysis");
-    constAnalysisWrapper.RunOnPackage(chirPkg, opts.chirDebugOptimizer, ci.isCJLint, opts.GetJobs(), &diag);
+    constAnalysisWrapper.RunOnPackage(chirPkg, opts.chirDebugOptimizer, opts.GetJobs(), &diag);
 }
 
 bool ToCHIR::RunConstantPropagation()
@@ -543,9 +515,7 @@ bool ToCHIR::RunConstantPropagation()
         std::vector<std::unique_ptr<CHIR::ConstPropagation>> cpList;
         for (size_t idx = 0; idx < funcNum; ++idx) {
             auto func = globalFuncs.at(idx);
-            if (!ci.isCJLint && func->Get<SkipCheck>() == SkipKind::SKIP_CODEGEN) {
-                continue;
-            }
+
             auto cp = std::make_unique<CHIR::ConstPropagation>(*builderList[idx], &constAnalysisWrapper, opts);
             taskQueue.AddTask<void>([constPropagation = cp.get(), func, isDebug, isCJLint]() {
                 return constPropagation->RunOnFunc(func, isDebug, isCJLint);
@@ -565,13 +535,6 @@ bool ToCHIR::RunConstantPropagation()
     return diag.GetErrorCount() == 0;
 }
 
-bool ToCHIR::RunConstSafetyCheck()
-{
-    Utils::ProfileRecorder recorder("CHIR Opt", "Constant Safety Check");
-    auto check = CHIR::ConstSafetyCheck(&constAnalysisWrapper);
-    check.RunOnPackage(*chirPkg, ci.isCJLint, opts.GetJobs());
-    return diag.GetErrorCount() == 0;
-}
 
 bool ToCHIR::RunConstantPropagationAndSafetyCheck()
 {
@@ -587,7 +550,7 @@ void ToCHIR::RunRangePropagation()
     }
     Utils::ProfileRecorder recorder("CHIR Opt", "Range Propagation");
     AnalysisWrapper<RangeAnalysis, RangeDomain> vra(builder);
-    vra.RunOnPackage(chirPkg, opts.chirDebugOptimizer, ci.isCJLint, opts.GetJobs(), &diag);
+    vra.RunOnPackage(chirPkg, opts.chirDebugOptimizer, opts.GetJobs(), &diag);
     size_t threadNum = opts.GetJobs();
     if (threadNum == 1) {
         auto cp = CHIR::RangePropagation(builder, &vra, &diag, opts.enIncrementalCompilation);
@@ -603,9 +566,7 @@ void ToCHIR::RunRangePropagation()
         std::vector<std::unique_ptr<CHIR::RangePropagation>> cpList;
         for (size_t idx = 0; idx < funcNum; ++idx) {
             auto func = globalFuncs.at(idx);
-            if (func->Get<SkipCheck>() == SkipKind::SKIP_CODEGEN) {
-                continue;
-            }
+
             auto cp = std::make_unique<CHIR::RangePropagation>(
                 *builderList[idx], &vra, &diag, opts.enIncrementalCompilation);
             taskQueue.AddTask<void>(
@@ -642,7 +603,7 @@ void ToCHIR::RunRedundantFutureOpt()
         return;
     }
     Utils::ProfileRecorder recorder("CHIR Opt", "RedundantFutureOpt");
-    RedundantFutureRemoval::RunOnPackage(chirPkg, opts.chirDebugOptimizer);
+    RedundantFutureRemoval(*chirPkg, opts.chirDebugOptimizer).RunOnPackage();
     DumpCHIRDebug("RedundantFutureOpt");
 }
 
@@ -673,6 +634,20 @@ void ToCHIR::RunUnitUnify()
     auto unitUnify = CHIR::UnitUnify(builder);
     unitUnify.RunOnPackage(chirPkg, opts.chirDebugOptimizer);
     DumpCHIRDebug("Unit_Unify");
+}
+
+DevirtualizationInfo ToCHIR::CollectDevirtualizationInfo()
+{
+    DevirtualizationInfo devirtInfo(chirPkg);
+    if (opts.IsOptimizationExisted(GlobalOptions::OptimizationFlag::FUNC_INLINING) ||
+        (opts.IsOptimizationExisted(GlobalOptions::OptimizationFlag::DEVIRTUALIZATION) &&
+         !opts.enIncrementalCompilation)) {
+        // Collect all inheritance tree information.
+        Utils::ProfileRecorder::Start("CHIR Opt", "Collect Devirt Info");
+        devirtInfo.CollectInfo();
+        Utils::ProfileRecorder::Stop("CHIR Opt", "Collect Devirt Info");
+    }
+    return devirtInfo;
 }
 
 void ToCHIR::MarkNoSideEffect()
@@ -724,15 +699,7 @@ bool ToCHIR::RunOptimizationPassAndRulesChecking()
     UselessExprElimination();
     MarkNoSideEffect();
     RunUnitUnify();
-    DevirtualizationInfo devirtInfo(chirPkg);
-    if (opts.IsOptimizationExisted(GlobalOptions::OptimizationFlag::FUNC_INLINING) ||
-        (opts.IsOptimizationExisted(GlobalOptions::OptimizationFlag::DEVIRTUALIZATION) &&
-            !opts.enIncrementalCompilation)) {
-        // Collect all inheritance tree information.
-        Utils::ProfileRecorder::Start("CHIR Opt", "Collect Devirt Info");
-        devirtInfo.CollectInfo();
-        Utils::ProfileRecorder::Stop("CHIR Opt", "Collect Devirt Info");
-    }
+    auto devirtInfo = CollectDevirtualizationInfo();
     RunFunctionInline(devirtInfo);
     RedundantLoadElimination();
     RedundantGetOrThrowElimination();
@@ -754,18 +721,35 @@ bool ToCHIR::RunConstantEvaluation()
     }
     Utils::ProfileRecorder recorder("CHIR", "Constant Evaluation");
     auto ce = CHIR::Interpreter::ConstEvalPass(ci, builder, sourceManager, opts, diagEngine);
-    ce.RunOnPackage(*chirPkg, initFuncsForConstVar, {});
+    std::vector<Cangjie::CHIR::Interpreter::Bchir> bchirPackages;
+    ce.RunOnPackage(*chirPkg, initFuncsForConstVar, bchirPackages);
     DumpCHIRDebug("after_const_eval");
     return true;
 }
 
-bool ToCHIR::RunIRChecker(const std::string& suffix) const
+bool ToCHIR::RunIRChecker(const Phase& phase) const
 {
     if (!opts.chirWFC) {
         return true;
     }
+    std::string suffix;
+    switch (phase) {
+        case Phase::RAW:
+            suffix = "after translation";
+            break;
+        case Phase::OPT:
+            suffix = "after compiler optimization";
+            break;
+        case Phase::PLUGIN:
+            suffix = "after perform pulgin";
+            break;
+        case Phase::ANALYSIS_FOR_CJLINT:
+            suffix = "after analysis for cjlint";
+            break;
+    }
     Utils::ProfileRecorder recorder("CHIR", "IRCheck " + suffix);
-    return IRCheck(*chirPkg, opts, builder);
+    CJC_NULLPTR_CHECK(chirPkg);
+    return IRCheck(*chirPkg, opts, builder, phase);
 }
 
 void ToCHIR::RecordCodeInfoAtTheBegin()
@@ -774,7 +758,7 @@ void ToCHIR::RecordCodeInfoAtTheBegin()
         return;
     }
     Utils::ProfileRecorder recorder("CHIR", "RecordCodeInfo");
-    Utils::ProfileRecorder::SetPackageName(pkg.fullPackageName);
+
     std::function<int64_t(void)> getASTNodeQuantity = [this]() -> int64_t {
         int64_t astNodeCnt = 0;
         AST::Walker(&pkg, [&astNodeCnt](auto /* node */) {
@@ -838,6 +822,9 @@ void ToCHIR::RecordCodeInfoAtTheEnd()
     int64_t funcExprNum = 0;
     int64_t wrapperFuncExprNum = 0;
     for (auto func : chirPkg->GetGlobalFuncs()) {
+        if (!func->GetBody()) {
+            continue;
+        }
         int64_t exprNum = 0;
         for (auto b : func->GetBody()->GetBlocks()) {
             exprNum += static_cast<int64_t>(b->GetExpressions().size());
@@ -925,32 +912,6 @@ bool ToCHIR::RunAnalysisForCJLint()
     return false;
 }
 
-void ToCHIR::TagUselessFunctions()
-{
-    Utils::ProfileRecorder recorder("CHIR", "TagUselessFunctions");
-    // Erase useless abstract functions for codegen, which is also not used for cjcov or cjdb.
-    // These functions are needed for CHIR checking, so only can be removed at the end of CHIR stage.
-    std::unordered_set<Func*> visited;
-    std::queue<Func*> q;
-    for (auto func : chirPkg->GetGlobalFuncs()) {
-        if (func->Get<SkipCheck>() == SkipKind::SKIP_CODEGEN) {
-            q.emplace(func);
-        }
-    }
-    while (!q.empty()) {
-        auto cur = q.front();
-        q.pop();
-        if (auto [_, success] = visited.emplace(cur); !success) {
-            continue;
-        }
-        for (auto user : cur->GetUsers()) {
-            if (auto parent = user->GetParentFunc()) {
-                parent->Set<SkipCheck>(SkipKind::SKIP_CODEGEN);
-                q.emplace(parent);
-            }
-        }
-    }
-}
 
 void ToCHIR::EraseDebugExpr()
 {
@@ -1063,8 +1024,8 @@ std::pair<Value*, Apply*> ToCHIR::DoCFFIFuncWrapper(T& curFunc, bool isForeign, 
     auto entry = builder.CreateBlock(body);
     body->SetEntryBlock(entry);
     auto retType = curFunc.GetReturnType();
-    auto res = builder.CreateExpression<Apply>(curFunc.GetDebugLocation(), retType, &curFunc, args, entry);
-    StaticCast<Apply*>(res)->SetInstantiatedFuncType(nullptr, nullptr, paramTys, *retType);
+    auto res = builder.CreateExpression<Apply>(
+        curFunc.GetDebugLocation(), retType, &curFunc, FuncCallContext{.args = args}, entry);
     entry->AppendExpression(res);
     auto retAlloc =
         builder.CreateExpression<Allocate>(DebugLocation(), builder.GetType<RefType>(retType), retType, entry);
@@ -1110,6 +1071,47 @@ void ToCHIR::CreateBoxTypeForRecursionValueType()
     DumpCHIRDebug("BoxRecursionEnum");
 }
 
+namespace {
+void EmitCHIR(const std::string& outputPath, const CHIR::Package& package, ToCHIR::Phase phase, bool dump)
+{
+    std::string path;
+    if (FileUtil::IsDir(outputPath)) {
+        path = FileUtil::JoinPath(outputPath, package.GetName() + CHIR_SERIALIZATION_FILE_EXTENSION);
+    } else {
+        path = outputPath;
+    }
+    CHIRSerializer::Serialize(package, path, phase);
+    if (dump) {
+        const std::string dumpFileName =
+            FileUtil::GetFileNameWithoutExtension(path) + "_Emit_Debug" + CHIR_READABLE_FILE_EXTENSION;
+        // print serialize extension info which just for serialization not necessary for chir nodes
+        CHIRPrinter::PrintCHIRSerializeInfo(phase, dumpFileName);
+        // print package
+        CHIRPrinter::PrintPackage(package, dumpFileName);
+    }
+}
+} // namespace
+
+bool ToCHIR::ComputeAnnotations(std::vector<const AST::Decl*>&& annoOnly)
+{
+    isComputingAnnos = true;
+    if (!TranslateToCHIR(std::move(annoOnly))) {
+        return false;
+    }
+    FlatForInExpr();
+    RunUnreachableMarkBlockRemoval();
+    RunMergingBlocks("CHIR", "MergingBlock");
+    NothingTypeExprElimination();
+    UnreachableBlockElimination();
+    DoClosureConversion();
+    if (!RunConstantEvaluation()) {
+        return false;
+    }
+    isComputingAnnos = false;
+    debugFileIndex = 0;
+    return true;
+}
+
 bool ToCHIR::Run()
 {
     CJC_NULLPTR_CHECK(typeManager);
@@ -1119,12 +1121,15 @@ bool ToCHIR::Run()
     CJC_NULLPTR_CHECK(&releaseCHIRMemory);
     CJC_NULLPTR_CHECK(&cangjieHome);
 
-    if (!TranslateToCHIR()) {
+    if (!TranslateToCHIR({})) {
         return false;
+    }
+    if (opts.emitCHIRPhase == GlobalOptions::CandidateEmitCHIRPhase::RAW) {
+        EmitCHIR(outputPath, *chirPkg, Phase::RAW, opts.chirDumpDebugMode);
+        return true;
     }
     RecordCHIRExprNum("trans");
     RecordCodeInfoAtTheBegin();
-    TagUselessFunctions();
     UnreachableBlockReporter();
     FlatForInExpr();
     RunUnreachableMarkBlockRemoval();
@@ -1132,7 +1137,7 @@ bool ToCHIR::Run()
     RunMarkClassHasInited();
 
     if (ci.isCJLint) {
-        return RunAnalysisForCJLint() && RunIRChecker("in the end");
+        return RunAnalysisForCJLint() && RunIRChecker(Phase::ANALYSIS_FOR_CJLINT);
     }
     if (!RunOptimizationPassAndRulesChecking()) {
         return false;
@@ -1161,13 +1166,15 @@ bool ToCHIR::Run()
     CFFIFuncWrapper();
     RecordCHIRExprNum("CHIR stage");
     RecordCodeInfoAtTheEnd();
-    if (!RunIRChecker("in the end")) {
+    if (!RunIRChecker(Phase::OPT)) {
         return false;
     }
-    if (opts.saveTemps && !opts.disableInstantiation) {
+    if (opts.emitCHIRPhase == GlobalOptions::CandidateEmitCHIRPhase::OPT) {
+        EmitCHIR(outputPath, *chirPkg, Phase::OPT, opts.chirDumpDebugMode);
+    } else if (opts.saveTemps) {
         auto tempFileInfo =
             TempFileManager::Instance().CreateNewFileInfo({.fileName = chirPkg->GetName()}, TempFileKind::O_CHIR);
-        CHIRSerializer::Serialize(*chirPkg, tempFileInfo.filePath);
+        CHIRSerializer::Serialize(*chirPkg, tempFileInfo.filePath, Phase::OPT);
     }
     return true;
 }
@@ -1218,13 +1225,17 @@ void ToCHIR::UpdatePosOfMacroExpandNode()
 bool ToCHIR::PerformPlugin(CHIR::Package& package)
 {
     bool succeed = true;
+    bool hasPluginForCHIR = false;
+#ifndef CANGJIE_ENABLE_GCOV
     try {
+#endif
         Utils::ProfileRecorder recorder("CHIR", "Plugin Execution");
         CHIRPluginManager chirPluginManager = ci.metaTransformPluginBuilder.BuildCHIRPluginManager(builder);
-        chirPluginManager.ForEachMetaTransformConcept([&package](MetaTransformConcept& mtc) {
+        chirPluginManager.ForEachMetaTransformConcept([&package, &hasPluginForCHIR](MetaTransformConcept& mtc) {
             if (!mtc.IsForCHIR()) {
                 return;
             }
+            hasPluginForCHIR = true;
             if (mtc.IsForFunc()) {
                 for (auto func : package.GetGlobalFuncs()) {
                     static_cast<MetaTransform<CHIR::Func>*>(&mtc)->Run(*func);
@@ -1235,24 +1246,30 @@ bool ToCHIR::PerformPlugin(CHIR::Package& package)
                 CJC_ASSERT(false && "Should not reach here.");
             }
         });
+#ifndef CANGJIE_ENABLE_GCOV
     } catch (...) {
         succeed = false;
     }
+#endif
     if (!succeed) {
         diag.DiagnoseRefactor(DiagKindRefactor::plugin_throws_exception, DEFAULT_POSITION);
+    } else if (hasPluginForCHIR && builder.IsEnableIRCheckerAfterPlugin()) {
+        DumpCHIRDebug("PLUGIN");
+        Utils::ProfileRecorder rec2("CHIR", "IRCheck after plugins");
+        succeed = IRCheck(package, opts, builder, Phase::PLUGIN);
     }
     return succeed;
 }
 #endif
 
-bool ToCHIR::TranslateToCHIR()
+bool ToCHIR::TranslateToCHIR(std::vector<const AST::Decl*>&& annoOnly)
 {
     Utils::ProfileRecorder recorder("CHIR", "AST to CHIR Translation");
     std::unordered_map<AST::Ty*, Type*> typeMap;
     CHIR::CHIRTypeCache chirTypeCache(typeMap);
     auto chirType = std::make_unique<CHIRType>(builder, chirTypeCache);
     auto ast2chirBuilder = AST2CHIR::AST2CHIRBuilder();
-    auto ast2CHIR = ast2chirBuilder.SetGenericInstantiationManager(*gim)
+    auto ast2CHIR = ast2chirBuilder.SetGenericInstantiationManager(gim)
                         ->SetImportManager(importManager)
                         ->SetSourceManager(sourceManager)
                         ->SetTypeManager(*typeManager)
@@ -1263,9 +1280,16 @@ bool ToCHIR::TranslateToCHIR()
                         ->SetCHIRBuilder(builder)
                         ->SetCHIRType(*chirType)
                         ->SetOutputPath(outputPath)
+                        ->SetComputeAnnotations(isComputingAnnos)
                         ->Build();
+    ast2CHIR.SetAnnoOnlyDecls(std::move(annoOnly));
     auto res = ast2CHIR.ToCHIRPackage(pkg);
     if (diag.GetErrorCount() != 0 || !res) {
+        return false;
+    }
+    chirPkg = ast2CHIR.GetPackage();
+    DumpCHIRDebug("AST_CHIR");
+    if (!opts.enIncrementalCompilation && !RunIRChecker(Phase::RAW)) {
         return false;
     }
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
@@ -1277,13 +1301,15 @@ bool ToCHIR::TranslateToCHIR()
         curVirtFuncWrapDep = ast2CHIR.GetCurVirtualFuncWrapperDepForIncr();
         delVirtFuncWrapForIncr = ast2CHIR.GetDeleteVirtualFuncWrapperForIncr();
     }
-    chirPkg = ast2CHIR.GetPackage();
-    srcCodeImportedFuncMap = ast2CHIR.GetSrcCodeImportedFuncs();
-    srcCodeImportedVarMap = ast2CHIR.GetSrcCodeImportedVars();
+    srcCodeImportedFuncs = ast2CHIR.GetSrcCodeImportedFuncs();
+    srcCodeImportedVars = ast2CHIR.GetSrcCodeImportedVars();
     implicitFuncs = ast2CHIR.GetImplicitFuncs();
     initFuncsForConstVar = ast2CHIR.GetInitFuncsForConstVar();
     maybeUnreachable = ast2CHIR.GetMaybeUnreachableBlocks();
-    DumpCHIRDebug("AST_CHIR");
+    if (isComputingAnnos) {
+        annoFactoryFuncs = ast2CHIR.GetAnnoFactoryFuncs();
+        globalNominalCache = std::move(chirTypeCache.globalNominalCache);
+    }
 
     for (auto& file : pkg.files) {
         for (auto& macrocall : file->originalMacroCallNodes) {

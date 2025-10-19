@@ -37,11 +37,6 @@ enum class Attribute {
     FINAL,    /**< Mark a Func override a parent class's func, and this func self does not have VIRTUAL Attribute. */
     OPERATOR, ///< Mark whether a declaration is a operator one.
 
-    /**
-     * Mark whether a node is foreign call.
-     * NOTE: this attribute is come frome AST's Node's JAVA_APP and JAVA_EXT
-     */
-    JAVA,
     READONLY,             ///< 'let x = xxx', 'x' enable READONLY attribute
     CONST,                ///< correspond `const` keyword in Cangjie source code.
     IMPORTED,             ///< Mark whether variable、func、enum、struct、class is imported from other package.
@@ -58,6 +53,7 @@ enum class Attribute {
                      ///< converted from a decl in current package that is not recompiled.
     UNREACHABLE,     ///< Mark a Block is unreachable.
     NO_SIDE_EFFECT,  ///< Mark a Func does't have side effect.
+    SKIP_ANALYSIS,   ///< Mark node that is not used for analysis.
     ATTR_END
 };
 
@@ -71,7 +67,8 @@ const std::unordered_map<Attribute, std::string> ATTR_TO_STRING{{Attribute::STAT
     {Attribute::COMPILER_ADD, "compilerAdd"}, {Attribute::GENERIC, "generic"},
     {Attribute::NO_REFLECT_INFO, "noReflectInfo"}, {Attribute::NO_INLINE, "noInline"},
     {Attribute::NO_DEBUG_INFO, "noDebugInfo"}, {Attribute::UNREACHABLE, "unreachable"},
-    {Attribute::NO_SIDE_EFFECT, "noSideEffect"}, {Attribute::FINAL, "final"}, {Attribute::JAVA, "j-foreign"}};
+    {Attribute::NO_SIDE_EFFECT, "noSideEffect"}, {Attribute::FINAL, "final"},
+    {Attribute::SKIP_ANALYSIS, "skip_analysis"},};
 
 constexpr uint64_t ATTR_SIZE = 32;
 

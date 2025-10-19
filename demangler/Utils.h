@@ -75,7 +75,7 @@ enum class OperatorKind : size_t {
 };
 
 const std::unordered_map<const char*, const char*, StdPkgHash, StdPkgCompare> MANGLE_STDPKG_MAP = {
-    {"aa", "std.ad"},
+
     {"ab", "std.sync"},
     {"ac", "std.collection"},
     {"ad", "std.deriving"},
@@ -115,9 +115,7 @@ const std::unordered_map<const char*, const char*, StdPkgHash, StdPkgCompare> MA
     {"bm", "std.deriving.resolve"},
     {"bn", "std.database.sql"},
     {"bo", "std.net.native"},
-    {"bp", "std.net.native.cjvm"},
     {"bq", "std.convert.native"},
-    {"br", "std.ffi.java"},
     {"bs", "std.objectpool.native"},
     {"bt", "std.fs.native"},
     {"bu", "std.runtime.native"},

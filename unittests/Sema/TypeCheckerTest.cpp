@@ -11,10 +11,7 @@
 #include "cangjie/AST/PrintNode.h"
 #include "cangjie/AST/Walker.h"
 #include "cangjie/Basic/Match.h"
-#include "gtest/gtest.h"
-#include <cstdlib>
-#include <string>
-#include <vector>
+
 
 using namespace Cangjie;
 using namespace AST;
@@ -97,17 +94,17 @@ TEST_F(TypeCheckerTest, DISABLED_MacroCallInLSPTest)
 {
     std::string code = R"(
     @M1
-    func test(){
+    func test() {
         var a = 1
         a = 2
     }
     @M2
     class A {
         var a = 1
-        func test(){
+        func test() {
             this.a = 2
         }
-        func test1(){
+        func test1() {
             var b = 1
             b = 2
         }
@@ -181,6 +178,25 @@ TEST_F(TypeCheckerTest, DISABLED_MacroDiagInLSPTest)
         }
     }
     EXPECT_EQ(findOptNone, true);
+    Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
+}
+
+TEST_F(TypeCheckerTest, DISABLED_NoDiagInLSPMacroCallTest)
+{
+    srcPath = projectPath + "/unittests/Sema/SemaCharFiles/";
+    std::string command = "cjc " + srcPath + "AddClassTyInfoMacro.cj --compile-macro -Woff all";
+    int err = system(command.c_str());
+    ASSERT_EQ(0, err);
+
+    instance->invocation.globalOptions.enableMacroInLSP = false;
+    invocation.globalOptions.executablePath = projectPath + "/output/bin/";
+    instance->compileOnePackageFromSrcFiles = true;
+
+    instance->srcFilePaths = {srcPath + "NoDiagInLSPMacroCall.cj"};
+    invocation.globalOptions.outputMode = GlobalOptions::OutputMode::STATIC_LIB;
+    invocation.globalOptions.enableCompileTest = true;
+    instance->Compile(CompileStage::SEMA);
+    EXPECT_EQ(diag.GetErrorCount(), 0);
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 

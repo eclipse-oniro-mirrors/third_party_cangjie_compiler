@@ -4,7 +4,7 @@
 
 Cangjie is a general-purpose programming language designed for all-scenario application development, balancing development efficiency and runtime performance while providing a great programming experience. Cangjie features concise and efficient syntax, multi-paradigm programming, and type safety. For more information, please refer to the [Cangjie Language Development Guide](https://cangjie-lang.cn/docs?url=%2F1.0.0%2Fuser_manual%2Fsource_zh_cn%2Ffirst_understanding%2Fbasic.html) and the [Cangjie Programming Language White Paper](https://cangjie-lang.cn/docs?url=%2F0.53.18%2Fwhite_paper%2Fsource_zh_cn%2Fcj-wp-abstract.html).
 
-This repository provides the source code for the Cangjie compiler, which consists of two main parts: the compiler frontend and modified open-source LLVM components. The latter includes the LLVM backend, opt optimizer, llc, ld linker, and debugger. For details on third-party dependencies, see the [Third-Party Library Documentatio](./third_party/README.md). 
+This repository provides the source code for the Cangjie compiler, which consists of two main parts: the compiler frontend and modified open-source LLVM components. The latter includes the LLVM backend, opt optimizer, llc, ld linker, and debugger. For details on third-party dependencies, see the [Third-Party Library Documentation](./third_party/README.md).
 
 ## Architecture
 
@@ -89,7 +89,7 @@ cangjie_compiler/
 
 ## Constraints
 
-Currently, building Cangjie compiler artifacts directly in the Windows environment is not supported. Instead, you need to generate compiler artifacts that can run on Windows through cross-compilation in a Linux environment. For details, see the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md). For future support plans, refer to the [Platform Support Roadmap](#platform-support-roadmap).
+Currently, building Cangjie compiler artifacts directly in the Windows environment is not supported. Instead, you need to generate compiler artifacts that can run on Windows through cross-compilation in a Linux environment. For details, see the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/main/README_zh.md). For future support plans, refer to the [Platform Support Roadmap](#platform-support-roadmap).
 
 ## Platform Support Roadmap
 
@@ -178,7 +178,7 @@ For more platform-specific build information, see the [Standalone Build Guide](d
 
 ### Integration Build Guide
 
-For integration builds, please refer to the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md).
+For integration builds, please refer to the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/main/README_zh.md).
 
 ## License
 
@@ -202,7 +202,7 @@ This project is licensed under [Apache-2.0 with Runtime Library Exception](./LIC
 | flatbuffers         | Apache License V2.0                  | Used for serialization/deserialization of cjo files and macros                                                                          | Compiler & StdLib(std.ast)  | Integrated into the Cangjie binary release  |
 | libboundscheck      | Mulan Permissive Software License V2 | Used for safe function implementations in the compiler and related code                                                                 | Compiler, StdLib, Extension | Integrated into the Cangjie binary release  |
 
-For details on other build dependencies, see [Build Dependencies](https://gitcode.com/Cangjie/cangjie_build/blob/dev/docs/env_zh.md) and the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md).
+For details on other build dependencies, see [Build Dependencies](https://gitcode.com/Cangjie/cangjie_build/blob/main/docs/env_zh.md) and the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/main/README_zh.md).
 
 ## Contribution
 

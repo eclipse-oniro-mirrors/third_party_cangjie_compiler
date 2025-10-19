@@ -16,26 +16,26 @@ target_link_libraries(
     cangjie-lsp
     GTest::gtest
     GTest::gtest_main)
-add_test(NAME WalkerTests COMMAND WalkerTests)
+add_test(NAME WalkerTest COMMAND WalkerTest)
 
-add_executable(CloneTests CloneTest.cpp)
+add_executable(CloneTest CloneTest.cpp)
 target_link_libraries(
-    CloneTests
+    CloneTest
     ${CMAKE_DL_LIBS}
     $<TARGET_OBJECTS:CangjieASTExtra>
     cangjie-lsp
     GTest::gtest
     GTest::gtest_main)
-add_test(NAME CloneTests COMMAND CloneTests)
-add_executable(CreateTests CreateTest.cpp)
+add_test(NAME CloneTest COMMAND CloneTest)
+add_executable(CreateTest CreateTest.cpp)
 target_link_libraries(
-    CreateTests
+    CreateTest
     ${CMAKE_DL_LIBS}
     $<TARGET_OBJECTS:CangjieASTExtra>
     cangjie-lsp
     GTest::gtest
     GTest::gtest_main)
-add_test(NAME CreateTests COMMAND CreateTests)
+add_test(NAME CreateTest COMMAND CreateTest)
 
 add_executable(SearchTest SearchTest.cpp)
 target_link_libraries(

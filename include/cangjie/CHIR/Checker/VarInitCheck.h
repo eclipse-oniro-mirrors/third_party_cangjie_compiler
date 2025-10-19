@@ -13,7 +13,7 @@
 #include "cangjie/CHIR/Analysis/MaybeUninitAnalysis.h"
 #include "cangjie/CHIR/CHIRCasting.h"
 #include "cangjie/CHIR/DiagAdapter.h"
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/Package.h"
 
 namespace Cangjie::CHIR {
@@ -22,14 +22,14 @@ class VarInitCheck {
 public:
     explicit VarInitCheck(DiagAdapter* diag);
 
-    void RunOnPackage(const Package* package, bool isDebug, size_t threadNum);
+    void RunOnPackage(const Package* package, size_t threadNum);
 
-    void RunOnFunc(const Func* func, bool isDebug);
+    void RunOnFunc(const Func* func);
 
 private:
     // ================================================================= //
     void UseBeforeInitCheck(const Func* func, const ConstructorInitInfo* ctorInitInfo,
-        const std::vector<MemberVarInfo>& members, bool isDebug);
+        const std::vector<MemberVarInfo>& members);
 
     bool CheckLoadToUninitedAllocation(const MaybeUninitDomain& state, const Load& load) const;
 
@@ -58,7 +58,7 @@ private:
 
     // ================================================================= //
     void ReassignInitedLetVarCheck(const Func* func, const ConstructorInitInfo* ctorInitInfo,
-        const std::vector<MemberVarInfo>& members, bool isDebug) const;
+        const std::vector<MemberVarInfo>& members) const;
 
     void CheckStoreToInitedCustomDefMember(const MaybeInitDomain& state, const Func* func, const StoreElementRef* store,
         const std::vector<MemberVarInfo>& members) const;

@@ -49,6 +49,10 @@ public:
 
     bool Run();
 
+    /// Compute Annotation values, and save the results for AOP checkings.
+    /// Only AST2CHIR and necessary CHIR opt's are executed.
+    bool ComputeAnnotations(std::vector<const AST::Decl*>&& annoOnly);
+
     CHIR::Package* GetPackage() const
     {
         return chirPkg;
@@ -102,9 +106,29 @@ public:
     {
         return initFuncsForConstVar;
     }
+    const std::vector<std::pair<const AST::Decl*, Func*>>& GetAnnoFactoryFuncs() const
+    {
+        return annoFactoryFuncs;
+    }
+
+    const AST2CHIRNodeMap<CustomTypeDef>& GetGlobalNominalCache() const
+    {
+        return globalNominalCache;
+    }
+
+    enum Phase : uint8_t {
+        RAW, // after translation,
+        OPT, // after compiler optimization,
+        PLUGIN, // after perform pulgin
+        ANALYSIS_FOR_CJLINT, // after analysis for cjlint
+        PHASE_MIN = RAW,
+        PHASE_MAX = ANALYSIS_FOR_CJLINT,
+    };
 
 private:
-    bool TranslateToCHIR();
+    /// \param annoOnly pass the decls of which only annoFactoryFuncs are to be translated, during
+    /// computing annotations stage. Empty in normal AST2CHIR translation.
+    bool TranslateToCHIR(std::vector<const AST::Decl*>&& annoOnly);
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     bool PerformPlugin(CHIR::Package& package);
 #endif
@@ -129,7 +153,7 @@ private:
     bool RunVarInitChecking();
     bool RunConstantPropagationAndSafetyCheck();
     bool RunConstantPropagation();
-    bool RunConstSafetyCheck();
+
     void RunRangePropagation();
     void RunArrayListConstStartOpt();
     void RunFunctionInline(DevirtualizationInfo& devirtInfo);
@@ -140,8 +164,9 @@ private:
     bool RunOptimizationPassAndRulesChecking();
     void MarkNoSideEffect();
     void RunUnitUnify();
+    DevirtualizationInfo CollectDevirtualizationInfo();
     bool RunConstantEvaluation();
-    bool RunIRChecker(const std::string& suffix) const;
+    bool RunIRChecker(const Phase& phase) const;
     void UpdatePosOfMacroExpandNode();
     void RecordCodeInfoAtTheBegin();
     void RecordCodeInfoAtTheEnd();
@@ -150,7 +175,7 @@ private:
     void RunConstantAnalysis();
     // run semantic checks that have to be performed on CHIR
     bool RunAnnotationChecks();
-    void TagUselessFunctions();
+
     void EraseDebugExpr();
     void CFFIFuncWrapper();
     void RemoveUnusedImports(bool removeSrcCodeImported);
@@ -192,13 +217,17 @@ private:
     // any change in incremental compilation, rollback is required.
     std::set<std::string> ccOutFuncsRawMangle;
     class DiagAdapter diag;
-    std::unordered_map<Func*, ImportedFunc*> srcCodeImportedFuncMap;
-    std::unordered_map<GlobalVar*, ImportedVar*> srcCodeImportedVarMap;
+    std::unordered_set<Func*> srcCodeImportedFuncs;
+    std::unordered_set<GlobalVar*> srcCodeImportedVars;
     std::unordered_set<ClassDef*> uselessClasses;
     std::unordered_set<Func*> uselessLambda;
     std::unordered_map<std::string, FuncBase*> implicitFuncs;
     std::vector<CHIR::FuncBase*> initFuncsForConstVar;
     std::unordered_map<Block*, Terminator*> maybeUnreachable;
+    /// Whether this CHIR convertor is translating Annotations
+    bool isComputingAnnos{false};
+    std::vector<std::pair<const AST::Decl*, Func*>> annoFactoryFuncs;
+    AST2CHIRNodeMap<CustomTypeDef> globalNominalCache;
 };
 } // namespace Cangjie::CHIR
 #endif

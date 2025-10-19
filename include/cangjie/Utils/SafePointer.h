@@ -17,9 +17,14 @@
 #define CANGJIE_UTILS_SAFEPOINTER_H
 
 #include <cstdint>
+#ifndef CANGJIE_ENABLE_GCOV
+static_assert(true);
 #include <exception>
+#endif
 #include <type_traits>
 #include <vector>
+
+#include "CheckUtils.h"
 
 /*
  * A non-crash counterpart for unique_ptr and raw pointer.
@@ -33,6 +38,7 @@
  * Dereference to a pointer that is already released still crashes.
  */
 
+#ifndef CANGJIE_ENABLE_GCOV
 class NullPointerException : public std::exception {
 public:
     NullPointerException();
@@ -50,6 +56,7 @@ public:
 private:
     int64_t triggerPoint = 0;
 };
+#endif
 
 template <typename T> class Ptr;
 
@@ -137,20 +144,28 @@ public:
 
     T* operator->() const
     {
+#ifdef CANGJIE_ENABLE_GCOV
+        return origin;
+#else
         if (origin != nullptr) {
             return origin;
         } else {
+#ifndef CANGJIE_ENABLE_GCOV
             throw NullPointerException();
+#else
+#ifdef CJC_ABORT
+            CJC_ABORT();
+#else
+            return nullptr;
+#endif
+#endif
         }
+#endif
     }
 
     T& operator*() const
     {
-        if (origin != nullptr) {
-            return *origin;
-        } else {
-            throw NullPointerException();
-        }
+        return *operator->();
     }
 
     operator bool() const
@@ -257,20 +272,28 @@ public:
 
     T* operator->() const
     {
+#ifdef CANGJIE_ENABLE_GCOV
+        return ptr;
+#else
         if (ptr != nullptr) {
             return ptr;
         } else {
+#ifndef CANGJIE_ENABLE_GCOV
             throw NullPointerException();
+#else
+#ifdef CJC_ABORT
+            CJC_ABORT();
+#else
+            return nullptr;
+#endif
+#endif
         }
+#endif
     }
 
     T& operator*() const
     {
-        if (ptr != nullptr) {
-            return *ptr;
-        } else {
-            throw NullPointerException();
-        }
+        return *operator->();
     }
 
     T* get() const

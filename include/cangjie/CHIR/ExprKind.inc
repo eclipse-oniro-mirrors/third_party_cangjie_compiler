@@ -94,7 +94,7 @@ EXPRKIND(SPAWN, "Spawn", Spawn)
 EXPRKIND(GET_INSTANTIATE_VALUE, "GetInstantiateValue", GetInstantiateValue)
 
 EXPRKIND(BOX, "Box", Box)
-EXPRKIND(UNBOX, "Unbox", Unbox)
+EXPRKIND(UNBOX, "UnBox", Unbox)
 EXPRKIND(TRANSFORM_TO_GENERIC, "TransformToGeneric", TransformToGeneric)
 EXPRKIND(TRANSFORM_TO_CONCRETE, "TransformToConcrete", TransformToConcrete)
 EXPRKIND(UNBOX_TO_REF, "UnBoxToRef", UnBoxToRef)

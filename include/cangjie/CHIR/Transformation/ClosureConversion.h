@@ -27,7 +27,7 @@ public:
      * @param srcCodeImportedFuncMap
      */
     ClosureConversion(Package& package, CHIRBuilder& builder, const GlobalOptions& opts,
-        const std::unordered_map<Func*, ImportedFunc*>& srcCodeImportedFuncMap);
+        const std::unordered_set<Func*>& srcCodeImportedFuncs);
 
     /**
      * @brief Main process to do closure conversion.
@@ -97,7 +97,7 @@ private:
     CHIRBuilder& builder;
     ClassDef& objClass;
     const GlobalOptions& opts;
-    const std::unordered_map<Func*, ImportedFunc*>& srcCodeImportedFuncMap;
+    const std::unordered_set<Func*>& srcCodeImportedFuncs;
 
     // key: any type, value: closure type
     std::unordered_map<const Type*, Type*> typeConvertMap;
@@ -108,7 +108,7 @@ private:
     ClassDef* GetOrCreateGenericAutoEnvBaseDef(size_t paramNum);
     ClassDef* GetOrCreateAutoEnvBaseDef(const FuncType& funcType);
     ClassDef* CreateAutoEnvImplDef(const std::string& className, const std::vector<GenericType*>& genericTypes,
-        const FuncType& memberFuncType, ClassDef& superClassDef,
+        const Value& srcFunc, ClassDef& superClassDef,
         std::unordered_map<const GenericType*, Type*>& originalTypeToNewType);
     ClassDef* GetOrCreateAutoEnvImplDef(FuncBase& func, ClassDef& superClassDef);
     ClassDef* GetOrCreateAutoEnvImplDef(Lambda& func, ClassDef& superClassDef, const std::vector<Value*>& boxedEnvs);
@@ -146,7 +146,7 @@ private:
     Func* CreateGenericMethodInAutoEnvWrapper(ClassDef& autoEnvWrapperDef);
     void CreateInstMethodInAutoEnvWrapper(ClassDef& autoEnvWrapperDef, Func& genericFunc);
     void ConvertTypeFromGenericBaseToInstBase(std::vector<Type*>& types);
-    bool IsLambdaCanBeInlinedAndRemoved(const Lambda& lambda);
+
 
     std::unordered_map<std::string, ClassDef*> genericAutoEnvBaseDefs;
     std::unordered_map<std::string, ClassDef*> instAutoEnvBaseDefs;

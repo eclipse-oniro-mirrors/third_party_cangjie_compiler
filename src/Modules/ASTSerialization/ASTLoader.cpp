@@ -360,6 +360,7 @@ void ASTLoader::ASTLoaderImpl::LoadImportContent(ImportContent& content, const P
     }
     content.begin = DEFAULT_POSITION;
     content.end = DEFAULT_POSITION;
+    content.isDecl = is.isDecl();
 }
 
 Position ASTLoader::ASTLoaderImpl::LoadPos(const PackageFormat::Position* posObj)

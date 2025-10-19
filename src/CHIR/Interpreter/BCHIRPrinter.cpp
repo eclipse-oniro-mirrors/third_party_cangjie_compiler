@@ -19,7 +19,7 @@
 
 #include "cangjie/Basic/Print.h"
 #include "cangjie/CHIR/IntrinsicKind.h"
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/Type/Type.h"
 #include "cangjie/Utils/FileUtil.h"
 
@@ -193,6 +193,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOPRune()
 {
     auto val = static_cast<char32_t>(bytecode[index]);
     std::stringstream stream;
+    stream << "r'";
     if (val >= ' ' && val <= '~') {
         if (val == '\'' || val == '\\') {
             stream << '\\' << static_cast<char>(val);
@@ -202,6 +203,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOPRune()
     } else {
         stream << "\\u{" << std::hex << val << "}";
     }
+    stream << '\'';
     Print(index, stream.str());
     index++;
 }
@@ -293,18 +295,6 @@ void BCHIRPrinter::DefinitionPrinter::PrintPath()
     }
 }
 
-void BCHIRPrinter::DefinitionPrinter::PrintOPSyscall()
-{
-    auto strIdx = bytecode[index];
-    auto str = bchir.GetString(strIdx);
-    Print(index, "(str: " + std::to_string(strIdx) + ")" + " -> " + str);
-    index++;
-    auto numberOfArgs = bytecode[index];
-    PrintAtIndex(); // number of args
-    for (size_t i = 0; i < numberOfArgs + 1; ++i) {
-        PrintTy();
-    }
-}
 
 void BCHIRPrinter::DefinitionPrinter::PrintOPIntrinsic(OpCode opCode)
 {
@@ -334,16 +324,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOPIntrinsic(OpCode opCode)
     Print(index, std::move(overflow));
 }
 
-void BCHIRPrinter::DefinitionPrinter::PrintOPCApply()
-{
-    auto numberOfArgs = bytecode[index];
-    // number of arguments
-    PrintAtIndex();
-    // type of the CFunc arguments + CFunc result
-    for (size_t i = 0; i < numberOfArgs + 1; ++i) {
-        PrintTy();
-    }
-}
+
 
 void BCHIRPrinter::DefinitionPrinter::PrintOP()
 {
@@ -496,13 +477,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOP()
             PrintAtIndex();
             return;
         }
-        case OpCode::OBJECT: {
-            // number of args
-            PrintAtIndex();
-            // class id
-            PrintAtIndex();
-            return;
-        }
+
         case OpCode::STORE:
         case OpCode::RETURN:
         case OpCode::EXIT:
@@ -555,9 +530,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOP()
         case OpCode::BIN_DIV_EXC:
         case OpCode::BIN_MOD_EXC:
         case OpCode::BIN_EXP_EXC:
-        case OpCode::BIN_BITAND_EXC:
-        case OpCode::BIN_BITOR_EXC:
-        case OpCode::BIN_BITXOR_EXC:
+
         case OpCode::BIN_LSHIFT_EXC:
         case OpCode::BIN_RSHIFT_EXC: {
             PrintOPBinRshift(opCode); // type kind, overflow strategy
@@ -620,7 +593,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOP()
             return;
         }
         case OpCode::CAPPLY: {
-            PrintOPCApply();
+
             return;
         }
         case OpCode::ASG: {
@@ -635,7 +608,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOP()
             return;
         }
         case OpCode::SYSCALL: {
-            PrintOPSyscall();
+
             return;
         }
         case OpCode::INTRINSIC0:

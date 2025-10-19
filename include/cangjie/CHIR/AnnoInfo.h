@@ -71,10 +71,6 @@ struct AnnoInfo {
     }
 };
 
-class Tuple;
-struct JavaAnnoInfo {
-    Ptr<Tuple> annos;
-};
 } // namespace Cangjie::CHIR
 
 #endif

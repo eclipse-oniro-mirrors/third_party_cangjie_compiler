@@ -10,8 +10,7 @@
 #include "cangjie/Basic/DiagnosticEngine.h"
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "cangjie/Parse/Parser.h"
-#include "gtest/gtest.h"
-#include <string>
+
 
 using namespace Cangjie;
 using namespace AST;

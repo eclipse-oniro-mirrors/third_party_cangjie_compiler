@@ -20,4 +20,4 @@ target_link_libraries(
     GTest::gtest_main
     TestCompilerInstanceObject)
 
-add_test(NAME PackageTests COMMAND PackageTests)
+add_test(NAME PackageTest COMMAND PackageTest)

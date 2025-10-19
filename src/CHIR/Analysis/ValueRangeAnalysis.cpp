@@ -32,9 +32,7 @@ BoolRange::BoolRange(BoolDomain domain) : ValueRange(RangeKind::BOOL), domain(st
 
 std::optional<std::unique_ptr<ValueRange>> BoolRange::Join(const ValueRange& rhs) const
 {
-    if (rhs.GetRangeKind() != RangeKind::BOOL) {
-        return nullptr;
-    }
+    CJC_ASSERT(rhs.GetRangeKind() == RangeKind::BOOL);
     auto rhsRange = StaticCast<const BoolRange&>(rhs);
     if (domain.IsSame(rhsRange.domain)) {
         return std::nullopt;
@@ -65,9 +63,7 @@ SIntRange::SIntRange(SIntDomain domain) : ValueRange(RangeKind::SINT), domain(st
 
 std::optional<std::unique_ptr<ValueRange>> SIntRange::Join(const ValueRange& rhs) const
 {
-    if (rhs.GetRangeKind() != RangeKind::SINT) {
-        return nullptr;
-    }
+    CJC_ASSERT(rhs.GetRangeKind() == RangeKind::SINT);
     auto rhsRange = StaticCast<const SIntRange&>(rhs);
     if (!domain.IsSame(rhsRange.domain) ||
         (domain.NumericBound().IsFullSet() && !domain.SymbolicBounds().Empty())) {
@@ -163,8 +159,8 @@ template <> RangeDomain::AllocatedObjMap ValueAnalysis<RangeValueDomain>::global
 template <> std::vector<std::unique_ptr<Ref>> ValueAnalysis<RangeValueDomain>::globalRefPool{};
 template <> std::vector<std::unique_ptr<AbstractObject>> ValueAnalysis<RangeValueDomain>::globalAbsObjPool{};
 template <>
-RangeDomain ValueAnalysis<RangeValueDomain>::globalState{
-    &globalChildrenMap, &globalAllocatedRefMap, &globalAllocatedObjMap, &globalRefPool, &globalAbsObjPool};
+RangeDomain ValueAnalysis<RangeValueDomain>::globalState{&globalChildrenMap, &globalAllocatedRefMap,
+    nullptr, &globalAllocatedObjMap, &globalRefPool, &globalAbsObjPool};
 
 BoolDomain RangeAnalysis::GetBoolDomainFromState(const RangeDomain& state, const Ptr<Value>& value)
 {
@@ -184,9 +180,7 @@ BoolDomain RangeAnalysis::GetBoolDomainFromState(const RangeDomain& state, const
 
 const SIntDomain& RangeAnalysis::GetSIntDomainFromState(const RangeDomain& state, const Ptr<Value>& value)
 {
-    if (!value->GetType()->IsInteger()) {
-        return GetDefaultIntCache(value->GetType());
-    }
+    CJC_ASSERT(value->GetType()->IsInteger());
     auto domain = state.CheckAbstractValueWithTopBottom(value);
     if (domain == nullptr || domain->IsTop()) {
         return GetDefaultIntCache(value->GetType());
@@ -214,8 +208,11 @@ void RangeAnalysis::HandleNormalExpressionEffect(RangeDomain& state, const Expre
             break;
         case ExprMajorKind::STRUCTURED_CTRL_FLOW_EXPR:
         default: {
+#ifndef NDEBUG
             CJC_ABORT();
+#else
             return;
+#endif
         }
     }
     if (expression->GetExprMajorKind() != ExprMajorKind::UNARY_EXPR &&
@@ -246,8 +243,8 @@ BoolDomain RangeAnalysis::GenerateBoolRangeFromBinaryOp(
     if (lhs->GetType()->IsInteger()) {
         const auto& lRange = GetSIntDomainFromState(state, lhs);
         const auto& rRange = GetSIntDomainFromState(state, rhs);
-        return ComputeRelIntBinop(
-            CHIRRelIntBinopArgs{lRange, rRange, lhs, rhs, binaryExpr->GetExprKind(), IsUnsignedArithmetic(binaryExpr)});
+        return ComputeRelIntBinop(CHIRRelIntBinopArgs{
+            lRange, rRange, lhs, rhs, binaryExpr->GetExprKind(), IsUnsignedArithmetic(*binaryExpr)});
     }
     const auto& lRange = GetBoolDomainFromState(state, lhs);
     const auto& rRange = GetBoolDomainFromState(state, rhs);
@@ -376,7 +373,7 @@ void RangeAnalysis::HandleBinaryExpr(RangeDomain& state, const BinaryExpression*
         const auto& lRange = GetSIntDomainFromState(state, lhs);
         const auto& rRange = GetSIntDomainFromState(state, rhs);
         auto ov = binaryExpr->GetOverflowStrategy();
-        auto isUnsigned = IsUnsignedArithmetic(binaryExpr);
+        auto isUnsigned = IsUnsignedArithmetic(*binaryExpr);
         if (lRange.IsSingleValue() && rRange.IsSingleValue()) {
             auto domain = CheckSingleValueOverflow(
                 CHIRArithmeticBinopArgs{lRange, rRange, lhs, rhs, binaryExpr->GetExprKind(), ov, isUnsigned},

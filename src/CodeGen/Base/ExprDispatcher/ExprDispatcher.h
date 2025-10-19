@@ -11,7 +11,7 @@
 
 #include "llvm/IR/Value.h"
 
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 
 namespace Cangjie {
 namespace CodeGen {

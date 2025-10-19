@@ -20,14 +20,14 @@ if(CANGJIE_CODEGEN_CJNATIVE_BACKEND)
         GTest::gtest
         GTest::gtest_main)
     target_link_libraries(
-        NodeSerializationTests
+        NodeSerializationTest
         cangjie-lsp
         ${LINK_LIBS}
         boundscheck-static
         GTest::gtest
         GTest::gtest_main)
     target_link_libraries(
-        MacroTests
+        MacroTest
         cangjie-lsp
         ${LINK_LIBS}
         boundscheck-static
@@ -35,11 +35,11 @@ if(CANGJIE_CODEGEN_CJNATIVE_BACKEND)
         GTest::gtest_main
         TestCompilerInstanceObject)
 
-    add_dependencies(NodeSerializationTests CangjieFlatbuffersHeaders)
-    target_include_directories(NodeSerializationTests PRIVATE ${FLATBUFFERS_INCLUDE_DIR})
+    add_dependencies(NodeSerializationTest CangjieFlatbuffersHeaders)
+    target_include_directories(NodeSerializationTest PRIVATE ${FLATBUFFERS_INCLUDE_DIR})
 
-    add_test(NAME TokenSerializationTests COMMAND TokenSerializationTests)
-    add_test(NAME NodeSerializationTests COMMAND NodeSerializationTests)
-    add_test(NAME MacroTests COMMAND MacroTests)
+    add_test(NAME TokenSerializationTest COMMAND TokenSerializationTest)
+    add_test(NAME NodeSerializationTest COMMAND NodeSerializationTest)
+    add_test(NAME MacroTest COMMAND MacroTest)
 
 endif()

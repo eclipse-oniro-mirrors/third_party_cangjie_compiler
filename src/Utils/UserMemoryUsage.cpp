@@ -33,7 +33,7 @@ static const int KILOBYTE = 1024;
 
 namespace Cangjie {
 
-#ifdef CANGJIE_WRITE_PROFILE
+
 std::string UserMemoryUsage::GetJson() const
 {
     std::ostringstream out;
@@ -59,29 +59,7 @@ std::string UserMemoryUsage::GetJson() const
     out << "\n}\n";
     return out.str();
 }
-#endif
 
-std::string UserMemoryUsage::GetFlat() const
-{
-    std::ostringstream out;
-    out.precision(DISPLAY_PRECISION);
-    out << std::fixed;
-    if (packageName.empty()) {
-        out << "================ Memory Usage ================\n";
-    } else {
-        out << "================ Memory Usage of [ " << packageName << " ] ================\n";
-    }
-    for (const auto& key : titleOrder) {
-        out << ("================ " + key + " ================\n");
-        for (auto& sec : titleInfoMap.at(key)) {
-            // 31, red; 32, green. This doesn't work on Windows.
-            out << "[ " << ANSI_COLOR_BRIGHT << ANSI_COLOR_GREEN << sec.subtitle << ANSI_COLOR_RESET << " ] "
-                << sec.start << " => " << sec.end << " MB        ";
-            out << std::showpos << sec.end - sec.start << std::noshowpos << " MB\n";
-        }
-    }
-    return out.str();
-}
 
 void UserMemoryUsage::Start(const std::string& title, const std::string& subtitle, const std::string& desc)
 {

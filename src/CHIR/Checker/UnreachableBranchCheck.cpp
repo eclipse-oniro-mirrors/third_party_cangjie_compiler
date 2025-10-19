@@ -19,11 +19,11 @@ UnreachableBranchCheck::UnreachableBranchCheck(
 namespace {
 std::string GetKeyWordBySourceExpr(const Branch& branch)
 {
-    if (branch.sourceExpr == SourceExpr::IF_EXPR) {
+    if (branch.GetSourceExpr() == SourceExpr::IF_EXPR) {
         return "if";
-    } else if (branch.sourceExpr == SourceExpr::WHILE_EXPR) {
+    } else if (branch.GetSourceExpr() == SourceExpr::WHILE_EXPR) {
         return "while";
-    } else if (branch.sourceExpr == SourceExpr::FOR_IN_EXPR) {
+    } else if (branch.GetSourceExpr() == SourceExpr::FOR_IN_EXPR) {
         return "for";
     }
     return "";
@@ -45,9 +45,7 @@ void UnreachableBranchCheck::RunOnPackage(const Package& package, size_t threadN
             if (func->Get<SkipCheck>() == SkipKind::SKIP_DCE_WARNING) {
                 continue;
             }
-            if (func->Get<SkipCheck>() == SkipKind::SKIP_CODEGEN) {
-                continue;
-            }
+
             RunOnFunc(func);
         }
     } else {
@@ -57,9 +55,7 @@ void UnreachableBranchCheck::RunOnPackage(const Package& package, size_t threadN
             if (func->Get<SkipCheck>() == SkipKind::SKIP_DCE_WARNING) {
                 continue;
             }
-            if (func->Get<SkipCheck>() == SkipKind::SKIP_CODEGEN) {
-                continue;
-            }
+
             taskQueue.AddTask<void>([this, func]() { return RunOnFunc(func); });
         }
         taskQueue.RunAndWaitForAllTasksCompleted();
@@ -83,7 +79,7 @@ void UnreachableBranchCheck::PrintWarning(
         auto branchNode = StaticCast<Terminator*>(block.GetTerminator());
         bool rec{true};
         if (auto br = DynamicCast<Branch>(branchNode)) {
-            if (br->sourceExpr == SourceExpr::FOR_IN_EXPR) {
+            if (br->GetSourceExpr() == SourceExpr::FOR_IN_EXPR) {
                 rec = false;
             }
         }
@@ -102,14 +98,12 @@ void UnreachableBranchCheck::PrintWarning(
     }
     if (node.GetExprKind() == ExprKind::BRANCH) {
         auto branch = StaticCast<const Branch*>(&node);
-        if (branch->sourceExpr == SourceExpr::QUEST || branch->sourceExpr == SourceExpr::BINARY) {
+        if (branch->GetSourceExpr() == SourceExpr::QUEST || branch->GetSourceExpr() == SourceExpr::BINARY) {
             if (!isRecursive) {
                 (void)diag.DiagnoseRefactor(DiagKindRefactor::chir_dce_unreachable_expression, range);
             }
-        } else if (branch->sourceExpr == SourceExpr::MATCH_EXPR) {
+        } else if (branch->GetSourceExpr() == SourceExpr::MATCH_EXPR) {
             (void)diag.DiagnoseRefactor(DiagKindRefactor::chir_unreachable_pattern, range);
-        } else if (block.TestAttr(Attribute::COMPILER_ADD)) {
-            (void)diag.DiagnoseRefactor(DiagKindRefactor::chir_dce_unreachable_block, range);
         } else {
             auto keyWord = GetKeyWordBySourceExpr(*branch);
             auto builder =

@@ -719,6 +719,8 @@ public:
 
     void AddNote(const std::string& note);
 
+    void AddNote(const Position& pos, const std::string& note);
+
     void AddHelp(const DiagHelp& help);
 
     ~DiagnosticBuilder();

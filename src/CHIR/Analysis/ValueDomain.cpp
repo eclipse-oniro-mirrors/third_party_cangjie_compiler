@@ -21,7 +21,7 @@ AbstractObject::AbstractObject(std::string identifier) : Value(nullptr, identifi
 
 std::string AbstractObject::ToString() const
 {
-    return this->identifier;
+    return identifier;
 }
 
 AbstractObject* AbstractObject::GetTopObjInstance()

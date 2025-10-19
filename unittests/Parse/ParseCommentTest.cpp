@@ -132,7 +132,7 @@ main() {
     EXPECT_EQ(attchNum, 3);
 }
 
-TEST_F(ParseCommentTest, LeadComments)
+TEST_F(ParseCommentTest, leadingComments)
 {
     code = R"(
 class A {
@@ -229,7 +229,7 @@ TEST_F(ParseCommentTest, MultStyComents)
     public func foo(){/* c8 inner funcBlock*/}
 
     // c9 lead funcDecl of bar
-    foreign func bar(){}
+    foreign func bar(){ }
 
     main () {
         1 + 2
@@ -268,10 +268,12 @@ TEST_F(ParseCommentTest, MultStyComents)
             ASSERT_EQ(nodeLeadCms.size(), 1);
             EXPECT_TRUE(nodeLeadCms[0].cms.front().info.Value().find("c0") != std::string::npos);
         } else if (node->astKind == ASTKind::MACRO_EXPAND_DECL) {
-            ASSERT_EQ(nodeLeadCms.size(), 1);
-            EXPECT_TRUE(nodeLeadCms[0].cms.front().info.Value().find("c1") != std::string::npos);
-            ASSERT_EQ(nodeTrailCms.size(), 1);
-            EXPECT_TRUE(nodeTrailCms[0].cms.front().info.Value().find("c6") != std::string::npos);
+            auto d = StaticAs<ASTKind::MACRO_EXPAND_DECL>(node)->invocation.decl.get();
+            ASSERT_TRUE(d);
+            ASSERT_EQ(d->comments.leadingComments.size(), 1);
+            EXPECT_TRUE(d->comments.leadingComments[0].cms.front().info.Value().find("c1") != std::string::npos);
+            ASSERT_EQ(d->comments.trailingComments.size(), 1);
+            EXPECT_TRUE(d->comments.trailingComments[0].cms.front().info.Value().find("c6") != std::string::npos);
         } else if (node->astKind == ASTKind::VAR_DECL) {
             ASSERT_EQ(nodeLeadCms.size(), 2);
             EXPECT_TRUE(nodeLeadCms[0].cms.front().info.Value().find("c2") != std::string::npos);

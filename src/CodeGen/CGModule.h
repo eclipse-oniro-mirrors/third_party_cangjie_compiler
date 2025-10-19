@@ -18,7 +18,7 @@
 #include "Base/CGTypes/CGArrayType.h"
 #include "CGContext.h"
 #include "cangjie/Basic/UGTypeKind.h"
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/Value.h"
 #include "cangjie/Option/Option.h"
 
@@ -135,7 +135,7 @@ public:
     }
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-    void InitIncrementalGen();
+    bool InitIncrementalGen();
     void GenIncremental();
     void GenCodeGenAddedMetadata() const;
 #endif

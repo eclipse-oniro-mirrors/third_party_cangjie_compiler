@@ -20,7 +20,7 @@
 #include "cangjie/AST/Node.h"
 
 namespace Cangjie {
-void PrintNode(Ptr<const AST::Node> node, unsigned indent = 0, const std::string& str = "");
+void PrintNode(Ptr<const AST::Node> node, unsigned indent = 0, const std::string addition = "");
 } // namespace Cangjie
 
 #endif // CANGJIE_AST_PRINTNODE_H

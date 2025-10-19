@@ -13,16 +13,7 @@ target_link_libraries(
     ${CMAKE_DL_LIBS}
     GTest::gtest
     GTest::gtest_main)
-add_test(NAME ParserTests COMMAND ParserTests)
-
-add_executable(ParseTypeTests ParseTypeTest.cpp)
-target_link_libraries(
-    ParseTypeTests
-    cangjie-lsp
-    ${CMAKE_DL_LIBS}
-    GTest::gtest
-    GTest::gtest_main)
-add_test(NAME ParseTypeTests COMMAND ParseTypeTests)
+add_test(NAME ParseTypeTest COMMAND ParseTypeTest)
 
 add_executable(ParseTypeAliasTest ParseTypeAliasTest.cpp)
 target_link_libraries(

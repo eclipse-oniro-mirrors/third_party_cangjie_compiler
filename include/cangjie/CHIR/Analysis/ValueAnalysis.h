@@ -52,14 +52,17 @@ public:
      * @brief State constructor from relation map of value in function.
      * @param childrenMap CHIR child map.
      * @param allocatedRefMap allocate reference map.
+     * @param allocatedTwoLevelRefMap allocate reference map for two level reference.
      * @param allocatedObjMap allocate object map.
      * @param refPool all references in function.
      * @param absObjPool all objects in function.
      */
-    explicit State(ChildrenMap* childrenMap, AllocatedRefMap* allocatedRefMap, AllocatedObjMap* allocatedObjMap,
-        std::vector<std::unique_ptr<Ref>>* refPool, std::vector<std::unique_ptr<AbstractObject>>* absObjPool)
+    explicit State(ChildrenMap* childrenMap, AllocatedRefMap* allocatedRefMap, AllocatedRefMap* allocatedTwoLevelRefMap,
+        AllocatedObjMap* allocatedObjMap, std::vector<std::unique_ptr<Ref>>* refPool,
+        std::vector<std::unique_ptr<AbstractObject>>* absObjPool)
         : childrenMap(childrenMap),
           allocatedRefMap(allocatedRefMap),
+          allocatedTwoLevelRefMap(allocatedTwoLevelRefMap),
           allocatedObjMap(allocatedObjMap),
           refPool(refPool),
           absObjPool(absObjPool)
@@ -77,6 +80,7 @@ public:
         this->refMap = rhs.refMap;
         this->childrenMap = rhs.childrenMap;
         this->allocatedRefMap = rhs.allocatedRefMap;
+        this->allocatedTwoLevelRefMap = rhs.allocatedTwoLevelRefMap;
         this->allocatedObjMap = rhs.allocatedObjMap;
         this->refPool = rhs.refPool;
         this->absObjPool = rhs.absObjPool;
@@ -367,6 +371,21 @@ public:
         return obj;
     }
 
+    AbstractObject* GetTwoLevelRefAndSetToTop(Value* dest, const Expression* expr)
+    {
+        CJC_ASSERT(!dest->GetType() || dest->GetType()->IsRef());
+        auto firstRef = StaticCast<RefType*>(dest->GetType());
+        CJC_ASSERT(firstRef->IsRef());
+        auto refOuter = CreateNewRef(expr);
+        Update(dest, refOuter);
+        auto refInner = CreateNewRef(expr, true);
+        refMap.emplace(refOuter, refInner);
+        auto obj = CreateNewObject(GetObjName(absObjPool->size()), expr);
+        refMap.emplace(refInner, obj);
+        SetToBound(obj, true);
+        return obj;
+    }
+
     /// check value is bottom
     bool CheckValueIsBottom(const Ptr<Value>& value) const
     {
@@ -381,6 +400,18 @@ public:
         return it != programState.end() && it->second.GetKind() == ValueDomain::ValueKind::TOP;
     }
 
+    bool CheckValueIsObject(const Ptr<Value>& value) const
+    {
+        auto it = programState.find(value);
+        return it != programState.end() && it->second.GetKind() == ValueDomain::ValueKind::VAL;
+    }
+
+    bool CheckValueIsRef(const Ptr<Value>& value) const
+    {
+        auto it = programState.find(value);
+        return it != programState.end() && it->second.GetKind() == ValueDomain::ValueKind::REF;
+    }
+
     /// clear all states.
     void ClearState()
     {
@@ -393,16 +424,17 @@ public:
     }
 
 private:
-    Ref* CreateNewRef(const Expression* expr = nullptr)
+    Ref* CreateNewRef(const Expression* expr = nullptr, bool createTwoLevelRef = false)
     {
+        auto& allocateMap = createTwoLevelRef ? allocatedTwoLevelRefMap : allocatedRefMap;
         Ref* ref = nullptr;
         bool isStaticRef = &ValueAnalysis<ValueDomain>::globalState == this;
         if (expr) {
-            if (auto it = allocatedRefMap->find(expr); it != allocatedRefMap->end()) {
+            if (auto it = allocateMap->find(expr); it != allocateMap->end()) {
                 ref = it->second;
             } else {
                 ref = refPool->emplace_back(std::make_unique<Ref>(GetRefName(refPool->size()), isStaticRef)).get();
-                allocatedRefMap->emplace(expr, ref);
+                allocateMap->emplace(expr, ref);
             }
         } else {
             ref = refPool->emplace_back(std::make_unique<Ref>(GetRefName(refPool->size()), isStaticRef)).get();
@@ -628,6 +660,8 @@ private:
     RefMap refMap;
     ChildrenMap* childrenMap;
     AllocatedRefMap* allocatedRefMap;
+    // only for inner ref of &&
+    AllocatedRefMap* allocatedTwoLevelRefMap;
     AllocatedObjMap* allocatedObjMap;
     std::vector<std::unique_ptr<Ref>>* refPool;
     std::vector<std::unique_ptr<AbstractObject>>* absObjPool;
@@ -671,7 +705,7 @@ public:
      * @param isDebug flag whether print debug log.
      */
     ValueAnalysis(const Func* func, CHIRBuilder& builder, bool isDebug = false)
-    : Analysis<State<ValueDomain>>(func, isDebug), builder(builder)
+        : Analysis<State<ValueDomain>>(func, isDebug), builder(builder)
     {
     }
 
@@ -713,7 +747,8 @@ public:
      */
     State<ValueDomain> Bottom() final
     {
-        return State<ValueDomain>(&childrenMap, &allocatedRefMap, &allocatedObjMap, &refPool, &absObjPool);
+        return State<ValueDomain>(
+            &childrenMap, &allocatedTwoLevelRefMap, &allocatedRefMap, &allocatedObjMap, &refPool, &absObjPool);
     }
 
     /**
@@ -757,7 +792,7 @@ public:
      */
     void HandleVarStateCapturedByLambda(State<ValueDomain>& state, const Lambda* lambda) override
     {
-        for (auto var : lambda->GetCapturedVars()) {
+        for (auto var : GetLambdaCapturedVarsRecursively(*lambda)) {
             state.SetSelfAndChildrenStateToTop(var);
         }
     }
@@ -850,6 +885,24 @@ public:
     static std::vector<std::unique_ptr<Ref>> globalRefPool;
     /// all global object
     static std::vector<std::unique_ptr<AbstractObject>> globalAbsObjPool;
+
+protected:
+    virtual void PreHandleGetElementRefExpr(State<ValueDomain>& state, const GetElementRef* getElemRef)
+    {
+        auto dest = getElemRef->GetResult();
+        auto destIt = state.programState.find(dest);
+        if (destIt == state.programState.end()) {
+            auto destRef = state.CreateNewRef(getElemRef);
+            state.programState.emplace(dest, destRef);
+            state.refMap.emplace(destRef, FindTargetElement(state, getElemRef));
+        } else {
+            CJC_ASSERT(destIt->second.GetKind() == ValueDomain::ValueKind::REF);
+            auto destRef = destIt->second.GetRef();
+            auto destRefIt = state.refMap.find(destRef);
+            CJC_ASSERT(destRefIt != state.refMap.end());
+            destRefIt->second = FindTargetElement(state, getElemRef);
+        }
+    }
 
 private:
     void PreHandleMemoryExpr(State<ValueDomain>& state, const Expression* expression)
@@ -953,22 +1006,6 @@ private:
         }
     }
 
-    void PreHandleGetElementRefExpr(State<ValueDomain>& state, const GetElementRef* getElemRef)
-    {
-        auto dest = getElemRef->GetResult();
-        auto destIt = state.programState.find(dest);
-        if (destIt == state.programState.end()) {
-            auto destRef = state.CreateNewRef(getElemRef);
-            state.programState.emplace(dest, destRef);
-            state.refMap.emplace(destRef, FindTargetElement(state, getElemRef));
-        } else {
-            CJC_ASSERT(destIt->second.GetKind() == ValueDomain::ValueKind::REF);
-            auto destRef = destIt->second.GetRef();
-            auto destRefIt = state.refMap.find(destRef);
-            CJC_ASSERT(destRefIt != state.refMap.end());
-            destRefIt->second = FindTargetElement(state, getElemRef);
-        }
-    }
 
     template <typename TElemRef> AbstractObject* FindTargetElement(State<ValueDomain>& state, const TElemRef* elemRef)
     {
@@ -1352,8 +1389,7 @@ private:
             for (auto ty : tupleTy->GetElementTypes()) {
                 childrenTypes.emplace_back(ty->IsRef());
             }
-        } else if (rootTy->GetTypeKind() == Type::TypeKind::TYPE_CLOSURE) {
-            childrenTypes = {false, true}; // funcType and envType
+
         } else if (rootTy->GetTypeKind() == Type::TypeKind::TYPE_ENUM) {
             // We only focus the state of index of an enum. And its type is not a ref type.
             childrenTypes.emplace_back(false);
@@ -1402,7 +1438,7 @@ private:
     void PreHandleFieldExpr(State<ValueDomain>& state, const Field* field)
     {
         auto dest = field->GetResult();
-        auto indexes = field->GetIndexes();
+        auto indexes = field->GetPath();
         if (indexes.size() > 1) {
             if (auto it = state.programState.find(dest); it == state.programState.end()) {
                 state.InitToTopOrTopRef(dest, dest->GetType()->IsRef());
@@ -1547,6 +1583,7 @@ private:
 
     typename State<ValueDomain>::ChildrenMap childrenMap;
     typename State<ValueDomain>::AllocatedRefMap allocatedRefMap;
+    typename State<ValueDomain>::AllocatedRefMap allocatedTwoLevelRefMap;
     typename State<ValueDomain>::AllocatedObjMap allocatedObjMap;
     std::vector<std::unique_ptr<Ref>> refPool;
     std::vector<std::unique_ptr<AbstractObject>> absObjPool;

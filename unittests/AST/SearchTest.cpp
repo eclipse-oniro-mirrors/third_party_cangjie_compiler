@@ -128,13 +128,13 @@ func testlsp():Int32 {
     var a:Int32 = 0
 
     var b:Int32 = 1
-    if (a == 0){
+    if (a == 0) {
         var c : Int32 = 0
         var d : Int32 = 0
-        if (c == 0){
+        if (c == 0) {
             var e : Int32 = 0
             var f : Int32 = 0
-            if (e == 0){
+            if (e == 0) {
 
                 return 1
             }
@@ -151,13 +151,13 @@ open class Base {}
 class Data <: Base {
     var data: Int32 = 1
 }
-func a1(){
-    func a(){}
+func a1() {
+    func a(){ }
 }
-func a(){}
-func func1(){}
-func afunc(){}
-func int646(){}
+func a(){ }
+func func1(){ }
+func afunc(){ }
+func int646(){ }
 let c = 123
 
 func run(): Int64 {
@@ -256,7 +256,8 @@ TEST_F(SearchTest, DISABLED_WildcardCharacterTest)
 
     res = searcher.Search(ctx, "name:Int64*");
     res.erase(std::remove_if(
-                  res.begin(), res.end(), [](Symbol* sym) { return sym->node->TestAttr(Attribute::COMPILER_ADD); }),
+        res.begin(), res.end(),
+        [](Symbol* sym) { return sym->node->TestAttr(Attribute::COMPILER_ADD); }),
         res.end());
     EXPECT_EQ(res.size(), 2);
 
@@ -663,8 +664,7 @@ struct Foor<T> {
     ASTContext& ctx = *instance->GetASTContextByPackage(pkgs[0]);
 
     Searcher searcher;
-    std::vector<Symbol*> res;
-    res = searcher.Search(ctx, "_ = (1, 2, 14)");
+    std::vector<Symbol*> res = searcher.Search(ctx, "_ = (1, 2, 14)");
     EXPECT_EQ(res[0]->name, "T");
 }
 
@@ -688,8 +688,7 @@ TEST_F(SearchTest, DISABLED_CompletionTest001)
     std::string codeTest = R"(func testlsp():Unit {
     var a:Int32 = 0
     var b:Int32 = 1
-    if (a == 0){
-
+    if (a == 0) {
     }
     )";
 
@@ -1005,12 +1004,12 @@ TEST_F(SearchTest, DISABLED_Annotation00)
 @Annotation
 public class C34 {
     public const init(a:Bool) {}
-    public const C34(b:Int64){}
+    public const C34(b:Int64) {}
 }
-class CA12{
+class CA12 {
     public func foo(@C33[true] i: Int32): Unit {}
     @C34[true]
-    init(){}
+    init() {}
 }
 main() {}
 )";
@@ -1038,10 +1037,10 @@ TEST_F(SearchTest, DISABLED_Annotation01)
 public class C33 {
     public const init(a:Int64) {}
 }
-class CA12{
+class CA12 {
     public func foo(@C33[6] i: Int32): Unit {}
     @C33[9]
-    init(){}
+    init() {}
 }
 main() {}
 )";
@@ -1079,7 +1078,7 @@ public class C6 {
 class Foo1 {
     static var aa = 0
 }
-func test1(){
+func test1() {
     var a = Foo1.aa
 }
 
@@ -1163,18 +1162,18 @@ TEST_F(SearchTest, DISABLED_NamedFuncArgSearchTest)
 {
     std::string codeTest = R"(
  public open class Test12 {
-    public init( a:Int32) {}
+    public init(a:Int32) {}
     public init(a:Int64) {}
-    public init( a!:Bool) {}
+    public init(a!:Bool) {}
     public init(c!:String = "cc") {}
-    public Test12(a:Int64,b!:Int64) {a+b}
-    public init(a:Int64,b!:Int32,c!:Bool=true){}
+    public Test12(a:Int64, b!:Int64) {a+b}
+    public init(a:Int64, b!:Int32, c!:Bool=true){ }
     public var abc = 0
 }
-func test42(){
+func test42() {
     var x1 = Test12(1)
     var x2 = Test12(1, b: 2) // (13, 24)
-    var x3 = Test12(1, b: 2,c:true)
+    var x3 = Test12(1, b: 2, c:true)
     var x4 = x1.abc
     Test12()
 }
@@ -1502,7 +1501,7 @@ TEST_F(SearchTest, DISABLED_SynReferenceAfterSema_NameReference_ThisAndSuper)
 {
     // Test for normal name reference accessing.
     std::string codeTest = R"(
-class A <: B{
+class A <: B {
     let a: Int32 = 1
     func getNum1():Int32 {
         var a =
@@ -2069,7 +2068,7 @@ class A {
     }
     let a : Float64 = 1.0
 }
-main(){}
+main(){ }
     )";
     std::unique_ptr<TestCompilerInstance> instance = std::make_unique<TestCompilerInstance>(invocation, diag);
     instance->code = codeTest;

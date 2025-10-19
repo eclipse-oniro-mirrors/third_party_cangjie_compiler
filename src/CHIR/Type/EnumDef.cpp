@@ -89,10 +89,6 @@ void EnumDef::AddCtor(EnumCtorInfo ctor)
     ctors.emplace_back(ctor);
 }
 
-size_t EnumDef::GetCtorSize() const
-{
-    return ctors.size();
-}
 
 std::vector<EnumCtorInfo> EnumDef::GetCtors() const
 {

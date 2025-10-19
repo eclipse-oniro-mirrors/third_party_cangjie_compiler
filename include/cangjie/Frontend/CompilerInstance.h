@@ -198,6 +198,13 @@ public:
     bool GenerateCHIRForPkg(AST::Package& pkg);
     virtual bool PerformCHIRCompilation();
 
+#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
+    std::unordered_map<unsigned int, std::string>& GetFileNameMap()
+    {
+        return fileNameMap;
+    }
+#endif
+
     /**
      * Dump the parsed tokens for debugging.
      */

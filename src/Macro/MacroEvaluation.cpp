@@ -234,14 +234,16 @@ void RefreshMacroCallArgs(MacroCall& macCall, DiagnosticEngine& diag)
     TokenVector tokensAfterEval;
     if (macCall.status == MacroEvalStatus::ANNOTATION) {
         // Add @annotation[a,b] tokens.
+        size_t atTokenSize{1};
         if (pInvocation->isCompileTimeVisible) {
             std::string atExclToken = "@!";
+            atTokenSize = atExclToken.size();
             tokensAfterEval.emplace_back(
-                TokenKind::AT_EXCL, atExclToken, pInvocation->atPos, pInvocation->atPos + atExclToken.size());
+                TokenKind::AT_EXCL, atExclToken, pInvocation->atPos, pInvocation->atPos + atTokenSize);
         } else {
             tokensAfterEval.emplace_back(Token(TokenKind::AT, "@", pInvocation->atPos, pInvocation->atPos + 1));
         }
-        auto tks = GetTokensFromString(pInvocation->fullName, diag, pInvocation->atPos + 1);
+        auto tks = GetTokensFromString(pInvocation->fullName, diag, pInvocation->atPos + atTokenSize);
         (void)tokensAfterEval.insert(tokensAfterEval.end(), tks.begin(), tks.end());
         if (!pInvocation->attrs.empty()) {
             (void)tokensAfterEval.emplace_back(
@@ -561,7 +563,8 @@ void MacroEvaluation::CreateChildMacroCall(
             tokensToParse[i].SetValuePos(tokensToParse[i].Value(), begin, end);
         }
     }
-    Parser parser{tokensToParse, diag, ci->diag.GetSourceManager(), false, ci->invocation.globalOptions.compileCjd};
+    Parser parser{tokensToParse, diag, ci->diag.GetSourceManager(), false,
+        ci->invocation.globalOptions.compileCjd};
     parser.SetPrimaryDecl(primaryName).SetCurFile(macCall.GetNode()->curFile);
     parser.SetCompileOptions(ci->invocation.globalOptions);
     auto decl = parser.ParseDecl(ScopeKind(scopeKind));
@@ -582,6 +585,10 @@ void MacroEvaluation::CreateChildMacroCall(
         macCall.status = MacroEvalStatus::FAIL;
     }
     (void)pInvocation->macroAtPosition.emplace_back(mc->GetBeginPos());
+    if (!mc->GetInvocation()->macroAtPosition.empty()) {
+        pInvocation->macroAtPosition.insert(pInvocation->macroAtPosition.end(),
+            mc->GetInvocation()->macroAtPosition.begin(), mc->GetInvocation()->macroAtPosition.end());
+    }
     (void)childMacCalls.emplace_back(std::move(mc)); // For save child macrocall in memory.
     if (startIndex < curIndex) {
         auto beginIter = inputTokens.begin() + static_cast<int>(startIndex);
@@ -627,6 +634,17 @@ void MacroEvaluation::CheckDeprecatedMacrosUsage(MacroCall& macCall) const
     }
 }
 
+void MacroEvaluation::SaveUsedMacros(MacroCall& macCall)
+{
+    SaveUsedMacroPkgs(macCall.packageName);
+    auto node = macCall.GetNode();
+    auto decl = macCall.GetDefinition();
+    if (!node || !node->curFile || !decl) {
+        return;
+    }
+    ci->importManager.AddUsedMacroDecls(macCall.GetNode()->curFile, decl);
+}
+
 void MacroEvaluation::SaveUsedMacroPkgs(const std::string packageName)
 {
     if (packageName.empty() || usedMacroPkgs.find(packageName) != usedMacroPkgs.end()) {
@@ -653,7 +671,7 @@ bool MacroEvaluation::NeedCreateMacroCallTree(MacroCall& macCall, bool reEval)
         return true;
     }
     if (macCall.ResolveMacroCall(ci)) {
-        SaveUsedMacroPkgs(macCall.packageName);
+        SaveUsedMacros(macCall);
         CheckDeprecatedMacrosUsage(macCall);
         // Find macrodef and check attr.
         if (!CheckAttrTokens(pInvocation->attrs, macCall)) {
@@ -990,8 +1008,7 @@ void MacroEvaluation::Evaluate()
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     findMethodFlag = RuntimeInit::GetInstance().InitRuntime(
         ci->invocation.GetRuntimeLibPath(), ci->invocation.globalOptions.environment.allVariables);
-#else
-    findMethodFlag = RuntimeInit::GetInstance().InitRuntime(ci->invocation.GetRuntimeLibPath(), GetMacroDependPath());
+
 #endif
     if (findMethodFlag) {
         EvalMacros();

@@ -67,9 +67,9 @@ static bool PerformDumpAction(DefaultCompilerInstance& instance, const FrontendO
             instance.DumpSymbols();
             break;
         case FrontendOptions::DumpAction::DUMP_AST:
-            ret = instance.Compile(CompileStage::OVERFLOW_STRATEGY);
+            ret = instance.Compile(CompileStage::MANGLING);
             for (auto srcPkg : instance.GetSourcePackages()) {
-                PrintNode(srcPkg);
+                PrintNode(srcPkg, 0, "after MANGLING");
             }
             break;
         case FrontendOptions::DumpAction::TYPE_CHECK:
@@ -130,7 +130,7 @@ static bool HandleEmptyInputFileSituation(const DefaultCompilerInstance& instanc
 static bool ExecuteCompile(DefaultCompilerInstance& instance)
 {
     FrontendOptions& opts = instance.invocation.frontendOptions;
-
+    bool isEmitCHIR = instance.invocation.globalOptions.IsEmitCHIREnable();
     if (IsEmptyInputFile(instance) && opts.dumpAction != FrontendOptions::DumpAction::DESERIALIZE_CHIR) {
         return HandleEmptyInputFileSituation(instance);
     }
@@ -144,11 +144,11 @@ static bool ExecuteCompile(DefaultCompilerInstance& instance)
         return false;
     }
     bool res = true;
-    {
+    if (!isEmitCHIR) {
         Cangjie::ICE::TriggerPointSetter iceSetter(CompileStage::CODEGEN);
         res = instance.PerformCodeGen() && res;
     }
-    {
+    if (!isEmitCHIR) {
         Cangjie::ICE::TriggerPointSetter iceSetter(CompileStage::SAVE_RESULTS);
         res = instance.PerformCjoAndBchirSaving() && res;
     }

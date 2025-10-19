@@ -3,7 +3,6 @@
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
-
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 #include "TypeCheckerImpl.h"
 
@@ -51,6 +50,7 @@ OwnedPtr<MatchCase> GetValueMatchCase(
     valMatchCase->ty = valMatchCase->exprOrDecls->ty;
     return valMatchCase;
 }
+}
 
 /**
  * Given selector A, SomeExpr B, OtherExpr C. Ref var x. Only support for 'Option'.
@@ -61,8 +61,8 @@ OwnedPtr<MatchCase> GetValueMatchCase(
  * }
  * NOTE: this happens before generic instantiation.
  */
-OwnedPtr<Expr> ConstructOptionMatch(OwnedPtr<Expr> selector, OwnedPtr<Block> someExpr,
-    OwnedPtr<Block> otherExpr, RefExpr& someVar, Ptr<Ty> someTy)
+OwnedPtr<Expr> TypeChecker::TypeCheckerImpl::ConstructOptionMatch(OwnedPtr<Expr> selector, OwnedPtr<Block> someExpr,
+    OwnedPtr<Block> otherExpr, RefExpr& someVar, Ptr<Ty> someTy) const
 {
     Ptr<FuncDecl> ctorDecl = nullptr;
     // Caller guarantees seletor is enum option type.
@@ -99,7 +99,7 @@ OwnedPtr<Expr> ConstructOptionMatch(OwnedPtr<Expr> selector, OwnedPtr<Block> som
     matchExpr->matchCases.emplace_back(std::move(wildMatchCase));
     return matchExpr;
 }
-} // namespace
+
 
 /**
  * Desugar for Binary expression for ??(coalescing).

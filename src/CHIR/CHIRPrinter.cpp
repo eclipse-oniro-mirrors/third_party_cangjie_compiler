@@ -3,7 +3,6 @@
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
-
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 /**
  * @file
@@ -15,7 +14,8 @@
 
 #include <fstream>
 
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/CHIR.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/Package.h"
 #include "cangjie/CHIR/Type/Type.h"
 #include "cangjie/CHIR/Value.h"
@@ -82,11 +82,50 @@ void CHIRPrinter::PrintCFG(const Func& func, const std::string& path)
 void CHIRPrinter::PrintPackage(const Package& package, const std::string& fullPath)
 {
     std::fstream fout;
-    fout.open(fullPath, std::ios::out);
+    fout.open(fullPath, std::ios::out | std::ios::app);
     if (!fout.is_open()) {
         std::cerr << "open file: " << fullPath << " failed!" << std::endl;
         return;
     }
     fout << package.ToString() << std::endl;
+    fout.close();
+}
+void CHIRPrinter::PrintCHIRSerializeInfo(ToCHIR::Phase phase, const std::string& path)
+{
+    if (path.empty()) {
+        Errorln("path empty");
+        return;
+    }
+    auto realDirPath = FileUtil::GetAbsPath(FileUtil::GetDirPath(path));
+    if (!realDirPath.has_value()) {
+        Errorln("realDirPath false");
+        return;
+    }
+    auto fileNameWithExt = FileUtil::GetFileName(path);
+    auto ret = FileUtil::JoinPath(realDirPath.value(), fileNameWithExt);
+    std::fstream fout;
+    fout.open(ret, std::ofstream::out);
+    if (!fout.is_open()) {
+        std::cerr << "open file: " << ret << " failed!" << std::endl;
+        return;
+    }
+    std::string phaseStr{};
+    switch (phase) {
+        case ToCHIR::Phase::RAW:
+            phaseStr = "raw";
+            break;
+        case ToCHIR::Phase::OPT:
+            phaseStr = "opt";
+            break;
+#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
+        case ToCHIR::Phase::PLUGIN:
+            phaseStr = "plugin";
+            break;
+        case ToCHIR::Phase::ANALYSIS_FOR_CJLINT:
+            phaseStr = "analysis for cjlint";
+            break;
+#endif
+    }
+    fout << "ToCHIRPhase: " << phaseStr << std::endl;
     fout.close();
 }

@@ -102,7 +102,7 @@ Ptr<Constant> ArrayLambdaOpt::CheckIfLambdaReturnConst(const Lambda& lambda) con
                 return nullptr;
             }
             for (auto e : blocksInLambda[0]->GetExpressions()) {
-                if (e->GetExprKind() == ExprKind::DEBUGEXPR || e->GetExprMajorKind() == ExprMajorKind::TERMINATOR) {
+                if (e->IsDebug() || e->IsTerminator()) {
                     continue;
                 }
                 if (validExprs.find(e) == validExprs.end()) {
@@ -110,8 +110,7 @@ Ptr<Constant> ArrayLambdaOpt::CheckIfLambdaReturnConst(const Lambda& lambda) con
                 }
             }
 
-            auto res = StaticCast<Constant*>(constant);
-            return res->IsFuncLit() ? nullptr : res;
+            return StaticCast<Constant*>(constant);
         }
     }
     return nullptr;
@@ -121,7 +120,7 @@ void ArrayLambdaOpt::RewriteArrayInitFunc(Apply& apply, const Ptr<const Constant
     auto& loc = apply.GetDebugLocation();
     auto rawArray = apply.GetArgs()[0];
     auto size = StaticCast<LocalVar*>(rawArray)->GetExpr()->GetOperand(0);
-    auto parent = apply.GetParent();
+    auto parent = apply.GetParentBlock();
     auto initVal = builder.CreateExpression<Constant>(constant->GetDebugLocation(), constant->GetResult()->GetType(),
         StaticCast<LiteralValue*>(constant->GetValue()), parent);
     initVal->SetDebugLocation(constant->GetDebugLocation());

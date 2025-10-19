@@ -12,9 +12,7 @@
 #include "cangjie/AST/Walker.h"
 #include "cangjie/Basic/DiagnosticEngine.h"
 #include "cangjie/Parse/Parser.h"
-#include "gtest/gtest.h"
-#include <string>
-#include <vector>
+
 
 using namespace Cangjie;
 using namespace AST;

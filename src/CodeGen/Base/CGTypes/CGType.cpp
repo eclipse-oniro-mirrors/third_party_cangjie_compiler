@@ -16,7 +16,7 @@
 #include "Base/CGTypes/CGCPointerType.h"
 #include "Base/CGTypes/CGCStringType.h"
 #include "Base/CGTypes/CGClassType.h"
-#include "Base/CGTypes/CGClosureType.h"
+
 #include "Base/CGTypes/CGEnumType.h"
 #include "Base/CGTypes/CGFunctionType.h"
 #include "Base/CGTypes/CGGenericType.h"
@@ -51,6 +51,14 @@ bool HasGenericTypeArg(const CHIR::Type& type)
         }
     }
     return false;
+}
+bool CanMallocUseFixedSize(const CHIR::Type& chirType)
+{
+    if (!chirType.IsClass()) {
+        return true;
+    }
+    auto classDef = StaticCast<CHIR::ClassType>(chirType).GetClassDef();
+    return classDef->TestAttr(CHIR::Attribute::VIRTUAL) || !classDef->TestAttr(CHIR::Attribute::PUBLIC);
 }
 } // namespace
 
@@ -120,10 +128,7 @@ CGType* CGTypeMgr::GetConcreteCGTypeFor(CGModule& cgMod, const CHIR::Type& chirT
             cgType = new CGRefType(cgMod, cgCtx, chirType, static_cast<unsigned>(extraInfo.addrspace));
             break;
         }
-        case CHIR::Type::TypeKind::TYPE_CLOSURE: {
-            cgType = new CGClosureType(cgMod, cgCtx, StaticCast<const CHIR::ClosureType&>(chirType));
-            break;
-        }
+
         case CHIR::Type::TypeKind::TYPE_BOXTYPE: {
             cgType = new CGBoxType(cgMod, cgCtx, StaticCast<const CHIR::BoxType&>(chirType));
             break;
@@ -248,12 +253,8 @@ llvm::GlobalVariable* CGType::GetOrCreateTypeInfo()
     if (typeInfo) {
         return typeInfo;
     }
-    auto baseType = &chirType;
-    if (chirType.IsClosure()) {
-        baseType = static_cast<const CHIR::ClosureType&>(chirType).GetFuncType();
-    }
     const auto typeInfoType = CGType::GetOrCreateTypeInfoType(cgMod.GetLLVMContext());
-    auto tiName = CGType::GetNameOfTypeInfoGV(*baseType);
+    auto tiName = CGType::GetNameOfTypeInfoGV(chirType);
     if (cgGenericKind == CGGenericKind::STATIC_GI) {
         if (!cgMod.GetLLVMModule()->getNamedGlobal(tiName)) {
             cgCtx.RegisterStaticGIName(tiName);
@@ -264,9 +265,12 @@ llvm::GlobalVariable* CGType::GetOrCreateTypeInfo()
     } else if (cgGenericKind == CGGenericKind::DYNAMIC_GI) {
         return GetOrCreateGenericCustomTypeInfo();
     }
-    cgMod.GetCGContext().AddCodeGenAddedFuncsOrVars(*baseType, tiName);
+    cgMod.GetCGContext().AddCodeGenAddedFuncsOrVars(chirType, tiName);
     CJC_ASSERT(typeInfo && "This type does not have a typeinfo GV, please check the caller.");
     typeInfo->addAttribute(GC_KLASS_ATTR);
+    if (CanMallocUseFixedSize(chirType)) {
+        typeInfo->addAttribute(GC_CAN_MALLOC_WITH_FIXED_SIZE);
+    }
     if (!typeInfo->hasInitializer()) {
         cgMod.DelayGenTypeInfo(this);
     }
@@ -279,7 +283,7 @@ llvm::GlobalVariable* CGType::GetOrCreateTypeTemplate()
         return typeTemplate;
     }
     bool needTT = chirType.IsTuple() || chirType.IsVArray() || chirType.IsRawArray() || chirType.IsCPointer() ||
-        chirType.IsClosure() || chirType.IsBox() || chirType.IsCFunc() || chirType.IsFunc();
+        chirType.IsBox() || chirType.IsCFunc() || chirType.IsFunc();
     if (auto ct = dynamic_cast<const CHIR::CustomType*>(&chirType)) {
         needTT = needTT || !ct->GetGenericArgs().empty();
     }
@@ -433,11 +437,8 @@ llvm::Type* CGType::GetBitMapType(llvm::LLVMContext& llvmCtx)
 }
 
 llvm::FunctionType* CGType::GetCodeGenFunctionType(
-    llvm::LLVMContext& llvmCtx, llvm::Type* retType, std::vector<llvm::Type*>& params, bool shouldReturnVoid)
+    llvm::LLVMContext& llvmCtx, llvm::Type* retType, std::vector<llvm::Type*>& params)
 {
-    if (shouldReturnVoid) {
-        return llvm::FunctionType::get(llvm::Type::getVoidTy(llvmCtx), params, false);
-    }
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     if (IsPassedByReference(retType)) {
         params.insert(params.begin(), retType->getPointerTo());
@@ -481,13 +482,6 @@ CHIR::RefType* CGType::GetRefTypeOfCHIRInt8(CHIR::CHIRBuilder& chirBuilder)
     return GetRefTypeOf(chirBuilder, *chirBuilder.GetInt8Ty());
 }
 
-CHIR::FuncType* CGType::GetCorrespondingVTableMethodType(
-    CHIR::CHIRBuilder& chirBuilder, const CHIR::FuncType& funcType)
-{
-    auto oriParamTypes = funcType.GetParamTypes();
-    std::vector<CHIR::Type*> fixedParamTypes(oriParamTypes.begin() + 1, oriParamTypes.end());
-    return chirBuilder.GetType<CHIR::FuncType>(fixedParamTypes, chirBuilder.GetUnitTy());
-}
 
 llvm::StructType* CGType::GetOrCreateTypeInfoType(llvm::LLVMContext& llvmCtx)
 {
@@ -639,6 +633,10 @@ void CGType::GenTypeInfo()
     }
 
     if (IsConcrete() && cgMod.GetCGContext().IsCustomTypeOfOtherLLVMModule(chirType)) {
+        auto customType = dynamic_cast<const CHIR::CustomType*>(&chirType);
+        if (customType && customType->GetCustomTypeDef()->Get<CHIR::LinkTypeInfo>() == Linkage::EXTERNAL_WEAK) {
+            typeInfo->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+        }
         return;
     }
 
@@ -770,7 +768,7 @@ llvm::Constant* CGType::GenKindOfTypeInfo()
         {CHIR::Type::TypeKind::TYPE_VARRAY, UGTypeKind::UG_VARRAY},
         {CHIR::Type::TypeKind::TYPE_CPOINTER, UGTypeKind::UG_CPOINTER},
         {CHIR::Type::TypeKind::TYPE_CSTRING, UGTypeKind::UG_CSTRING},
-        {CHIR::Type::TypeKind::TYPE_CLOSURE, UGTypeKind::UG_FUNC},
+
         {CHIR::Type::TypeKind::TYPE_BOXTYPE, UGTypeKind::UG_CLASS},
         {CHIR::Type::TypeKind::TYPE_GENERIC, UGTypeKind::UG_GENERIC}};
     CJC_ASSERT(!chirType.IsRef() && "Unexpected CHIR type to generate typeinfo.");
@@ -881,7 +879,7 @@ bool CGType::IsReference() const
             chirType.GetTypeArgs()[0]->IsBox())) {
         return true;
     }
-    if (chirType.IsClosure() || chirType.IsBox() || chirType.IsClass() || chirType.IsRawArray()) {
+    if (chirType.IsBox() || chirType.IsClass() || chirType.IsRawArray()) {
         return true;
     }
     if (chirType.IsEnum()) {
@@ -898,12 +896,7 @@ bool CGType::IsReference() const
     return false;
 }
 
-bool CGType::HasBasePtr() const
-{
-    auto cgFunctionType = dynamic_cast<const CGFunctionType*>(this);
-    CJC_ASSERT(cgFunctionType && "Not a function type.");
-    return cgFunctionType->HasBasePtr();
-}
+
 
 // for reflection only
 llvm::StructType* CGType::GetOrCreateGenericTypeInfoType(llvm::LLVMContext& llvmCtx)
@@ -1022,10 +1015,7 @@ std::string GetTypeQualifiedNameForReflect(CGModule& cgMod, const CHIR::Type& t,
                 ")->" + GetTypeQualifiedNameForReflect(cgMod, *ft.GetReturnType(), forNameFieldOfTi);
             return name;
         }
-        case ChirTypeKind::TYPE_CLOSURE: {
-            auto& type = static_cast<const CHIR::ClosureType&>(t);
-            return GetTypeQualifiedNameForReflect(cgMod, *type.GetFuncType(), forNameFieldOfTi);
-        }
+
         case ChirTypeKind::TYPE_GENERIC: {
             auto genericTypeName = StaticCast<const CHIR::GenericType&>(t).GetSrcCodeIdentifier();
             auto upperBounds = StaticCast<const CHIR::GenericType&>(t).GetUpperBounds();

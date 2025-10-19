@@ -32,10 +32,12 @@ set(COMMON_UTIL_SRC
     FloatFormat.cpp
     Utils.cpp
     ICEUtil.cpp
-    Semaphore.cpp)
+    Semaphore.cpp
+    StdUtils/StdUtils.cpp)
 
 set(PROFILE_SRC
     ProfileRecorder.cpp
+    UserBase.cpp
     UserTimer.cpp
     UserMemoryUsage.cpp
     UserCodeInfo.cpp)
@@ -55,7 +57,8 @@ add_library(CangjieCommonUtilFFI OBJECT
             FloatFormat.cpp
             Utils.cpp
             ICEUtil.cpp
-            Semaphore.cpp)
+            Semaphore.cpp
+            StdUtils/StdUtils.cpp)
 add_library(CangjieUnicodeUtils OBJECT ${UNICODE_UTIL_SRC})
 
 target_include_directories(CangjieUnicodeUtils PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

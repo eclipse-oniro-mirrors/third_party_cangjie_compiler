@@ -369,9 +369,7 @@ struct SInt final {
     SInt SExt(IntWidth w) const;
     /// Extend this SInt as unsigned to a new width.
     SInt ZExt(IntWidth w) const;
-    /// Make an SInt with this SInt. The value is sign extended, truncated, or left alone to make it that width.
-    SInt SExtOrTrunc(IntWidth w) const;
-    SInt ZExtOrTrunc(IntWidth w) const;
+
 
     /// Region: manipulating functions
     /// Set all bits to one
@@ -380,12 +378,6 @@ struct SInt final {
     /// Set the selected bit \p pos to one
     void SetBit(unsigned pos);
 
-    /// Set the sign bit to one
-    void SetSignBit();
-
-    /// Set bits from \p lo to \p hi to one when \p lo is less than \p hi. Otherwise, this function handles the
-    /// "wrapping" case.
-    void SetBitsWithWrap(unsigned lo, unsigned hi);
 
     /// Set from \p lo to \p hi bits to one
     void SetBits(unsigned lo, unsigned hi);
@@ -399,11 +391,6 @@ struct SInt final {
     /// clear position to zero.
     void ClearBit(unsigned pos);
 
-    /// clear low bits to zero.
-    void ClearLowBits(unsigned lo);
-
-    /// clear signal bits to zero.
-    void ClearSignBit();
 
     /// flip all bits.
     void FlipAllBits();

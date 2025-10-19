@@ -113,6 +113,7 @@ public:
     std::string packageName;
     static constexpr Linkage LINKAGE = Linkage::EXTERNAL;
     DebugLocation loc = INVALID_LOCATION;
+    bool isConst{false};
 };
 
 template <> struct GVInit<AST::File> {
@@ -133,6 +134,7 @@ public:
     std::string rawMangledName;
     static constexpr Linkage LINKAGE = Linkage::INTERNAL;
     DebugLocation loc;
+    bool isConst{false};
 };
 
 template <> struct GVInit<AST::VarDecl> {
@@ -144,7 +146,8 @@ template <> struct GVInit<AST::VarDecl> {
                       MANGLE_FUNC_PARAM_TYPE_PREFIX + MANGLE_VOID_TY_SUFFIX),
           rawMangledName(var.rawMangleName),
           packageName(var.fullPackageName),
-          loc(trans.TranslateLocation(var))
+          loc(trans.TranslateLocation(var)),
+          isConst(var.IsConst())
     {
     }
 
@@ -155,6 +158,7 @@ public:
     std::string packageName;
     static constexpr Linkage LINKAGE = Linkage::INTERNAL;
     DebugLocation loc;
+    bool isConst;
 };
 
 template <> struct GVInit<AST::VarWithPatternDecl> {
@@ -166,7 +170,8 @@ template <> struct GVInit<AST::VarWithPatternDecl> {
               MANGLE_FUNC_PARAM_TYPE_PREFIX + MANGLE_VOID_TY_SUFFIX),
           rawMangledName(decl.rawMangleName),
           packageName(decl.fullPackageName),
-          loc(trans.TranslateLocation(decl))
+          loc(trans.TranslateLocation(decl)),
+          isConst(decl.IsConst())
     {
     }
 
@@ -177,6 +182,7 @@ public:
     std::string packageName;
     static constexpr Linkage LINKAGE = Linkage::INTERNAL;
     DebugLocation loc;
+    bool isConst;
 };
 } // namespace
 
@@ -191,7 +197,8 @@ Ptr<Func> GlobalVarInitializer::CreateGVInitFunc(const T& node, Args&&... args) 
 {
     auto context = GVInit<T>(node, trans, std::forward<Args>(args)...);
     return trans.CreateEmptyGVInitFunc(std::move(context.mangledName), std::move(context.srcCodeIdentifier),
-        std::move(context.rawMangledName), std::move(context.packageName), GVInit<T>::LINKAGE, std::move(context.loc));
+        std::move(context.rawMangledName), std::move(context.packageName), GVInit<T>::LINKAGE, std::move(context.loc),
+        context.isConst);
 }
 
 static bool IsSimpleLiteralValue(const AST::Expr& node)
@@ -219,6 +226,8 @@ static bool IsSimpleLiteralValue(const AST::Expr& node)
         case AST::TypeKind::TYPE_RUNE:
         case AST::TypeKind::TYPE_BOOLEAN:
             return true;
+        case AST::TypeKind::TYPE_STRUCT:
+            return node.ty->IsString();
         default:
             return false;
     }
@@ -236,15 +245,8 @@ Func* GlobalVarInitializer::TranslateInitializerToFunction(const AST::VarDecl& d
     if (auto globalVar = DynamicCast<GlobalVar>(variable)) {
         globalVar->SetInitFunc(*func);
     }
-    bool oldCompileTimeValueMark = trans.IsCompileTimeValue();
-    if (decl.isConst) {
-        func->EnableAttr(Attribute::CONST);
-        variable->EnableAttr(Attribute::CONST);
-        trans.SetCompileTimeValue(decl.isConst);
-    }
     auto initNode = trans.TranslateExprArg(
         *decl.initializer, *StaticCast<RefType*>(variable->GetType())->GetBaseType());
-    trans.SetCompileTimeValue(oldCompileTimeValueMark);
     auto loc = trans.TranslateLocation(decl);
     CJC_ASSERT(variable->GetType()->IsRef());
     auto expectedTy = StaticCast<RefType*>(variable->GetType())->GetBaseType();
@@ -306,12 +308,8 @@ void GlobalVarInitializer::FillGVInitFuncWithApplyAndExit(const std::vector<Ptr<
 {
     auto curBlock = trans.GetCurrentBlock();
     for (auto& func : varInitFuncs) {
-        auto apply = trans.GenerateFuncCall(*func, StaticCast<FuncType*>(func->GetType()), std::vector<Type*>{},
-            nullptr, nullptr, std::vector<Value*>{}, INVALID_LOCATION);
-        if (func->IsCompileTimeValue()) {
-            apply->SetCompileTimeValue();
-            apply->GetResult()->EnableAttr(Attribute::CONST);
-        }
+        trans.GenerateFuncCall(*func, StaticCast<FuncType*>(func->GetType()), std::vector<Type*>{},
+            nullptr, std::vector<Value*>{}, INVALID_LOCATION);
     }
     trans.CreateAndAppendTerminator<Exit>(curBlock);
 }
@@ -319,17 +317,8 @@ void GlobalVarInitializer::FillGVInitFuncWithApplyAndExit(const std::vector<Ptr<
 Func* GlobalVarInitializer::TranslateTupleOrEnumPatternInitializer(const AST::VarWithPatternDecl& decl)
 {
     auto func = CreateGVInitFunc<AST::VarWithPatternDecl>(decl);
-    bool oldCompileTimeValueMark = trans.IsCompileTimeValue();
-    if (decl.isConst) {
-        func->EnableAttr(Attribute::CONST);
-        trans.SetCompileTimeValue(decl.isConst);
-    }
     auto initNode = Translator::TranslateASTNode(*decl.initializer, trans);
-    trans.SetCompileTimeValue(oldCompileTimeValueMark);
     trans.FlattenVarWithPatternDecl(*decl.irrefutablePattern, initNode, false);
-    if (decl.isConst) {
-        func->EnableAttr(Attribute::CONST);
-    }
     auto curBlock = trans.GetCurrentBlock();
     if (curBlock->GetTerminator() == nullptr) {
         trans.CreateAndAppendTerminator<Exit>(curBlock);
@@ -340,13 +329,7 @@ Func* GlobalVarInitializer::TranslateTupleOrEnumPatternInitializer(const AST::Va
 Func* GlobalVarInitializer::TranslateWildcardPatternInitializer(const AST::VarWithPatternDecl& decl)
 {
     auto func = CreateGVInitFunc<AST::VarWithPatternDecl>(decl);
-    bool oldCompileTimeValueMark = trans.IsCompileTimeValue();
-    if (decl.isConst) {
-        func->EnableAttr(Attribute::CONST);
-        trans.SetCompileTimeValue(decl.isConst);
-    }
     Translator::TranslateASTNode(*decl.initializer, trans);
-    trans.SetCompileTimeValue(oldCompileTimeValueMark);
     auto curBlock = trans.GetCurrentBlock();
     if (curBlock->GetTerminator() == nullptr) {
         trans.CreateAndAppendTerminator<Exit>(curBlock);
@@ -390,6 +373,7 @@ Ptr<Func> GlobalVarInitializer::TranslateFileInitializer(
         if (auto initFunc = TranslateVarInit(*decl)) {
             if (decl->IsConst()) {
                 initFuncsForConstVar.emplace_back(initFunc);
+                SetCompileTimeValueFlagRecursivly(*StaticCast<Func*>(initFunc));
             }
             varInitFuncs.push_back(initFunc);
         }
@@ -484,16 +468,17 @@ void GlobalVarInitializer::AddImportedPackageInit(const AST::Package& curPackage
         auto initFunc = builder.CreateImportedVarOrFunc<ImportedFunc>(
             initFuncTy, context.mangledName, context.srcCodeIdentifier, context.rawMangledName, pkgName);
         initFunc->EnableAttr(Attribute::PUBLIC);
-        trans.GenerateFuncCall(*initFunc, StaticCast<FuncType*>(initFunc->GetType()), std::vector<Type*>{}, nullptr,
-            nullptr, std::vector<Value*>{}, INVALID_LOCATION);
+        trans.GenerateFuncCall(*initFunc, StaticCast<FuncType*>(initFunc->GetType()),
+            std::vector<Type*>{}, nullptr, std::vector<Value*>{}, INVALID_LOCATION);
     }
 }
 
 void GlobalVarInitializer::AddGenericInstantiatedInit()
 {
-    std::vector<Value*> giInitArgs;
-    trans.CreateAndAppendExpression<Intrinsic>(
-        builder.GetUnitTy(), CHIR::IntrinsicKind::PREINITIALIZE, giInitArgs, trans.GetCurrentBlock());
+    auto callContext = IntrisicCallContext {
+        .kind = IntrinsicKind::PREINITIALIZE
+    };
+    trans.CreateAndAppendExpression<Intrinsic>(builder.GetUnitTy(), callContext, trans.GetCurrentBlock());
 }
 
 Ptr<Func> GlobalVarInitializer::GeneratePackageInitBase(const AST::Package& curPackage, const std::string& suffix)

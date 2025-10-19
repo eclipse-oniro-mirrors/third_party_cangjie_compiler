@@ -12,6 +12,7 @@
 #include "cangjie/CHIR/Type/StructDef.h"
 #include "cangjie/CHIR/Visitor/Visitor.h"
 
+using namespace Cangjie;
 using namespace Cangjie::CHIR;
 
 ReachingDefinitionDomain::ReachingDefinitionDomain(std::unordered_map<const Value*, size_t>* allocateIdxMap)
@@ -135,7 +136,7 @@ void ReachingDefinitionAnalysis::InitializeFuncEntryState(ReachingDefinitionDoma
 
 void ReachingDefinitionAnalysis::HandleVarStateCapturedByLambda(ReachingDefinitionDomain& state, const Lambda* lambda)
 {
-    for (auto var : lambda->GetCapturedVars()) {
+    for (auto var : GetLambdaCapturedVarsRecursively(*lambda)) {
         if (auto it = state.allocateIdxMap->find(var); it != state.allocateIdxMap->end()) {
             state.reachingDefs[it->second].SetToBound(/* isTop = */ true);
             state.reachingLoadDefs[it->second].SetToBound(/* isTop = */ true);

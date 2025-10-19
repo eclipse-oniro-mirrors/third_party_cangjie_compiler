@@ -28,7 +28,7 @@ public:
     {
         // All chirExprs should be in the same BasicBlock.
         for (auto it : chirExprs) {
-            CJC_ASSERT(it->GetParent() == chirExprs[0]->GetParent());
+            CJC_ASSERT(it->GetParentBlock() == chirExprs[0]->GetParentBlock());
         }
     }
 
@@ -49,20 +49,18 @@ public:
 
 void ExpressionGeneratorImpl::EmitIR()
 {
-    if (chirExprs.empty()) {
-        return;
-    }
+    CJC_ASSERT(!chirExprs.empty());
     IRBuilder2 irBuilder(cgMod);
     // Since we restricted all the expressions are in the same basic block,
     // we are able to just use the first expression to determine the insert
     // point.
-    if (auto parentBB = chirExprs.front()->GetParent()) {
+    if (auto parentBB = chirExprs.front()->GetParentBlock()) {
         irBuilder.SetInsertPoint(cgMod.GetMappedBB(parentBB));
     }
-    irBuilder.CreateGenericParaDeclare(*cgMod.GetOrInsertCGFunction(chirExprs.front()->GetParentFunc()));
+    irBuilder.CreateGenericParaDeclare(*cgMod.GetOrInsertCGFunction(chirExprs.front()->GetTopLevelFunc()));
     for (auto chirExpr : chirExprs) {
         CHIRExprWrapper chirExprWrapper = CHIRExprWrapper(*chirExpr);
-        if (chirExpr->GetParent()) {
+        if (chirExpr->GetParentBlock()) {
             irBuilder.EmitLocation(chirExprWrapper);
         }
         irBuilder.SetCHIRExpr(&chirExprWrapper);
@@ -98,7 +96,7 @@ void ExpressionGeneratorImpl::EmitIR()
                 }
                 break;
             default: {
-                printf("Unexpected expr kind: %" PRIu64 "\n", static_cast<uint64_t>(chirExpr->GetExprKind()));
+
                 CJC_ASSERT(false && "Should not reach here.");
                 break;
             }
@@ -115,9 +113,9 @@ void ExpressionGeneratorImpl::EmitIR()
                     rawRet->getType()->getPointerAddressSpace());
             }
 #endif
-            CJC_NULLPTR_CHECK(chirExpr->GetParentFunc());
+            CJC_NULLPTR_CHECK(chirExpr->GetTopLevelFunc());
             bool isSRetArg =
-                irBuilder.GetInsertCGFunction()->IsSRet() && chirExpr->GetParentFunc()->GetReturnValue() == rst;
+                irBuilder.GetInsertCGFunction()->IsSRet() && chirExpr->GetTopLevelFunc()->GetReturnValue() == rst;
             cgMod.SetOrUpdateMappedCGValue(rst, std::make_unique<CGValue>(rawRet, cgType, isSRetArg));
         }
     }

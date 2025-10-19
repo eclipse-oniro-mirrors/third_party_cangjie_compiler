@@ -84,13 +84,5 @@ TEST_F(MangleTypeTest, RefTypes)
     // construct a RefType of Int8
     auto refTy = builder.GetType<RefType>(int8Ty);
     EXPECT_EQ(MangleType(*refTy), "a");
-}
 
-TEST_F(MangleTypeTest, ClosureTypes)
-{
-    // construct a ClosureType
-    auto funcTy = builder.GetType<FuncType>(std::vector<Type*>{int64Ty, int64Ty}, int64Ty);
-    EXPECT_EQ(MangleType(*funcTy), "lll");
-    auto closureTy = builder.GetType<ClosureType>(int64Ty, funcTy);
-    EXPECT_EQ(MangleType(*closureTy), "L_lllE");
 }

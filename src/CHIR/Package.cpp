@@ -15,6 +15,8 @@
 #include "cangjie/CHIR/Type/StructDef.h"
 #include "cangjie/CHIR/Value.h"
 
+#include <sstream>
+
 using namespace Cangjie::CHIR;
 
 Package::Package(const std::string& name) : name(name)
@@ -211,6 +213,7 @@ std::string Package::ToString() const
     std::stringstream ss;
     ss << "package: " << name << "\n";
     ss << "packageAccessLevel: " << PackageAccessLevelToString(pkgAccessLevel) << "\n";
+    ss << "packageInitFunc: " << GetPackageInitFunc()->GetIdentifier() << "\n";
     ss << "\n==========================imports===============================\n";
     for (auto& it : importedVarAndFuncs) {
         ss << GetImportedValueStr(*it) << "\n";

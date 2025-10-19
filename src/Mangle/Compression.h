@@ -57,10 +57,7 @@ struct Entity {
     std::string mangledName;
     EntityType entityTy;
     virtual ~Entity() = default;
-    virtual size_t GetEntityLength()
-    {
-        return this->mangledName.size();
-    }
+
 };
 
 struct CJType {
@@ -70,10 +67,7 @@ struct CJType {
         this->mangledName = mangledName;
     }
     virtual ~CJType() = default;
-    virtual size_t GetCJTypeLength()
-    {
-        return this->mangledName.size();
-    }
+
     std::string mangledName = "";
     BaseType baseTy = BaseType::ERROR_BASE_TYPE;
 };
@@ -86,10 +80,7 @@ struct FunctionEntity : public Entity {
             this->paramTys = std::move(paramTys);
             this->genericTys = std::move(genericTys);
     }
-    size_t GetEntityLength() override
-    {
-        return Entity::GetEntityLength();
-    }
+
     std::vector<std::unique_ptr<CJType>> paramTys;
     std::vector<std::unique_ptr<CJType>> genericTys;
 };
@@ -101,10 +92,7 @@ struct DataEntity : public Entity {
     {
             this->genericTys = std::move(genericTys);
     }
-    size_t GetEntityLength() override
-    {
-        return Entity::GetEntityLength();
-    }
+
     std::vector<std::unique_ptr<CJType>> genericTys;
 };
 
@@ -115,10 +103,7 @@ struct ExtendEntity : public Entity {
     {
         this->extendTy = std::move(extendTy);
     }
-    size_t GetEntityLength() override
-    {
-        return Entity::GetEntityLength();
-    }
+
     std::unique_ptr<CJType> extendTy;
     std::string fileId;
     std::string localId;
@@ -131,10 +116,7 @@ struct CompositeType : public CJType {
     {
             this->genericTys = std::move(genericTys);
     }
-    size_t GetCJTypeLength() override
-    {
-        return CJType::GetCJTypeLength();
-    }
+
     std::vector<std::unique_ptr<CJType>> genericTys;
     std::string pkg;
     std::string name;
@@ -147,10 +129,7 @@ struct FunctionType : public CJType {
             this->retTy = std::move(retTy);
             this->paramTys = std::move(paramTys);
     }
-    size_t GetCJTypeLength() override
-    {
-        return CJType::GetCJTypeLength();
-    }
+
     std::unique_ptr<CJType> retTy;
     std::vector<std::unique_ptr<CJType>> paramTys;
 };
@@ -161,10 +140,7 @@ struct TupleType : public CJType {
     {
             this->elementTys = std::move(elementTys);
     }
-    size_t GetCJTypeLength() override
-    {
-        return CJType::GetCJTypeLength();
-    }
+
     std::vector<std::unique_ptr<CJType>> elementTys;
 };
 

@@ -40,6 +40,8 @@ void CopyBasicInfo(Ptr<const Node> source, Ptr<Node> target)
         target->begin = source->begin;
         target->end = source->end;
         target->curMacroCall = source->curMacroCall;
+        target->isInMacroCall = source->isInMacroCall;
+        target->comments = source->comments;
         CopyNodeScopeInfo(target, source);
     }
 }
@@ -90,6 +92,7 @@ void CopyNodeField(Ptr<Node> ret, const Node& e)
     ret->ty = e.ty;
     ret->curMacroCall = e.curMacroCall;
     ret->isInMacroCall = e.isInMacroCall;
+    ret->comments = e.comments;
     CopyNodeScopeInfo(ret, &e);
     ret->CopyAttrs(e.GetAttrs());
 }
@@ -493,7 +496,7 @@ OwnedPtr<QuoteExpr> ASTCloner::CloneQuoteExpr(const QuoteExpr& qe, const VisitFu
     expr->quotePos = qe.quotePos;
     expr->leftParenPos = qe.leftParenPos;
     expr->rightParenPos = qe.rightParenPos;
-    expr->content = qe.content;
+
     return expr;
 }
 
@@ -534,12 +537,31 @@ OwnedPtr<TryExpr> ASTCloner::CloneTryExpr(const TryExpr& te, const VisitFunc& vi
         expr->catchBlocks.push_back(CloneExpr(te.catchBlocks[i].get(), visitor));
         expr->catchPatterns.push_back(ClonePattern(te.catchPatterns[i].get(), visitor));
     }
+    for (const auto& handler : te.handlers) {
+        auto cloned = Handler();
+        cloned.pos = handler.pos;
+        cloned.commandPattern = ClonePattern(handler.commandPattern.get(), visitor);
+        cloned.block = CloneExpr(handler.block.get(), visitor);
+        if (handler.desugaredLambda) {
+            cloned.desugaredLambda = CloneLambdaExpr(*handler.desugaredLambda, visitor);
+            CopyNodeField(cloned.desugaredLambda, *handler.desugaredLambda);
+        }
+        expr->handlers.emplace_back(std::move(cloned));
+    }
     expr->finallyPos = te.finallyPos;
     expr->finallyBlock = CloneExpr(te.finallyBlock.get(), visitor);
     expr->resourceSpecCommaPos = te.resourceSpecCommaPos;
     expr->rParen = te.rParen;
     expr->catchLParenPosVector = te.catchLParenPosVector;
     expr->catchRParenPosVector = te.catchRParenPosVector;
+    if (te.tryLambda) {
+        expr->tryLambda = CloneExpr(te.tryLambda.get(), visitor);
+        CopyNodeField(expr->tryLambda, *te.tryLambda);
+    }
+    if (te.finallyLambda) {
+        expr->finallyLambda = CloneExpr(te.finallyLambda.get(), visitor);
+        CopyNodeField(expr->finallyLambda, *te.finallyLambda);
+    }
     return expr;
 }
 
@@ -548,6 +570,25 @@ OwnedPtr<ThrowExpr> ASTCloner::CloneThrowExpr(const ThrowExpr& te, const VisitFu
     auto expr = MakeOwned<ThrowExpr>();
     expr->throwPos = te.throwPos;
     expr->expr = CloneExpr(te.expr.get(), visitor);
+    return expr;
+}
+
+OwnedPtr<PerformExpr> ASTCloner::ClonePerformExpr(const PerformExpr& pe, const VisitFunc& visitor)
+{
+    auto expr = MakeOwned<PerformExpr>();
+    expr->performPos = pe.performPos;
+    expr->expr = CloneExpr(pe.expr.get(), visitor);
+    return expr;
+}
+
+OwnedPtr<ResumeExpr> ASTCloner::CloneResumeExpr(const ResumeExpr& re, const VisitFunc& visitor)
+{
+    auto expr = MakeOwned<ResumeExpr>();
+    expr->resumePos = re.resumePos;
+    expr->withPos = re.withPos;
+    expr->withExpr = CloneExpr(re.withExpr.get(), visitor);
+    expr->throwingPos = re.throwingPos;
+    expr->throwingExpr = CloneExpr(re.throwingExpr.get(), visitor);
     return expr;
 }
 
@@ -953,8 +994,7 @@ OwnedPtr<OptionalExpr> ASTCloner::CloneOptionalExpr(const OptionalExpr& oe, cons
     return expr;
 }
 
-OwnedPtr<OptionalChainExpr> ASTCloner::CloneOptionalChainExpr(
-    const OptionalChainExpr& oce, const VisitFunc& visitor)
+OwnedPtr<OptionalChainExpr> ASTCloner::CloneOptionalChainExpr(const OptionalChainExpr& oce, const VisitFunc& visitor)
 {
     auto expr = MakeOwned<OptionalChainExpr>();
     expr->expr = CloneExpr(oce.expr.get(), visitor);
@@ -1000,6 +1040,8 @@ template <typename ExprT> OwnedPtr<ExprT> ASTCloner::CloneExpr(Ptr<ExprT> expr, 
         [&visitor](const QuoteExpr& qe) { return OwnedPtr<Expr>(CloneQuoteExpr(qe, visitor)); },
         [&visitor](const TryExpr& te) { return OwnedPtr<Expr>(CloneTryExpr(te, visitor)); },
         [&visitor](const ThrowExpr& te) { return OwnedPtr<Expr>(CloneThrowExpr(te, visitor)); },
+        [&visitor](const PerformExpr& te) { return OwnedPtr<Expr>(ClonePerformExpr(te, visitor)); },
+        [&visitor](const ResumeExpr& re) { return OwnedPtr<Expr>(CloneResumeExpr(re, visitor)); },
         [&visitor](const ReturnExpr& re) { return OwnedPtr<Expr>(CloneReturnExpr(re, visitor)); },
         [&visitor](const WhileExpr& we) { return OwnedPtr<Expr>(CloneWhileExpr(we, visitor)); },
         [&visitor](const DoWhileExpr& dwe) { return OwnedPtr<Expr>(CloneDoWhileExpr(dwe, visitor)); },
@@ -1196,6 +1238,20 @@ OwnedPtr<ExceptTypePattern> ASTCloner::CloneExceptTypePattern(
     return ret;
 }
 
+OwnedPtr<CommandTypePattern> ASTCloner::CloneCommandTypePattern(
+    const CommandTypePattern& ctp, const VisitFunc& visitor)
+{
+    auto ret = MakeOwned<CommandTypePattern>();
+    ret->pattern = ClonePattern(ctp.pattern.get(), visitor);
+    for (auto& i : ctp.types) {
+        ret->types.push_back(CloneType(i.get(), visitor));
+    }
+    ret->patternPos = ctp.patternPos;
+    ret->colonPos = ctp.colonPos;
+    ret->bitOrPosVector = ctp.bitOrPosVector;
+    return ret;
+}
+
 OwnedPtr<VarOrEnumPattern> ASTCloner::CloneVarOrEnumPattern(
     const VarOrEnumPattern& vep, const VisitFunc& visitor)
 {
@@ -1222,6 +1278,7 @@ OwnedPtr<Pattern> ASTCloner::ClonePattern(Ptr<Pattern> pattern, const VisitFunc&
         [&visitor](const TypePattern& e) { return OwnedPtr<Pattern>(CloneTypePattern(e, visitor)); },
         [&visitor](const EnumPattern& e) { return OwnedPtr<Pattern>(CloneEnumPattern(e, visitor)); },
         [&visitor](const ExceptTypePattern& e) { return OwnedPtr<Pattern>(CloneExceptTypePattern(e, visitor)); },
+        [&visitor](const CommandTypePattern& e) { return OwnedPtr<Pattern>(CloneCommandTypePattern(e, visitor)); },
         [&visitor](const VarOrEnumPattern& e) { return OwnedPtr<Pattern>(CloneVarOrEnumPattern(e, visitor)); },
         [](const InvalidPattern& e) { return OwnedPtr<Pattern>(MakeOwned<InvalidPattern>(e)); },
         []() { return OwnedPtr<Pattern>(MakeOwned<InvalidPattern>()); });

@@ -16,7 +16,7 @@
 #define CANGJIE_CHIR_INTERRETER_INTERPRETERSTACK_H
 
 #include "cangjie/CHIR/Interpreter/BCHIR.h"
-#include "cangjie/CHIR/Interpreter/InterpreterValue.h"
+#include "cangjie/CHIR/Interpreter/InterpreterValueUtils.h"
 
 namespace Cangjie::CHIR::Interpreter {
 
@@ -199,6 +199,30 @@ struct InterpreterStack {
     }
 
     /**
+     * @brief Get a reference to the top element
+     *
+     * This method will be deprecated, avoid
+     */
+    template <typename T> const T& ArgsTop() const
+    {
+        CJC_ASSERT(!argStack.empty());
+        using S = std::decay_t<T>;
+
+        if constexpr (std::is_same_v<S, ITuple>) {
+            // #warning You shouldn't use ArgsTop with ITuple
+            abort();
+        } else if constexpr (std::is_same_v<S, IArray>) {
+            // #warning You shouldn't use ArgsTop with IArray
+            abort();
+        } else if constexpr (std::is_same_v<S, IObject>) {
+            // #warning You shouldn't use ArgsTop with IObject
+            abort();
+        } else {
+            return std::get<S>(argStack.back());
+        }
+    }
+
+    /**
      * @brief Get the top element as an IVal
      *
      * This method is slow, try to avoid it
@@ -328,12 +352,6 @@ struct InterpreterStack {
         std::swap(argStack[(argStack.size() - offsetFromEnd) + i], argStack[(argStack.size() - offsetFromEnd) + j]);
     }
 
-    void ArgsClean()
-    {
-        while (!argStack.empty()) {
-            ArgsPopBack();
-        }
-    }
 
     const ControlState& CtrlTop() const
     {
@@ -362,10 +380,6 @@ struct InterpreterStack {
         return controlStack.empty();
     }
 
-    void CtrlClean()
-    {
-        controlStack.clear();
-    }
 
     const std::vector<ControlState>& GetCtrlStack() const
     {

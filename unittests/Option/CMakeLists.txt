@@ -13,8 +13,8 @@ if(CANGJIE_CODEGEN_CJNATIVE_BACKEND)
     set(RUNTIME_LIB_DIR ${CMAKE_BINARY_DIR}/lib/${output_lib_dir})
 endif()
 target_link_libraries(
-    OptionTests
+    OptionTest
     ${LINK_LIBS}
     GTest::gtest
     GTest::gtest_main)
-add_test(NAME OptionTests COMMAND OptionTests)
+add_test(NAME OptionTest COMMAND OptionTest)

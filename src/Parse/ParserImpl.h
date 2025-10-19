@@ -164,7 +164,7 @@ private:
     // should be set true, and set false while leaving.
     bool enableThis{false};
     bool deadlocked{false};
-    bool hasJavaFFI{false};
+
     bool inForeignBlock{false};
     bool enableCustomAnno{false}; // parse macrocall as custom annotation.
 
@@ -227,6 +227,8 @@ private:
         {TokenKind::QUOTE, &ParserImpl::ParseQuoteExpr},
         {TokenKind::TRY, &ParserImpl::ParseTryExpr},
         {TokenKind::THROW, &ParserImpl::ParseThrowExpr},
+        {TokenKind::PERFORM, &ParserImpl::ParsePerformExpr},
+        {TokenKind::RESUME, &ParserImpl::ParseResumeExpr},
         {TokenKind::RETURN, &ParserImpl::ParseReturnExpr},
         {TokenKind::FOR, &ParserImpl::ParseForInExpr},
         {TokenKind::WHILE, &ParserImpl::ParseWhileExpr},
@@ -300,6 +302,7 @@ private:
     bool enableAttachComment{false};
     bool parseDeclFile{false};
 
+    bool enableEH{false};
     Triple::BackendType backend{Triple::BackendType::CJNATIVE};
     bool calculateLineNum{false};
     // we store line number info from all tokens
@@ -307,8 +310,7 @@ private:
     std::list<std::pair<unsigned, unsigned>> allTokensInOneFile;
     TokenVecMap commentsMap;
     uint8_t Precedence(TokenKind kind) const;
-    static constexpr int CONDITION_MODE_PRECEDENCE_AND{-1};
-    static constexpr int CONDITION_MODE_PRECEDENCE_OR{-2};
+
 
     /// Common initializer shared among constructors.
     void Init();
@@ -615,7 +617,7 @@ private:
     OwnedPtr<AST::FuncParam> ParseParamInParamList(
         const ScopeKind& scopeKind, Ptr<AST::FuncParam>& meetNamedParameter, Ptr<AST::FuncParam>& meetMemberParams);
     void ParseInterfaceDeclOrClassDeclGeneric(AST::InheritableDecl& ret);
-    void SetBodyParentClassLike(AST::ClassLikeDecl& ret, std::vector<OwnedPtr<AST::Decl>>& decls);
+
     void SetDefaultFunc(ScopeKind scopeKind, AST::Decl& decl) const;
     void ParseCaseBody(AST::EnumDecl& enumDecl);
     void ParseEnumBody(AST::EnumDecl& enumDecl);
@@ -722,6 +724,7 @@ private:
     OwnedPtr<AST::Expr> ParseMacroExprOrLambdaExpr();
     OwnedPtr<AST::Expr> ParseAnnotationLambdaExpr(bool isTailClosure = false);
     OwnedPtr<AST::FuncParamList> ParseFuncParamListInLambdaExpr();
+    OwnedPtr<FuncParam> ParseFuncParam();
     OwnedPtr<AST::FuncBody> ParseFuncBodyInLambdaExpr(bool isTailClosure = false);
     OwnedPtr<AST::LambdaExpr> ParseLambdaExpr();
     OwnedPtr<AST::Expr> ParseVArrayExpr();
@@ -735,6 +738,8 @@ private:
     /// recursively, and it DOES NOT mean whether the condition is good or not.
     bool CheckCondition(AST::Expr* e);
     OwnedPtr<AST::ThrowExpr> ParseThrowExpr();
+    OwnedPtr<AST::PerformExpr> ParsePerformExpr();
+    OwnedPtr<AST::ResumeExpr> ParseResumeExpr();
     // Parse 'this' or 'super'.
     OwnedPtr<AST::RefExpr> ParseThisOrSuper() const;
     OwnedPtr<AST::ReturnExpr> ParseReturnExpr();
@@ -761,8 +766,11 @@ private:
     OwnedPtr<AST::Decl> ParseVarDecl(
         const ScopeKind& scopeKind, const std::set<AST::Modifier>& modifiers, const Token& keyToken);
     OwnedPtr<AST::TryExpr> ParseTryExpr();
+    void ParseHandleBlock(AST::TryExpr& tryExpr);
+    void ParseCatchBlock(AST::TryExpr& tryExpr);
     void ParseTryWithResource(const ScopeKind& scopeKind, AST::TryExpr& tryExpr);
     OwnedPtr<AST::Pattern> ParseExceptTypePattern();
+    OwnedPtr<AST::Pattern> ParseCommandTypePattern();
     OwnedPtr<AST::ForInExpr> ParseForInExpr();
     OwnedPtr<AST::RefExpr> ParseRefExpr(ExprKind ek = ExprKind::ALL);
     OwnedPtr<AST::Expr> ParseWildcardExpr();
@@ -775,7 +783,7 @@ private:
     bool DiagForBlock(const AST::Block& block);
     template <typename T> bool CheckSkipRcurOrPrematureEnd(T& ret);
     OwnedPtr<AST::ClassBody> ParseClassBody(const AST::ClassDecl& cd);
-    OwnedPtr<AST::InterfaceBody> ParseInterfaceBody();
+    OwnedPtr<AST::InterfaceBody> ParseInterfaceBody(const AST::InterfaceDecl& id);
     OwnedPtr<AST::Decl> ParseEnumConstructor(
         const std::set<AST::Modifier>& modifiers, PtrVector<AST::Annotation>& annos);
     OwnedPtr<AST::TypePattern> ParseTypePattern(const Position& begin);
@@ -831,6 +839,13 @@ private:
         TokenKind separator, std::vector<Position>& positions, const std::function<void()>& parseElement);
     void ParseOneOrMoreWithSeparator(TokenKind separator, const std::function<void(const Position)>& storeSeparator,
         const std::function<void()>& parseElement);
+    /// Parse one or more via \ref parse, separated by \ref separator, and allows trailing separator.
+    void ParseOneOrMoreSepTrailing(std::function<void(const Position&)>&& storeSeparator,
+        std::function<void()>&& parseElement, TokenKind end, TokenKind separator = TokenKind::COMMA);
+    /// Parse zero or more via \ref parse, separated by \ref separator, and allows trailing separator.
+    /// Note that trailing comma is invalid if there are zero elements.
+    void ParseZeroOrMoreSepTrailing(std::function<void(const Position&)>&& storeSeparator,
+        std::function<void()>&& parseElement, TokenKind end, TokenKind separator = TokenKind::COMMA);
     void ParseZeroOrMoreWithSeparator(TokenKind separator, std::vector<Position>& positions,
         const std::function<void()>& parseElement, TokenKind terminator);
     void ParseZeroOrMoreWithSeparator(TokenKind separator, const std::function<void(const Position)>& storeSeparator,
@@ -901,7 +916,7 @@ private:
     void DiagExpectedLeftParenAfter(const Position& pos, const std::string& str);
     void DiagMatchCaseExpectedExprOrDecl();
     void DiagMatchCaseBodyCannotBeEmpty(const Position& pos);
-    void DiagExpectedCatchOrFinallyAfterTry(const AST::TryExpr& te);
+    void DiagExpectedCatchOrHandleOrFinallyAfterTry(const AST::TryExpr& te);
     void DiagExpectedSelectorOrMatchExprBody(const Position& pos);
     void DiagRedefinedResourceName(
         const std::pair<std::string, Position>& cur, const std::pair<std::string, Position>& pre);
@@ -1058,6 +1073,7 @@ private:
     void DiagExpectedIdentifierMacroExpandExpr(Ptr<AST::Node> node);
     void CheckLeftExpression(const Token& preT, const OwnedPtr<AST::Expr>& base, const Token& tok);
     void CheckWildcardInExpr(const OwnedPtr<AST::Expr>& root);
+    void SetMemberParentInheritableDecl(const AST::InheritableDecl& outer, const OwnedPtr<AST::Decl>& decl) const;
     friend class Parser;
 
     template <typename... Args>

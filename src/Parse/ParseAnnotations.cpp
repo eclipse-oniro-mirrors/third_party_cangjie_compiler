@@ -336,9 +336,7 @@ OwnedPtr<Annotation> ParserImpl::ParseAnnotation()
             break;
         }
     }
-    if (annotation->end.IsZero()) {
-        annotation->end = tok.End();
-    }
+    annotation->end = lastToken.End();
 
     return annotation;
 }

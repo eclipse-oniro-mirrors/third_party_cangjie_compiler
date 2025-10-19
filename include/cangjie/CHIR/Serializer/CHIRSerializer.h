@@ -17,9 +17,8 @@ namespace Cangjie::CHIR {
 
 class CHIRSerializer {
     class CHIRSerializerImpl;
-
 public:
-    static void Serialize(const Package& package, const std::string filename);
+    static void Serialize(const Package& package, const std::string filename, ToCHIR::Phase phase);
 };
 
 } // namespace Cangjie::CHIR

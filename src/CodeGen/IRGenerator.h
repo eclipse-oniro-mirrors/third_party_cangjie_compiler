@@ -24,9 +24,7 @@ namespace CodeGen {
 class IRGeneratorImpl {
 public:
     virtual ~IRGeneratorImpl() = default;
-    virtual void EmitIR()
-    {
-    }
+    virtual void EmitIR() = 0;
 
 protected:
     IRGeneratorImpl() = default;

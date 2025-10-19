@@ -26,7 +26,7 @@ Ptr<Value> Translator::Visit(const AST::ClassDecl& decl)
 void Translator::TranslateClassLikeDecl(ClassDef& classDef, const AST::ClassLikeDecl& decl)
 {
     // step 1: set attribute
-    classDef.SetAnnoInfo(CreateAnnoFactoryFuncs(decl, &classDef));
+    classDef.SetAnnoInfo(CreateAnnoFactoryFuncSig(decl, &classDef));
 
     // step 2: set type
     auto classTy = TranslateType(*decl.ty);
@@ -75,27 +75,6 @@ void Translator::TranslateClassLikeDecl(ClassDef& classDef, const AST::ClassLike
     CollectTypeAnnotation(decl, classDef);
 }
 
-std::unordered_map<AST::Ty*, ClassDef*> Translator::boxedRefEnumTypeClass;
-ClassDef* Translator::GetOrCreateBoxedRefEnumType(AST::Ty* declTy)
-{
-    if (auto it = boxedRefEnumTypeClass.find(declTy); it != boxedRefEnumTypeClass.end()) {
-        return it->second;
-    }
-    auto className = "$Box_" + declTy->String();
-    auto mangledName = MangleUtils::GetMangledNameOfCompilerAddedClass(className);
-    auto classDef = builder.CreateClass(INVALID_LOCATION, className, mangledName,
-        builder.GetChirContext().GetCurPackage()->GetName(), true, false);
-    boxedRefEnumTypeClass.emplace(declTy, classDef);
-    classDef->SetType(*builder.GetType<ClassType>(classDef));
-    classDef->SetSuperClassTy(*builder.GetObjectTy());
-    classDef->EnableAttr(Attribute::COMPILER_ADD);
-    classDef->EnableAttr(Attribute::NO_REFLECT_INFO);
-    classDef->Set<IsBoxedClass>(true);
-    AttributeInfo attributeInfo;
-    attributeInfo.SetAttr(Attribute::PUBLIC, true);
-    classDef->AddInstanceVar(MemberVarInfo{"value", "", TranslateType(*declTy), attributeInfo, INVALID_LOCATION});
-    return classDef;
-}
 
 void Translator::AddMemberVarDecl(CustomTypeDef& def, const AST::VarDecl& decl)
 {
@@ -103,7 +82,7 @@ void Translator::AddMemberVarDecl(CustomTypeDef& def, const AST::VarDecl& decl)
         auto staticVar = VirtualCast<GlobalVarBase*>(GetSymbolTable(decl));
         def.AddStaticMemberVar(staticVar);
         if (auto gv = DynamicCast<GlobalVar>(staticVar)) {
-            CreateAnnotationInfo<GlobalVar>(decl, *gv, def);
+            CreateAnnotationInfo<GlobalVar>(decl, *gv,&def);
         }
     } else {
         Ptr<Type> ty = TranslateType(*decl.ty);
@@ -113,7 +92,7 @@ void Translator::AddMemberVarDecl(CustomTypeDef& def, const AST::VarDecl& decl)
             .type = ty,
             .attributeInfo = BuildVarDeclAttr(decl),
             .loc = loc,
-            .annoInfo = CreateAnnoFactoryFuncs(decl, &def)});
+            .annoInfo = CreateAnnoFactoryFuncSig(decl, &def)});
     }
 }
 
@@ -193,7 +172,7 @@ void Translator::TranslateAbstractMethod(ClassDef& classDef, const AST::FuncDecl
     }
     for (auto& arg : args) {
         params.emplace_back(
-            AbstractMethodParam{arg->identifier, TranslateType(*arg->ty), CreateAnnoFactoryFuncs(*arg, &classDef)});
+            AbstractMethodParam{arg->identifier, TranslateType(*arg->ty), CreateAnnoFactoryFuncSig(*arg, &classDef)});
     }
     std::vector<GenericType*> funcGenericTypeParams;
     if (decl.funcBody->generic != nullptr) {
@@ -206,7 +185,7 @@ void Translator::TranslateAbstractMethod(ClassDef& classDef, const AST::FuncDecl
     auto attr = BuildAttr(decl.GetAttrs());
     attr.SetAttr(Attribute::ABSTRACT, true);
     auto abstractMethod = AbstractMethodInfo{decl.identifier, decl.mangledName, funcType, params, attr,
-        CreateAnnoFactoryFuncs(annotationDecl, &classDef), funcGenericTypeParams, hasBody, &classDef};
+        CreateAnnoFactoryFuncSig(annotationDecl, &classDef), funcGenericTypeParams, hasBody, &classDef};
     classDef.AddAbstractMethod(abstractMethod);
 }
 } // namespace Cangjie::CHIR

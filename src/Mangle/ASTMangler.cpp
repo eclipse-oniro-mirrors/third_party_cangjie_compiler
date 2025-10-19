@@ -3,7 +3,6 @@
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
-
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 #include "cangjie/Mangle/ASTMangler.h"
 
@@ -185,6 +184,8 @@ std::optional<std::string> ASTMangler::TruncateExtendMangledName(const std::stri
 
 static std::string MangleType(const AST::Type& typeAnnotation)
 {
+    std::function<std::string(const AST::Type &)> mangleThisType =
+        [](const AST::Type &) { return MANGLE_THIS_PREFIX; };
     static const std::unordered_map<AST::ASTKind, std::function<std::string (const AST::Type&)>>
         HANDLE_TYPE_MAP = {
             {ASTKind::PRIMITIVE_TYPE, ASTMangler::ManglePrimitiveType},
@@ -196,9 +197,7 @@ static std::string MangleType(const AST::Type& typeAnnotation)
             {ASTKind::FUNC_TYPE, MangleFuncTypeAnnotation},
             {ASTKind::TUPLE_TYPE, MangleTupleTypeAnnotation},
             {ASTKind::QUALIFIED_TYPE, MangleQualifiedTypeAnnotation},
-            {ASTKind::THIS_TYPE, [](const AST::Type&) {
-                return MANGLE_THIS_PREFIX;
-            }}
+            {ASTKind::THIS_TYPE, mangleThisType}
         };
 
     if (auto found = HANDLE_TYPE_MAP.find(typeAnnotation.astKind); found != HANDLE_TYPE_MAP.end()) {
@@ -279,7 +278,7 @@ private:
     void MangleFuncParameters(const std::vector<OwnedPtr<FuncParam>>& params)
     {
         for (const auto& param : params) {
-            MangleFuncParamModifiers(*param);
+
             if (param->type) {
                 mangled += MangleType(*param->type);
             }
@@ -301,16 +300,6 @@ private:
         }
     }
 
-    void MangleFuncParamModifiers(const FuncParam& param)
-    {
-        for (auto& mod : param.modifiers) {
-            if (mod.modifier == TokenKind::INOUT) {
-                mangled += MANGLE_INOUT_PREFIX;
-                // At most one inout is allowed
-                return;
-            }
-        }
-    }
 
     void MangleDeclCommon(const Decl& decl)
     {
@@ -363,7 +352,7 @@ private:
                 mangled += MangleType(*propDecl->type);
             }
         }
-        
+
         if (auto ctor = DynamicCast<PrimaryCtorDecl*>(&decl)) {
             MangleFuncParameters(ctor->funcBody->paramLists[0]->params);
         }

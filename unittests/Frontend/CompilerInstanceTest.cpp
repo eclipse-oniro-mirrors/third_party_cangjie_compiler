@@ -11,7 +11,7 @@
 #include "cangjie/Basic/SourceManager.h"
 #include "cangjie/FrontendTool/DefaultCompilerInstance.h"
 #include "cangjie/Utils/FileUtil.h"
-#include "gtest/gtest.h"
+
 
 #include <memory>
 #include <string>

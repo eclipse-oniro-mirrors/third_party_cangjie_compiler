@@ -11,7 +11,7 @@
 #undef main
 
 #include <fcntl.h>
-#include <stdio.h>
+#include <cstdio>
 #include <unordered_map>
 #include <vector>
 

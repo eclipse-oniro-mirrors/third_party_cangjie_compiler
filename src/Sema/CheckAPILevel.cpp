@@ -12,7 +12,7 @@
  * This file provides the function of checking APILevel customized macros.
  */
 
-#include "cangjie/Sema/CheckAPILevel.h"
+#include "CheckAPILevel.h"
 
 #include <functional>
 #include <iostream>
@@ -25,73 +25,85 @@
 #include "cangjie/Basic/StringConvertor.h"
 #include "cangjie/Utils/CastingTemplate.h"
 #include "cangjie/Utils/SafePointer.h"
+#include "cangjie/Utils/StdUtils.h"
 
 using namespace Cangjie;
 using namespace AST;
 using namespace APILevelCheck;
 
 namespace {
-const std::string PKG_NAME_WHERE_APILEVEL_AT = "ohos.labels";
-const std::string APILEVEL_ANNO_NAME = "APILevel";
-const std::string LEVEL_IDENTGIFIER = "level";
-const std::string SYSCAP_IDENTGIFIER = "syscap";
-const std::string CFG_PARAM_LEVEL_NAME = "APILevel_level";
-const std::string CFG_PARAM_SYSCAP_NAME = "APILevel_syscap";
-// Based on the definition of 'APILevel' in the 'ohos.labels'.
-const std::string PARAMLIST_STR = "(UInt8, atomicservice!: Bool, crossplatform!: Bool, deprecated!: UInt8, form!: "
-                                  "Bool, permission!: ?PermissionValue, stagemodelonly!: Bool, syscap!: String)";
+constexpr std::string_view PKG_NAME_WHERE_APILEVEL_AT = "ohos.labels";
+constexpr std::string_view APILEVEL_ANNO_NAME = "APILevel";
+constexpr std::string_view SINCE_IDENTGIFIER = "since";
+constexpr std::string_view LEVEL_IDENTGIFIER = "level";
+constexpr std::string_view SYSCAP_IDENTGIFIER = "syscap";
+constexpr std::string_view CFG_PARAM_LEVEL_NAME = "APILevel_level";
+constexpr std::string_view CFG_PARAM_SYSCAP_NAME = "APILevel_syscap";
 // For level check:
-const std::string PKG_NAME_DEVICE_INFO_AT = "ohos.device_info";
-const std::string DEVICE_INFO = "DeviceInfo";
-const std::string SDK_API_VERSION = "sdkApiVersion";
-// For syscap check:
-const std::string PKG_NAME_CANIUSE_AT = "ohos.base";
-const std::string CANIUSE_IDENTIFIER = "canIUse";
+const LevelType IFAVAIALBEL_LOWER_LIMITLEVEL = 19;
 
 LevelType Str2LevelType(std::string s)
 {
-    try {
-        return static_cast<LevelType>(std::stoull(s));
-    } catch (...) {
-        return 0;
-    }
+    return static_cast<LevelType>(Stoull(s).value_or(0));
 }
 
 void ParseLevel(const Expr& e, APILevelAnnoInfo& apilevel, DiagnosticEngine& diag)
 {
-    auto lce = DynamicCast<LitConstExpr*>(&e);
+    Ptr<const LitConstExpr> lce = nullptr;
+    if (e.astKind == ASTKind::BINARY_EXPR) {
+        auto be = StaticCast<BinaryExpr>(&e);
+        CJC_NULLPTR_CHECK(be->rightExpr);
+        lce = DynamicCast<LitConstExpr>(be->rightExpr.get());
+    } else if (e.astKind == ASTKind::LIT_CONST_EXPR) {
+        lce = StaticCast<LitConstExpr>(&e);
+    }
     if (!lce || lce->kind != LitConstKind::INTEGER) {
-        diag.DiagnoseRefactor(DiagKindRefactor::sema_only_literal_support, e);
+        diag.DiagnoseRefactor(DiagKindRefactor::sema_only_literal_support, e, "integer");
         return;
     }
     auto newLevel = Str2LevelType(lce->stringValue);
-    apilevel.level = apilevel.level == 0 ? newLevel : std::min(newLevel, apilevel.level);
+    apilevel.since = apilevel.since == 0 ? newLevel : std::min(newLevel, apilevel.since);
+}
+
+void ParseSince(const Expr& e, APILevelAnnoInfo& apilevel, DiagnosticEngine& diag)
+{
+    Ptr<const LitConstExpr> lce = nullptr;
+    if (e.astKind == ASTKind::BINARY_EXPR) {
+        auto be = StaticCast<BinaryExpr>(&e);
+        CJC_NULLPTR_CHECK(be->rightExpr);
+        lce = DynamicCast<LitConstExpr>(be->rightExpr.get());
+    } else if (e.astKind == ASTKind::LIT_CONST_EXPR) {
+        lce = StaticCast<LitConstExpr>(&e);
+    }
+    if (!lce || lce->kind != LitConstKind::STRING) {
+        diag.DiagnoseRefactor(DiagKindRefactor::sema_only_literal_support, e, "string");
+        return;
+    }
+    auto newLevel = Str2LevelType(lce->stringValue);
+    apilevel.since = apilevel.since == 0 ? newLevel : std::min(newLevel, apilevel.since);
 }
 
 void ParseSysCap(const Expr& e, APILevelAnnoInfo& apilevel, DiagnosticEngine& diag)
 {
-    auto lce = DynamicCast<LitConstExpr>(&e);
+    Ptr<const LitConstExpr> lce = nullptr;
+    if (e.astKind == ASTKind::CALL_EXPR) {
+        auto ce = StaticCast<CallExpr>(&e);
+        CJC_ASSERT(ce->args.size() == 1 && ce->args[0]->expr);
+        lce = DynamicCast<LitConstExpr>(ce->args[0]->expr.get());
+    } else if (e.astKind == ASTKind::LIT_CONST_EXPR) {
+        lce = StaticCast<LitConstExpr>(&e);
+    }
     if (!lce || lce->kind != LitConstKind::STRING) {
-        diag.DiagnoseRefactor(DiagKindRefactor::sema_only_literal_support, e);
+        diag.DiagnoseRefactor(DiagKindRefactor::sema_only_literal_support, e, "string");
         return;
     }
     apilevel.syscap = lce->stringValue;
 }
 
-void Placeholder([[maybe_unused]] const Expr& e, [[maybe_unused]] const APILevelAnnoInfo& apilevel,
-    [[maybe_unused]] const DiagnosticEngine& diag)
-{
-}
-
 using ParseNameParamFunc = std::function<void(const Expr&, APILevelAnnoInfo&, DiagnosticEngine&)>;
-std::unordered_map<std::string, ParseNameParamFunc> parseNameParam = {
+std::unordered_map<std::string_view, ParseNameParamFunc> parseNameParam = {
+    {SINCE_IDENTGIFIER, ParseSince},
     {LEVEL_IDENTGIFIER, ParseLevel},
-    {"atomicservice", Placeholder},
-    {"crossplatform", Placeholder},
-    {"deprecated", Placeholder},
-    {"form", Placeholder},
-    {"permission", Placeholder},
-    {"stagemodelonly", Placeholder},
     {SYSCAP_IDENTGIFIER, ParseSysCap},
 };
 
@@ -140,11 +152,7 @@ uint64_t ParseJsonNumber(size_t& pos, const std::vector<uint8_t>& in)
     if (num.str().size()) {
         --pos;
     }
-    try {
-        return std::stoull(num.str());
-    } catch (...) {
-        return 0;
-    }
+    return Stoull(num.str()).value_or(0);
 }
 
 OwnedPtr<JsonObject> ParseJsonObject(size_t& pos, const std::vector<uint8_t>& in);
@@ -251,37 +259,6 @@ Ptr<JsonObject> GetJsonObject(Ptr<JsonObject> root, const std::string& key, cons
     return nullptr;
 }
 
-void ChkIfImportDeviceInfo(DiagnosticEngine& diag, const ImportManager& im, const IfAvailableExpr& iae)
-{
-    if (iae.GetFullPackageName() == PKG_NAME_DEVICE_INFO_AT) {
-        return;
-    }
-    auto importedPkgs = im.GetAllImportedPackages();
-    for (auto& importedPkg : importedPkgs) {
-        if (importedPkg->srcPackage && importedPkg->srcPackage->fullPackageName == PKG_NAME_DEVICE_INFO_AT) {
-            return;
-        }
-    }
-    auto builder = diag.DiagnoseRefactor(
-        DiagKindRefactor::sema_use_expr_without_import, iae, PKG_NAME_DEVICE_INFO_AT, "IfAvailable");
-    builder.AddNote("depend on declaration '" + DEVICE_INFO + "'");
-}
-
-void ChkIfImportBase(DiagnosticEngine& diag, const ImportManager& im, const IfAvailableExpr& iae)
-{
-    if (iae.GetFullPackageName() == PKG_NAME_CANIUSE_AT) {
-        return;
-    }
-    auto importedPkgs = im.GetAllImportedPackages();
-    for (auto& importedPkg : importedPkgs) {
-        if (importedPkg->srcPackage && importedPkg->srcPackage->fullPackageName == PKG_NAME_CANIUSE_AT) {
-            return;
-        }
-    }
-    auto builder =
-        diag.DiagnoseRefactor(DiagKindRefactor::sema_use_expr_without_import, iae, PKG_NAME_CANIUSE_AT, "IfAvailable");
-    builder.AddNote("depend on declaration '" + CANIUSE_IDENTIFIER + "'");
-}
 
 void ClearAnnoInfoOfDepPkg(ImportManager& importManager)
 {
@@ -304,89 +281,55 @@ void ClearAnnoInfoOfDepPkg(ImportManager& importManager)
         Walker(depPkg, clearAnno).Walk();
     }
 }
-} // namespace
-
-// Before desugar: `@IfAvaliable(level: 11, {=>...}, {=>...})`
-// Desugar as: `if (DeviceInfo.sdkApiVersion >= 11) {...} else {...}`
-OwnedPtr<Expr> APILevelAnnoChecker::DesugarIfAvailableLevelCondition(IfAvailableExpr& iae)
+void MarkTargetAsExternalWeak(Ptr<Node> node)
 {
-    auto deviceInfoDecl = importManager.GetImportedDecl(PKG_NAME_DEVICE_INFO_AT, DEVICE_INFO);
-    if (!deviceInfoDecl) {
-        ChkIfImportDeviceInfo(diag, importManager, iae);
-        return nullptr;
+    if (!node) {
+        return;
     }
-    // Get property 'DeviceInfo.sdkApiVersion.get()' from PKG_NAME_DEVICE_INFO_AT.
-    Ptr<FuncDecl> target = nullptr;
-    for (auto& member : deviceInfoDecl->GetMemberDecls()) {
-        if (member->identifier.Val() == SDK_API_VERSION && member->astKind == ASTKind::PROP_DECL) {
-            auto propDecl = StaticCast<PropDecl>(member.get());
-            CJC_ASSERT(propDecl->getters.size() > 0);
-            target = propDecl->getters[0].get();
+    Ptr<Decl> target = nullptr;
+    if (node->GetTarget()) {
+        target = node->GetTarget();
+    } else if (auto ce = DynamicCast<CallExpr>(node); ce && ce->resolvedFunction) {
+        target = ce->resolvedFunction;
+    }
+    if (!target) {
+        return;
+    }
+    target->linkage = Linkage::EXTERNAL_WEAK;
+    if (auto fd = DynamicCast<FuncDecl>(target)) {
+        for (auto& param : fd->funcBody->paramLists[0]->params) {
+            if (param->desugarDecl) {
+                param->desugarDecl->linkage = Linkage::EXTERNAL_WEAK;
+            }
+        }
+        if (fd->propDecl) {
+            fd->propDecl->linkage = Linkage::EXTERNAL_WEAK;
+        }
+    } else if (auto md = DynamicCast<MacroDecl>(target)) {
+        if (md->desugarDecl) {
+            md->desugarDecl->linkage = Linkage::EXTERNAL_WEAK;
+        }
+    } else if (auto pd = DynamicCast<PropDecl>(target)) {
+        for (auto& getter : pd->getters) {
+            if (!getter) {
+                continue;
+            }
+            getter->linkage = Linkage::EXTERNAL_WEAK;
+        }
+        for (auto& setter : pd->setters) {
+            if (!setter) {
+                continue;
+            }
+            setter->linkage = Linkage::EXTERNAL_WEAK;
         }
     }
-    auto refOfDeviceInfo = CreateRefExpr(SrcIdentifier(DEVICE_INFO), deviceInfoDecl->ty, {});
-    refOfDeviceInfo->SetTarget(deviceInfoDecl);
-    auto me = CreateMemberAccess(std::move(refOfDeviceInfo), "$sdkApiVersionget");
-    me->SetTarget(target);
-    me->ty = target->ty;
-    auto callExpr = CreateCallExpr(
-        std::move(me), {}, target, typeManager.GetPrimitiveTy(TypeKind::TYPE_INT64), CallKind::CALL_DECLARED_FUNCTION);
-    callExpr->SetTarget(target);
-    auto condition = CreateBinaryExpr(std::move(callExpr), std::move(iae.GetArg()->expr), TokenKind::GE);
-    condition->ty = typeManager.GetPrimitiveTy(TypeKind::TYPE_BOOLEAN);
-    AddCurFile(*condition, iae.curFile);
-    return std::move(condition);
-}
-
-// Before desugar: `@IfAvaliable(syscap: "xxx", {=>...}, {=>...})`
-// Desugar as: `if (canIUse("xxx")) {...} else {...}`
-OwnedPtr<Expr> APILevelAnnoChecker::DesugarIfAvailableSyscapCondition(IfAvailableExpr& iae)
-{
-    // Get func decleration 'public func canIUse(syscap: String): Bool' from PKG_NAME_CANIUSE_AT.
-    auto canIUseFunc = importManager.GetImportedDecl(PKG_NAME_CANIUSE_AT, CANIUSE_IDENTIFIER);
-    if (!canIUseFunc || !canIUseFunc->IsFunc()) {
-        ChkIfImportBase(diag, importManager, iae);
-        return nullptr;
-    }
-    auto canIUseRef = CreateRefExpr(SrcIdentifier(CANIUSE_IDENTIFIER), canIUseFunc->ty, {});
-    canIUseRef->SetTarget(canIUseFunc);
-    std::vector<OwnedPtr<FuncArg>> argList;
-    argList.emplace_back(CreateFuncArg(std::move(iae.GetArg()->expr)));
-    auto condition = CreateCallExpr(std::move(canIUseRef), std::move(argList), StaticCast<FuncDecl>(canIUseFunc),
-        typeManager.GetPrimitiveTy(TypeKind::TYPE_BOOLEAN), CallKind::CALL_DECLARED_FUNCTION);
-    AddCurFile(*condition, iae.curFile);
-    condition->SetTarget(canIUseFunc);
-    return std::move(condition);
-}
-
-OwnedPtr<Expr> APILevelAnnoChecker::DesugarIfAvailableCondition(IfAvailableExpr& iae)
-{
-    if (iae.GetArg()->name == LEVEL_IDENTGIFIER) {
-        return DesugarIfAvailableLevelCondition(iae);
-    } else if (iae.GetArg()->name == SYSCAP_IDENTGIFIER) {
-        return DesugarIfAvailableSyscapCondition(iae);
-    } else {
-        return nullptr;
+    if (target->outerDecl && target->outerDecl->IsNominalDecl()) {
+        target->outerDecl->linkage = Linkage::EXTERNAL_WEAK;
+        MarkTargetAsExternalWeak(target->outerDecl);
     }
 }
 
-void APILevelAnnoChecker::DesugarIfAvailableExprInTypeCheck(IfAvailableExpr& iae)
-{
-    if (iae.desugarExpr) {
-        return;
-    }
-    // Create condition.
-    OwnedPtr<Expr> condition = DesugarIfAvailableCondition(iae);
-    if (!condition) {
-        return;
-    }
-    auto ifBlock = ASTCloner::Clone(iae.GetLambda1()->funcBody->body.get());
-    auto elseBlock = ASTCloner::Clone(iae.GetLambda2()->funcBody->body.get());
-    CJC_ASSERT(ifBlock->ty == elseBlock->ty);
-    auto ifExpr = CreateIfExpr(
-        std::move(condition), std::move(ifBlock), std::move(elseBlock), iae.GetLambda1()->funcBody->body->ty);
-    iae.desugarExpr = std::move(ifExpr);
-}
+} // namespace
 
 void APILevelAnnoChecker::ParseJsonFile(const std::vector<uint8_t>& in) noexcept
 {
@@ -435,24 +378,18 @@ void APILevelAnnoChecker::ParseJsonFile(const std::vector<uint8_t>& in) noexcept
         }
     }
     intersectionSet = lastSyscap.value();
-    for (auto cap : intersectionSet) {
-        Debugln("[apilevel] APILevel_syscap intersectionSet: ", cap);
-    }
-    for (auto cap : unionSet) {
-        Debugln("[apilevel] APILevel_syscap unionSet: ", cap);
-    }
+
 }
 
 void APILevelAnnoChecker::ParseOption() noexcept
 {
     auto& option = ci.invocation.globalOptions;
-    auto found = option.passedWhenKeyValue.find(CFG_PARAM_LEVEL_NAME);
+    auto found = option.passedWhenKeyValue.find(std::string(CFG_PARAM_LEVEL_NAME));
     if (found != option.passedWhenKeyValue.end()) {
         globalLevel = Str2LevelType(found->second);
-        Debugln("[apilevel] APILevel_level: ", globalLevel);
         optionWithLevel = true;
     }
-    found = option.passedWhenKeyValue.find(CFG_PARAM_SYSCAP_NAME);
+    found = option.passedWhenKeyValue.find(std::string(CFG_PARAM_SYSCAP_NAME));
     if (found != option.passedWhenKeyValue.end()) {
         auto syscapsCfgPath = found->second;
         std::vector<uint8_t> jsonContent;
@@ -497,26 +434,22 @@ APILevelAnnoInfo APILevelAnnoChecker::Parse(const Decl& decl)
         if (!anno || !IsAnnoAPILevel(anno.get(), decl)) {
             continue;
         }
-        if (anno->args.size() < 1) {
-            auto builder = diag.DiagnoseRefactor(
-                DiagKindRefactor::sema_wrong_number_of_arguments, *anno, "missing argument", PARAMLIST_STR);
-            builder.AddMainHintArguments(std::to_string(parseNameParam.size()), std::to_string(anno->args.size()));
-            continue;
-        }
-        // level
-        CJC_NULLPTR_CHECK(anno->args[0]);
-        parseNameParam[LEVEL_IDENTGIFIER](*anno->args[0]->expr.get(), ret, diag);
-        // syscap
-        for (size_t i = 1; i < anno->args.size(); ++i) {
+        for (size_t i = 0; i < anno->args.size(); ++i) {
             std::string argName = anno->args[i]->name.Val();
-            CJC_ASSERT(parseNameParam.count(argName) > 0);
+            if (parseNameParam.count(argName) <= 0) {
+                continue;
+            }
             std::string preSyscap = ret.syscap;
             parseNameParam[argName](*anno->args[i]->expr.get(), ret, diag);
             if (!preSyscap.empty() && preSyscap != ret.syscap) {
                 diag.DiagnoseRefactor(DiagKindRefactor::sema_apilevel_multi_diff_syscap, decl);
             }
         }
-        Debugln("[apilevel] ", decl.identifier, " get level: ", ret.level, ", syscap: ", ret.syscap);
+        // In the APILevel definition, only "since" does not provide a default value. Here, the alert indicates that
+        // there is an issue with the APILevel annotation, which may originnate from the cj.d file.
+        if (ret.since == 0) {
+            diag.DiagnoseRefactor(DiagKindRefactor::sema_apilevel_missing_arg, anno->begin, "since!: String");
+        }
     }
     levelCache[&decl] = ret;
     return ret;
@@ -528,12 +461,12 @@ bool APILevelAnnoChecker::CheckLevel(
     if (!optionWithLevel) {
         return true;
     }
-    LevelType scopeLevel = scopeAPILevel.level != 0 ? scopeAPILevel.level : globalLevel;
+    LevelType scopeLevel = scopeAPILevel.since != 0 ? scopeAPILevel.since : globalLevel;
     auto targetAPILevel = Parse(target);
-    if (targetAPILevel.level > scopeLevel && !node.begin.IsZero()) {
+    if (targetAPILevel.since > scopeLevel && !node.begin.IsZero()) {
         if (reportDiag) {
             diag.DiagnoseRefactor(DiagKindRefactor::sema_apilevel_ref_higher, node, target.identifier.Val(),
-                std::to_string(targetAPILevel.level), std::to_string(scopeLevel));
+                std::to_string(targetAPILevel.since), std::to_string(scopeLevel));
         }
         return false;
     }
@@ -618,17 +551,20 @@ bool APILevelAnnoChecker::CheckNode(Ptr<Node> node, APILevelAnnoInfo& scopeAPILe
 
 void APILevelAnnoChecker::CheckIfAvailableExpr(IfAvailableExpr& iae, APILevelAnnoInfo& scopeAPILevel)
 {
-    Ptr<FuncArg> arg = iae.GetArg();
-    if (!arg || !arg->expr || arg->expr->astKind != ASTKind::LIT_CONST_EXPR) {
+    if (!iae.desugarExpr || iae.desugarExpr->astKind != ASTKind::IF_EXPR) {
         return;
     }
-    if (parseNameParam.count(arg->name) <= 0) {
-        diag.DiagnoseRefactor(DiagKindRefactor::sema_ifavailable_unknow_arg_name, MakeRange(iae.GetArg()->name),
-            iae.GetArg()->name.Val());
+    auto ifExpr = StaticCast<IfExpr>(iae.desugarExpr.get());
+    Ptr<FuncArg> arg = iae.GetArg();
+    if (parseNameParam.count(arg->name.Val()) <= 0) {
         return;
     }
     auto ifScopeAPILevel = APILevelAnnoInfo();
-    parseNameParam[arg->name](*arg->expr.get(), ifScopeAPILevel, diag);
+    parseNameParam[arg->name.Val()](*ifExpr->condExpr, ifScopeAPILevel, diag);
+    if (ifScopeAPILevel.since != 0 && ifScopeAPILevel.since < IFAVAIALBEL_LOWER_LIMITLEVEL) {
+        diag.DiagnoseRefactor(DiagKindRefactor::sema_ifavailable_level_limit, *arg);
+        return;
+    }
     // if branch.
     auto checkerIf = [this, &ifScopeAPILevel, &scopeAPILevel](Ptr<Node> node) -> VisitAction {
         if (auto e = DynamicCast<IfAvailableExpr>(node)) {
@@ -639,30 +575,26 @@ void APILevelAnnoChecker::CheckIfAvailableExpr(IfAvailableExpr& iae, APILevelAnn
         // linkage to 'EXTERNAL_WEAK'.
         auto ret = CheckNode(node, ifScopeAPILevel);
         if (ret && !CheckNode(node, scopeAPILevel, false)) {
-            if (node->GetTarget()) {
-                Debugln("[apilevel] mark target ", node->GetTarget()->identifier.Val(), " as EXTERNAL_WEAK");
-                node->GetTarget()->linkage = Linkage::EXTERNAL_WEAK;
-            } else if (auto ce = DynamicCast<CallExpr>(node); ce && ce->resolvedFunction) {
-                Debugln("[apilevel] mark function ", ce->resolvedFunction->identifier.Val(), " as EXTERNAL_WEAK");
-                ce->resolvedFunction->linkage = Linkage::EXTERNAL_WEAK;
-            }
+            MarkTargetAsExternalWeak(node);
         }
         if (!ret) {
             return VisitAction::SKIP_CHILDREN;
         }
         return VisitAction::WALK_CHILDREN;
     };
-    Walker(iae.GetLambda1(), checkerIf).Walk();
+    Walker(ifExpr->thenBody.get(), checkerIf).Walk();
     // else branch.
     auto checkerElse = [this, &scopeAPILevel](Ptr<Node> node) -> VisitAction {
         if (auto e = DynamicCast<IfAvailableExpr>(node)) {
             CheckIfAvailableExpr(*e, scopeAPILevel);
             return VisitAction::SKIP_CHILDREN;
         }
-        CheckNode(node, scopeAPILevel);
+        if (!CheckNode(node, scopeAPILevel)) {
+            return VisitAction::SKIP_CHILDREN;
+        }
         return VisitAction::WALK_CHILDREN;
     };
-    Walker(iae.GetLambda2(), checkerElse).Walk();
+    Walker(ifExpr->elseBody.get(), checkerElse).Walk();
 }
 
 void APILevelAnnoChecker::Check(Package& pkg)
@@ -677,12 +609,12 @@ void APILevelAnnoChecker::Check(Package& pkg)
         auto scopeAPILevel = APILevelAnnoInfo();
         for (auto it = scopeDecl.rbegin(); it != scopeDecl.rend(); ++it) {
             scopeAPILevel = Parse(**it);
-            if (scopeAPILevel.level != 0) {
+            if (scopeAPILevel.since != 0) {
                 break;
             }
         }
         if (auto iae = DynamicCast<IfAvailableExpr>(node)) {
-            scopeAPILevel.level = scopeAPILevel.level == 0 ? globalLevel : scopeAPILevel.level;
+            scopeAPILevel.since = scopeAPILevel.since == 0 ? globalLevel : scopeAPILevel.since;
             CheckIfAvailableExpr(*iae, scopeAPILevel);
             return VisitAction::SKIP_CHILDREN;
         }
@@ -698,15 +630,9 @@ void APILevelAnnoChecker::Check(Package& pkg)
         return VisitAction::WALK_CHILDREN;
     };
     Walker(&pkg, checker, popScope).Walk();
-
-    // Desugar can't be skipped any node, cannot perform at the same time as the check.
-    auto desugarIfAvailable = [this](Ptr<Node> node) {
-        if (auto iae = DynamicCast<IfAvailableExpr>(node)) {
-            DesugarIfAvailableExprInTypeCheck(*iae);
-        }
-        return VisitAction::WALK_CHILDREN;
-    };
-    Walker(&pkg, desugarIfAvailable).Walk();
-    // Clear the annotation information of the dependency package.
-    ClearAnnoInfoOfDepPkg(importManager);
+    // Clear the annotation information of the dependency package to avoid chir failure.
+    // In the LSP scenario, annotation information still needs to be saved after SEMA.
+    if (!ci.invocation.globalOptions.enableMacroInLSP) {
+        ClearAnnoInfoOfDepPkg(importManager);
+    }
 }

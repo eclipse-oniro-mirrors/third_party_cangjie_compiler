@@ -20,7 +20,7 @@
 #endif
 #include "IRAttribute.h"
 #include "IRBuilder.h"
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/Type/Type.h"
 
 using namespace Cangjie;
@@ -204,7 +204,7 @@ inline bool HasAddrSpace(const CGValue* cgVal, unsigned int addrSpace)
     auto llvmType = llvmVal->getType();
     return llvmType->isPointerTy() && llvmType->getPointerAddressSpace() == addrSpace;
 }
-
+#ifdef __APPLE__
 inline void AddAttrForIntTypeArgOnMacMx(llvm::CallBase& callRet, const llvm::Use& arg)
 {
     auto intType = llvm::dyn_cast<llvm::IntegerType>(arg->getType());
@@ -218,7 +218,7 @@ inline void AddAttrForIntTypeArgOnMacMx(llvm::CallBase& callRet, const llvm::Use
         AddParamAttr(&callRet, arg.getOperandNo(), llvm::Attribute::SExt);
     }
 }
-
+#endif
 llvm::Value* CreateCFuncCallOrInvoke(IRBuilder2& irBuilder, llvm::Function& callee,
     const std::vector<CGValue*>& argsVal, const CHIR::Type& chirRetTy, bool isSRet)
 {
@@ -254,6 +254,7 @@ llvm::Value* CreateCFuncCallOrInvoke(IRBuilder2& irBuilder, llvm::Function& call
             AddParamAttr(callRet, it->getArgNo(), byValAttr);
         }
     }
+#ifdef __APPLE__
     const bool macOnMx = !nonAarch64 && target.os == Triple::OSType::DARWIN;
     if (macOnMx) {
         for (auto ext : {llvm::Attribute::SExt, llvm::Attribute::ZExt}) {
@@ -265,6 +266,7 @@ llvm::Value* CreateCFuncCallOrInvoke(IRBuilder2& irBuilder, llvm::Function& call
             AddAttrForIntTypeArgOnMacMx(*callRet, arg);
         }
     }
+#endif
     if (isSRet) {
         AddParamAttr(callRet, 0, llvm::Attribute::NoAlias);
         AddSRetAttribute(callRet);

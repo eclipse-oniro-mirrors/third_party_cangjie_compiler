@@ -258,7 +258,7 @@ void TypeChecker::TypeCheckerImpl::CheckCFuncType(ASTContext& ctx, const RefType
     CheckCFuncReturnType(*arg->retType);
 }
 
-bool TypeChecker::TypeCheckerImpl::CheckRefExprCheckTyArgs(const RefType& rt, const Decl& target) const
+bool TypeChecker::TypeCheckerImpl::CheckRefExprCheckTyArgs(const RefType& rt, const Decl& target)
 {
     bool skipFurther = false;
     if (rt.typeArguments.empty()) {

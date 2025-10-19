@@ -97,14 +97,6 @@ inline std::string GetMangledNameOfCompilerAddedClass(const std::string& classNa
     return MANGLE_NESTED_PREFIX + MangleName(className) + "E";
 }
 
-std::string GenerateTypeName(const CHIR::Type& type);
-std::string GenerateRawArrayName(const CHIR::RawArrayType& type);
-std::string GenerateTupleName(const CHIR::TupleType& type);
-std::string GenerateClosureName(const CHIR::ClosureType& type);
-std::string GenerateFuncName(const CHIR::FuncType& type);
-std::string GenerateVArrayName(const CHIR::VArrayType& type);
-std::string GenerateCPointerName(const CHIR::CPointerType& type);
-std::string GenerateCustomTypeName(const CHIR::CustomType& type);
 
 const std::unordered_map<CHIR::ExprKind, std::string> OPERATOR_KIND_TO_OP_MAP = {
     {CHIR::ExprKind::ADD, "add"},
@@ -151,13 +143,6 @@ inline bool HasNoUse(const llvm::Value& value)
     return !value.hasNUsesOrMore(1);
 }
 
-inline bool IsOption(const CHIR::Type& ty)
-{
-    if (!ty.IsEnum()) {
-        return false;
-    }
-    return StaticCast<const CHIR::EnumType&>(ty).IsOption();
-}
 
 inline const CHIR::Type* DeRef(const CHIR::Type& chirTy)
 {
@@ -245,8 +230,8 @@ inline bool IsAtomicIntrinsic(const CHIR::IntrinsicKind& intrinsicKind)
         intrinsicKind <= CHIR::IntrinsicKind::ATOMIC_FETCH_XOR;
 }
 
-int64_t GetIntMaxOrMin(const CHIR::IntType& ty, bool isMax);
-uint64_t GetUIntMax(const CHIR::IntType& ty);
+int64_t GetIntMaxOrMin(const CHIR::IntType::TypeKind& typeKind, bool isMax);
+uint64_t GetUIntMax(const CHIR::IntType::TypeKind& typeKind);
 
 inline bool IsPassedByReference(llvm::Type* type)
 {
@@ -314,6 +299,7 @@ public:
  * Return a pair consisting of a bool value set to true if the input parameter is a constant, and
  * a string representing the result of the serialization.
  */
+std::string ConstantValueToString(const CHIR::Constant& expr);
 std::tuple<bool, std::string> IsConstantArray(const CHIR::RawArrayLiteralInit& arrayLiteralInit);
 std::tuple<bool, std::string> IsConstantVArray(const CHIR::VArray& varray);
 std::tuple<bool, std::string> IsConstantTuple(const CHIR::Tuple& tuple);

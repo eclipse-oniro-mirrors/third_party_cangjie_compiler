@@ -11,8 +11,6 @@
 
 #include "cangjie/CHIR/Value.h"
 
-#include <iostream>
-#include <sstream>
 
 namespace Cangjie::CHIR {
 enum ConstantValueKind : uint8_t {
@@ -99,16 +97,16 @@ class StringLiteral : public LiteralValue {
     friend class CHIRBuilder;
 
 public:
-    std::string GetVal() const;
+    std::string GetVal() const&;
+    std::string GetVal() &&;
 
     std::string ToString() const override;
 
 private:
-    explicit StringLiteral(Type* ty, std::string val, bool isJString);
+    explicit StringLiteral(Type* ty, std::string val);
     ~StringLiteral() override = default;
 
     std::string val;
-    bool isJString; /**< is this literal string type from foreign language. */
 };
 
 /*

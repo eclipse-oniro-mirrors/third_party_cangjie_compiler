@@ -11,7 +11,7 @@
 
 #include "cangjie/CHIR/Analysis/AnalysisWrapper.h"
 #include "cangjie/CHIR/Analysis/ValueRangeAnalysis.h"
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/Package.h"
 #include "cangjie/CHIR/Utils.h"
 #include "cangjie/CHIR/Value.h"
@@ -83,11 +83,6 @@ private:
      */
     void RewriteToConstExpr(const RewriteInfo& rewriteInfo, bool isDebug) const;
 
-    /**
-     * This function will replaced all use of the result of the expression @p expr with the value
-     * @p newVal. A debug message will also be printed if @p isDebug is true.
-     */
-    void ReplaceUsageOfExprResult(const Ptr<const Expression>& expr, const Ptr<Value>& newVal, bool isDebug) const;
 
     // ==================== Rewrite Terminator Expressions ==================== //
 

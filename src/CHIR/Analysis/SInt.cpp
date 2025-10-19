@@ -684,25 +684,7 @@ void SInt::SetBit(unsigned pos)
     CJC_ASSERT(pos < width);
     val |= MaskBit(pos);
 }
-// Set the sign bit to one
-void SInt::SetSignBit()
-{
-    SetBit(width - 1);
-}
 
-// Set bits from \p lo to \p hi to one when \p lo is less than \p hi. Otherwise, this function handles the
-// "wrapping" case.
-void SInt::SetBitsWithWrap(unsigned lo, unsigned hi)
-{
-    CJC_ASSERT(lo <= width);
-    CJC_ASSERT(hi <= width);
-    if (lo < hi) {
-        SetBits(lo, hi);
-    } else {
-        SetLowBits(hi);
-        SetHighBits(width - lo);
-    }
-}
 
 // Set from \p lo to \p hi bits to one
 void SInt::SetBits(unsigned lo, unsigned hi)
@@ -733,17 +715,6 @@ void SInt::ClearBit(unsigned pos)
     val &= ~MaskBit(pos);
 }
 
-void SInt::ClearLowBits(unsigned lo)
-{
-    CJC_ASSERT(lo <= width);
-    SInt keep = GetHighBitsSet(width, width - lo);
-    *this &= keep;
-}
-
-void SInt::ClearSignBit()
-{
-    ClearBit(width - 1);
-}
 
 void SInt::FlipAllBits()
 {
@@ -1018,25 +989,6 @@ SInt SInt::SExt(IntWidth w) const
     return {w, static_cast<WordType>(SignExtend64(val, static_cast<unsigned>(this->width)))};
 }
 
-SInt SInt::ZExtOrTrunc(IntWidth w) const
-{
-    if (this->width < w) {
-        return ZExt(w);
-    } else if (this->width > w) {
-        return Trunc(w);
-    }
-    return *this;
-}
-
-SInt SInt::SExtOrTrunc(IntWidth w) const
-{
-    if (this->width < w) {
-        return SExt(w);
-    } else if (this->width > w) {
-        return Trunc(w);
-    }
-    return *this;
-}
 
 SInt SInt::SAddOvf(const SInt& rhs, bool& overflow) const
 {

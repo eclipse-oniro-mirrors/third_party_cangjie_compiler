@@ -13,4 +13,5 @@
 #include "cangjie/Basic/DiagRefactor/DiagnosticModule.def"
 #include "cangjie/Basic/DiagRefactor/DiagnosticPackage.def"
 #include "cangjie/Basic/DiagRefactor/DiagnosticParser.def"
+#include "cangjie/Basic/DiagRefactor/DiagnosticParserQuery.def"
 #include "cangjie/Basic/DiagRefactor/DiagnosticSema.def"

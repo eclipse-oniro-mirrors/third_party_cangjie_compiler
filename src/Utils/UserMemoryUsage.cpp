@@ -4,9 +4,10 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "UserMemoryUsage.h"
 
-#include <fstream>
 #include <iostream>
 #include <unordered_map>
 #include <vector>
@@ -31,6 +32,7 @@ static const int DISPLAY_PRECISION = 2;
 static const int KILOBYTE = 1024;
 
 namespace Cangjie {
+
 
 std::string UserMemoryUsage::GetJson() const
 {
@@ -57,6 +59,7 @@ std::string UserMemoryUsage::GetJson() const
     out << "\n}\n";
     return out.str();
 }
+
 
 void UserMemoryUsage::Start(const std::string& title, const std::string& subtitle, const std::string& desc)
 {

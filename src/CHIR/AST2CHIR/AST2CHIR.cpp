@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/AST2CHIR/AST2CHIR.h"
 
 #include "cangjie/AST/Match.h"
@@ -343,6 +345,7 @@ void AST2CHIR::SetGenericDecls() const
     }
 }
 
+
 void AST2CHIR::TranslateAllDecls(const AST::Package& pkg, const InitOrder& initOrder)
 {
     Utils::ProfileRecorder recorder("AST to CHIR Translation", "TranslateAllDecls");
@@ -384,7 +387,6 @@ void AST2CHIR::TranslateAllDecls(const AST::Package& pkg, const InitOrder& initO
         trans.TranslateAnnoFactoryFuncBody(*decl.first, *decl.second);
     }
     Utils::ProfileRecorder::Stop("TranslateAllDecls", "TranslateOtherTopLevelDecls");
-
     // step 4: set `CompileTimeValue` for lambda
     Utils::ProfileRecorder::Start("TranslateAllDecls", "SetCompileTimeValueFlag");
     for (auto func : package->GetGlobalFuncs()) {

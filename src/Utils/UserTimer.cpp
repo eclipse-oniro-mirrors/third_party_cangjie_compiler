@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "UserTimer.h"
 
 #include <algorithm>
@@ -12,6 +14,7 @@
 #include "cangjie/Utils/CheckUtils.h"
 
 namespace Cangjie {
+
 
 std::string UserTimer::GetJson() const
 {
@@ -34,6 +37,7 @@ std::string UserTimer::GetJson() const
     output += "\n}\n";
     return output;
 }
+
 
 void UserTimer::Start(const std::string& title, const std::string& subtitle, const std::string& desc)
 {

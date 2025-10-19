@@ -4,10 +4,12 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-#include <string>
-#include "gtest/gtest.h"
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/Macro/TokenSerialization.h"
 #include "cangjie/Lex/Lexer.h"
+#include "gtest/gtest.h"
+#include <string>
 using namespace Cangjie;
 
 class TokenSerializationTest : public testing::Test {

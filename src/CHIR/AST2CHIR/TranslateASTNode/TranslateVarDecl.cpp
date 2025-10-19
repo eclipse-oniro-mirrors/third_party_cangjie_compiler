@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
 #include "cangjie/CHIR/Utils.h"
@@ -83,6 +85,7 @@ void Translator::StoreRValueToLValue(const AST::VarDecl& decl, Value& rval, Ptr<
     } else {
         auto warnPos = GetVarLoc(builder.GetChirContext(), decl);
         lval = TypeCastOrBoxIfNeeded(rval, *leftType, varPos);
+
         // If disable `-g` option, let variable still need create `Debug` node for DCE print warning.
         // Note: there is a special case exist only disable '-g' option: the LocalVar's debug node will be overwritten,
         // but does not affect debugging information, because disable '-g' option, codegen will skip `Debug` node.

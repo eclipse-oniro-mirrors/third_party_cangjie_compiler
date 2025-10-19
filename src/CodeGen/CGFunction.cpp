@@ -4,11 +4,14 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Dominators.h"
 
 #include "Base/CGTypes/CGFunctionType.h"
 #include "CGModule.h"
+
 #include "IRBuilder.h"
 #include "Utils/BlockScopeImpl.h"
 #include "Utils/CGCommonDef.h"
@@ -193,6 +196,7 @@ void CGFunction::Opt() const
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     EraseReplaceableAlloca(cgMod, *function);
     AddZeroInitForStructWithRefField(cgMod, *function);
+
 #endif
 }
 

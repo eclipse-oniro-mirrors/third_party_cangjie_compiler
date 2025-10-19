@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CHIR_CHIRTYPE_H
 #define CANGJIE_CHIR_CHIRTYPE_H
 
@@ -47,6 +49,7 @@ public:
     Type* TranslateType(AST::Ty& ty);
     
     /**
+
      * @brief Fills the generic argument types.
      *
      * @param ty The AST generics type to be processed.

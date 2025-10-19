@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "CGContext.h"
 
 #include "CGContextImpl.h"
@@ -19,6 +21,7 @@ CGContext::CGContext(const SubCHIRPackage& subCHIRPackage, CGPkgContext& cgPkgCo
     llvmContext = new llvm::LLVMContext(); // This `llvmContext` will be released in the de-constructor of `CGModule`.
     llvmContext->setOpaquePointers(cgPkgContext.GetGlobalOptions().enableOpaque);
     impl = std::make_unique<CGContextImpl>();
+
 }
 #endif
 
@@ -121,6 +124,7 @@ void CGContext::AddNullableReference(llvm::Value* value)
 {
     (void)impl->nullableReference.emplace(value);
 }
+
 #endif
 } // namespace CodeGen
 } // namespace Cangjie

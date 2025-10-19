@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CHIR_OVERFLOWCHECKING_H
 #define CANGJIE_CHIR_OVERFLOWCHECKING_H
 
@@ -71,6 +73,7 @@ public:
     static bool IsExpOverflow(int64_t x, uint64_t y, OverflowStrategy strategy, int64_t* res);
 
     /**
+
      * @brief Checks for overflow when typecasting an integer to another type.
      *
      * @tparam T The source data type.

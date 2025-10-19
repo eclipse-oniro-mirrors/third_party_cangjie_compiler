@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -106,6 +108,7 @@ bool CHIR2BCHIR::IsConstClass(const CustomTypeDef& def) const
     }
 };
 
+
 template <bool ForConstEval> void CHIR2BCHIR::TranslateClasses(const Package& chirPkg)
 {
     for (const auto chirClass : chirPkg.GetAllClassDef()) {
@@ -124,6 +127,7 @@ template <bool ForConstEval> void CHIR2BCHIR::TranslateClasses(const Package& ch
         CollectMethods(*chirClass, classInfo);
         AddClassInfo(chirClass->GetIdentifierWithoutPrefix(), std::move(classInfo), bchir, isIncremental);
     }
+
     for (const auto chirClass : chirPkg.GetAllStructDef()) {
         if constexpr (ForConstEval) {
             if (!IsConstClass(*chirClass)) {
@@ -134,11 +138,13 @@ template <bool ForConstEval> void CHIR2BCHIR::TranslateClasses(const Package& ch
         CollectMethods(*chirClass, classInfo);
         AddClassInfo(chirClass->GetIdentifierWithoutPrefix(), std::move(classInfo), bchir, isIncremental);
     }
+
     for (const auto chirClass : chirPkg.GetAllEnumDef()) {
         Bchir::SClassInfo classInfo;
         CollectMethods(*chirClass, classInfo);
         AddClassInfo(chirClass->GetIdentifierWithoutPrefix(), std::move(classInfo), bchir, isIncremental);
     }
+
     for (const auto chirClass : chirPkg.GetAllExtendDef()) {
         auto extendedDef = chirClass->GetExtendedCustomTypeDef();
         if constexpr (ForConstEval) {
@@ -207,7 +213,6 @@ template <bool ForConstEval> void CHIR2BCHIR::TranslateFunctions(const Package& 
         if (isIncremental && bchir.GetFunctions().find(fIdent) != bchir.GetFunctions().end()) {
             bchir.RemoveFunction(fIdent);
         }
-
         if constexpr (ForConstEval) {
             bool missingBody = f->TestAttr(Attribute::SKIP_ANALYSIS) && !f->GetBody();
             if (missingBody) {
@@ -295,6 +300,7 @@ Bchir::ByteCodeContent CHIR2BCHIR::GetTypeIdx(Cangjie::CHIR::Type& chirType)
             }
             break;
         }
+
         case CHIR::Type::TYPE_FUNC: {
             auto& fType = StaticCast<const FuncType&>(chirType);
             for (auto& it : fType.GetParamTypes()) {
@@ -486,6 +492,7 @@ Bchir::ByteCodeContent CHIR2BCHIR::LVarId(Context& ctx, const Value& value)
     ctx.val2lvarId.emplace_hint(it, &value, ctx.localVarId);
     return ctx.localVarId++; // increment ctx.localVarId
 }
+
 
 
 void CHIR2BCHIR::TranslateAllocate(Context& ctx, const Expression& expr)

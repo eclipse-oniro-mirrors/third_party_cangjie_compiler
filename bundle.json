@@ -1,0 +1,36 @@
+{
+    "name": "@ohos/cangjie_compiler",
+    "description": "Cangjie compiler provides compilation of Cangjie language source code into executables, along with built-in debugging and optimization support",
+    "version": "6.1",
+    "license": "Apache-2.0 with Runtime Library Exceptions",
+    "publishAs": "code-segment",
+    "segment": {
+        "destPath": "third_party/cangjie_compiler"
+    },
+    "dirs": {},
+    "scripts": {},
+    "licensePath": "./LICENSE",
+    "component": {
+        "name": "cangjie_compiler",
+        "subsystem": "thirdparty",
+        "syscap": [],
+        "features": [],
+        "adapted_system_type": [ "standard" ],
+        "rom": "",
+        "ram": "",
+        "deps": {
+            "components": [
+                "mingw-w64",
+                "llvm-project",
+                "flatbuffers",
+                "bounds_checking_function"
+            ],
+            "third_party": []
+        },
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}

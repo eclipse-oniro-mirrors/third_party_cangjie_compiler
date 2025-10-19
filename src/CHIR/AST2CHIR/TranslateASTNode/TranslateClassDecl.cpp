@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
 #include "cangjie/CHIR/CHIRCasting.h"
@@ -72,6 +74,7 @@ void Translator::TranslateClassLikeDecl(ClassDef& classDef, const AST::ClassLike
     // step 6: collect annotation info of the type and members for annotation target check
     CollectTypeAnnotation(decl, classDef);
 }
+
 
 void Translator::AddMemberVarDecl(CustomTypeDef& def, const AST::VarDecl& decl)
 {

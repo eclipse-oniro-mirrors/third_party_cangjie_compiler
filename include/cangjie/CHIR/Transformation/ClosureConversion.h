@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CHIR_TRANSFORMATION_CLOSURE_CONVERSION_H
 #define CANGJIE_CHIR_TRANSFORMATION_CLOSURE_CONVERSION_H
 
@@ -144,6 +146,7 @@ private:
     Func* CreateGenericMethodInAutoEnvWrapper(ClassDef& autoEnvWrapperDef);
     void CreateInstMethodInAutoEnvWrapper(ClassDef& autoEnvWrapperDef, Func& genericFunc);
     void ConvertTypeFromGenericBaseToInstBase(std::vector<Type*>& types);
+
 
     std::unordered_map<std::string, ClassDef*> genericAutoEnvBaseDefs;
     std::unordered_map<std::string, ClassDef*> instAutoEnvBaseDefs;

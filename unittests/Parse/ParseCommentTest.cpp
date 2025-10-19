@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -98,6 +100,7 @@ class A {
 // c2 rule 1
 
 main() {
+
 }
     )";
     Parser parser(code, diag, sm, {0, 1, 1}, true);

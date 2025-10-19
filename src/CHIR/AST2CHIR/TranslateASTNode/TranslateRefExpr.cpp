@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/AST/Utils.h"
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
@@ -44,6 +46,7 @@ uint64_t Translator::GetVarMemberIndex(const AST::VarDecl& varDecl)
                 index++;
             }
         }
+
     } else if (outerDecl->astKind == ASTKind::CLASS_DECL) {
         auto classDecl = StaticCast<ClassDecl*>(outerDecl);
         auto classTy = StaticCast<ClassType*>(GetNominalSymbolTable(*classDecl)->GetType());
@@ -117,6 +120,7 @@ Translator::LeftValueInfo Translator::TranslateEnumMemberVarRef(const AST::RefEx
         return LeftValueInfo(castedIntExpr, {});
     }
 }
+
 
 Translator::LeftValueInfo Translator::TranslateVarRefAsLeftValue(const AST::RefExpr& refExpr)
 {

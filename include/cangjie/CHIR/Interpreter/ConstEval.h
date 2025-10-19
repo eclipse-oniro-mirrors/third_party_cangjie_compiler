@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -56,6 +58,7 @@ private:
     Value* ConvertFuncToChir(const FuncType& ty, const IFunc& val);
     Value* ConvertArrayToChir(
         VArrayType& ty, const IArray& val, std::function<void(Expression*)>& insertExpr, Block& parent);
+
 
     ClassType* FindClassType(const std::string& mangledName);
 

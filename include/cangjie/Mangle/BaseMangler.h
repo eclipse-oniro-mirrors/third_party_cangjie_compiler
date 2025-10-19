@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -421,6 +423,7 @@ protected:
     mutable std::unordered_map<std::string, int> wildcardMap{};
     mutable std::mutex manglerUpdateMutex;
 
+
 private:
     // Get the direct parent decl rather than the intermediate decl like `extendDecl`.
     Ptr<const AST::Decl> GetOuterDecl(const AST::Decl& decl) const;
@@ -597,6 +600,7 @@ inline std::string GetOptPkgName(const std::string& pkgName)
 }
 
 /**
+
  * @brief Mangle file name part for global private declaration.
  *
  * @param decl A reference to the AST::Decl.

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 
 #include "cangjie/CHIR/ConstantUtils.h"
@@ -578,6 +580,7 @@ Translator::LeftValueInfo Translator::TranslateMemberAccessAsLeftValue(const AST
         CJC_NULLPTR_CHECK(targetVal);
         return LeftValueInfo(targetVal, {});
     }
+
 
     // Case 2.4: target is non-static member variable
     if (target->outerDecl && !target->TestAttr(AST::Attribute::STATIC)) {

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 
 #include "cangjie/CHIR/Type/ExtendDef.h"
@@ -248,6 +250,7 @@ void Translator::WrapMutFunc(CHIRBuilder& builder, CustomTypeDef& customTypeDef)
     }
     for (auto& [srcTy, infos] : customTypeDef.GetVTable()) {
         for (size_t i = 0; i < infos.size(); ++i) {
+
             CJC_NULLPTR_CHECK(infos[i].instance);
             auto rawFunc = infos[i].instance;
             while (auto base = rawFunc->Get<WrappedRawMethod>()) {

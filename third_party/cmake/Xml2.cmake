@@ -4,6 +4,8 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 message(STATUS "Configuring xml2 library...")
 
 set(XML2_BUILD_DIR ${CMAKE_BINARY_DIR}/third_party/xml2-build)

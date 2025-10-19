@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -14,6 +16,7 @@
 #include <securec.h>
 
 using namespace Cangjie::CHIR::Interpreter;
+
 
 const IVal& BCHIRInterpreter::PeekValueOfGlobal(Bchir::VarIdx id) const
 {
@@ -53,10 +56,12 @@ void BCHIRInterpreter::Interpret()
         // pcExcOffset is going to 0 if entry point was X or 1 is entry point was X_EXC
         Bchir::ByteCodeIndex pcExcOffset{0};
         switch (current) {
+
             case OpCode::ALLOCATE_RAW_ARRAY: {
                 InterpretAllocateRawArray<false, false>();
                 continue;
             }
+
             case OpCode::ALLOCATE_EXC:
                 pcExcOffset = 1;
                 // intended missing break
@@ -295,6 +300,7 @@ void BCHIRInterpreter::Interpret()
                 interpStack.ArgsPush(std::move(tuple));
                 continue;
             }
+
             case OpCode::VARRAY: {
                 auto sizeIdx = pc + 1;
                 auto size = bchir.Get(sizeIdx);
@@ -304,6 +310,7 @@ void BCHIRInterpreter::Interpret()
                 pc = sizeIdx + 1;
                 continue;
             }
+
             case OpCode::VARRAY_GET: {
                 InterpretVArrayGet();
                 continue;
@@ -320,6 +327,7 @@ void BCHIRInterpreter::Interpret()
                 pc = thunkIdx + 1;
                 continue;
             }
+
             case OpCode::RETURN: {
                 InterpretReturn();
                 continue;
@@ -498,6 +506,7 @@ void BCHIRInterpreter::Interpret()
                 InterpretInvoke<OpCode::INVOKE>();
                 continue;
             }
+
             case OpCode::TYPECAST: {
                 InterpretTypeCast();
                 if (raiseExnToTopLevel) {
@@ -585,6 +594,7 @@ void BCHIRInterpreter::Interpret()
                 }
                 continue;
             }
+
             case OpCode::SWITCH: {
                 InterpretSwitch();
                 continue;
@@ -957,6 +967,7 @@ template <OpCode op> void BCHIRInterpreter::InterpretTypeCast()
     auto targetKind = static_cast<CHIR::Type::TypeKind>(bchir.Get(pc++));
     auto strat = static_cast<Cangjie::OverflowStrategy>(bchir.Get(pc++));
 
+
     bool raisedExc = false;
     switch (srcKind) {
         case CHIR::Type::TypeKind::TYPE_RUNE: {
@@ -1090,6 +1101,7 @@ void BCHIRInterpreter::InterpretDeref()
 
     interpStack.ArgsPushIValRef(*ptr.content);
 }
+
 
 static constexpr int INSTRUCTION_DIFF{3};
 template <typename T, typename S>
@@ -1351,6 +1363,7 @@ template <OpCode op, typename T, typename S> bool BCHIRInterpreter::BinOpFloat()
         interpStack.ArgsPush(IValUtils::PrimitiveValue<T, S>(a1.content * a2.content));
     } else if constexpr (op == OpCode::BIN_DIV) {
         interpStack.ArgsPush(IValUtils::PrimitiveValue<T, S>(a1.content / a2.content));
+
     } else if constexpr (op == OpCode::BIN_EQUAL || op == OpCode::BIN_NOTEQ || op == OpCode::BIN_LT ||
         op == OpCode::BIN_GT || op == OpCode::BIN_LE || op == OpCode::BIN_GE) {
         return BinOpCompare<op, decltype(a1.content)>(a1.content, a2.content);
@@ -1544,6 +1557,7 @@ template <OpCode op> bool BCHIRInterpreter::BinOpUnit()
     return false;
 }
 
+
 IResult BCHIRInterpreter::Run(size_t baseIdx, bool expectsReturn)
 {
     baseIndex = static_cast<unsigned>(baseIdx);
@@ -1650,6 +1664,7 @@ template <typename Ty> void BCHIRInterpreter::InterpretSwitchWithType()
     }
 }
 
+
 IVal* BCHIRInterpreter::AllocateValue(IVal&& value)
 {
     IVal* ptr = arena.Allocate(std::move(value));
@@ -1677,6 +1692,7 @@ std::string BCHIRInterpreter::DebugGetMangledName(Bchir::ByteCodeIndex index) co
 {
     return bchir.GetLinkedByteCode().GetMangledNameAnnotation(index);
 }
+
 
 void BCHIRInterpreter::PrintDebugInfo(Bchir::ByteCodeIndex currentPc)
 {
@@ -1791,4 +1807,5 @@ void BCHIRInterpreter::InterpretRawArrayLiteralInit()
     }
     interpStack.ArgsPush(IUnit());
 }
+
 

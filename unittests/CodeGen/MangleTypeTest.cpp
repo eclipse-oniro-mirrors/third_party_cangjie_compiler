@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "CGTest.h"
 #include "cangjie/CHIR/Type/Type.h"
 #include "cangjie/CodeGen/CGUtils.h"
@@ -82,4 +84,5 @@ TEST_F(MangleTypeTest, RefTypes)
     // construct a RefType of Int8
     auto refTy = builder.GetType<RefType>(int8Ty);
     EXPECT_EQ(MangleType(*refTy), "a");
+
 }

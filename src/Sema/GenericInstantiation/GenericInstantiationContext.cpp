@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -88,6 +90,7 @@ void GIM::GenericInstantiationManagerImpl::RestoreInstantiatedDeclTy() const
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     WalkImportedInstantiations([this](Decl& decl) { RestoreInstantiatedDeclTy(decl); },
         [this](auto& pkg) { return importManager.IsMacroRelatedPackageName(pkg.fullPackageName); });
+
 #endif
 }
 
@@ -157,6 +160,7 @@ bool GIM::GenericInstantiationManagerImpl::IsDeclCanRestoredForTy(const Decl& de
         }
     }
     return true;
+
 #endif
 }
 

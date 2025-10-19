@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "Base/CGTypes/CGFunctionType.h"
 
 #include "Base/CGTypes/CGGenericType.h"
@@ -90,6 +92,7 @@ llvm::Type* CGFunctionType::GenLLVMType()
         auto llvmType = cgType->GetLLVMType();
 
         (void)realParamIndices.emplace_back(realArgIdx);
+
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
         /// Effect Overview
         // The parameter that requires additional basePtr must meet and the function should not be 'mut'

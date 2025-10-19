@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "UserCodeInfo.h"
 
 namespace Cangjie {
@@ -12,6 +14,7 @@ void UserCodeInfo::RecordInfo(const std::string& item, int64_t value)
 {
     codeInfo.emplace_back(item, value);
 }
+
 
 std::string UserCodeInfo::GetJson() const
 {
@@ -26,4 +29,5 @@ std::string UserCodeInfo::GetJson() const
     output += "\n}\n";
     return output;
 }
+
 } // namespace Cangjie

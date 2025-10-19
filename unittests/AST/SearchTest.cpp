@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -1126,6 +1128,7 @@ enum E2<ABC> {
     | A22(ABC) | B
     func E11<EFG>(a: ABC) {}
     func kk(a:ABC) {}
+
 }
     )";
 

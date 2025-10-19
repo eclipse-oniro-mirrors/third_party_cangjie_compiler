@@ -4,10 +4,11 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "TypeCheckerImpl.h"
 
 #include "Desugar/AfterTypeCheck.h"
-#include "JoinAndMeet.h"
 #include "TypeCheckUtil.h"
 
 #include "cangjie/AST/Create.h"

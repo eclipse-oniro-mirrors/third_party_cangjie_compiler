@@ -4,22 +4,20 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-if(EXISTS ${CANGJIE_CJNATIVE_SOURCE_DIR})
-    set(UNICODE_DEPENDENCIES ${CANGJIE_CJNATIVE_SOURCE_DIR})
-else()
-    execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/utils_dep/
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-    execute_process(COMMAND git clone https://gitcode.com/openharmony/third_party_llvm-project.git --depth 1
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/utils_dep/
-        RESULT_VARIABLE GIT_CLONE_RESULT)
-    execute_process(COMMAND git fetch --depth 1 origin 5c68a1cb123161b54b72ce90e7975d95a8eaf2a4
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/utils_dep/third_party_llvm-project
-        RESULT_VARIABLE GIT_FETCH_RESULT)
-    execute_process(COMMAND git checkout 5c68a1cb123161b54b72ce90e7975d95a8eaf2a4
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/utils_dep/third_party_llvm-project
-        RESULT_VARIABLE GIT_FETCH_RESULT)
-    set(UNICODE_DEPENDENCIES ${CMAKE_BINARY_DIR}/utils_dep/third_party_llvm-project)
-endif()
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
+execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/utils_dep/
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+execute_process(COMMAND git clone https://gitcode.com/openharmony/third_party_llvm-project.git --depth 1
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/utils_dep/
+    RESULT_VARIABLE GIT_CLONE_RESULT)
+execute_process(COMMAND git fetch --depth 1 origin 5c68a1cb123161b54b72ce90e7975d95a8eaf2a4
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/utils_dep/third_party_llvm-project
+    RESULT_VARIABLE GIT_FETCH_RESULT)
+execute_process(COMMAND git checkout 5c68a1cb123161b54b72ce90e7975d95a8eaf2a4
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/utils_dep/third_party_llvm-project
+    RESULT_VARIABLE GIT_FETCH_RESULT)
+set(UNICODE_DEPENDENCIES ${CMAKE_BINARY_DIR}/utils_dep/third_party_llvm-project)
 
 set(UNICODE_UTIL_SRC
     Unicode.cpp

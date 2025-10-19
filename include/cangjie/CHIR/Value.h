@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CHIR_VALUE_H
 #define CANGJIE_CHIR_VALUE_H
 
@@ -145,6 +147,7 @@ public:
     // ===--------------------------------------------------------------------===//
     const AnnoInfo& GetAnnoInfo() const;
     void SetAnnoInfo(AnnoInfo&& info);
+
     
 protected:
     explicit Value(Type* ty, std::string identifier, ValueKind kind);
@@ -167,6 +170,7 @@ protected:
     std::vector<Expression*> users; // variable users
     std::mutex userMutex;           // mutex for AddUserOnly and RemoveUserOnly
     AnnoInfo annoInfo;              // annoInfo, used in struct/class/enum member func
+
 
 private:
     ValueKind GetValueKind() const;
@@ -341,6 +345,7 @@ enum FuncKind : uint8_t {
     MAIN_ENTRY,
     ANNOFACTORY_FUNC,
     MACRO_FUNC,
+
     DEFAULT_PARAMETER_FUNC,
     FUNCKIND_END
 };
@@ -358,6 +363,7 @@ struct AbstractMethodParam {
     std::string paramName;
     Type* type = nullptr;
     AnnoInfo annoInfo;
+
 
     std::string ToString();
 };
@@ -560,6 +566,7 @@ public:
     void SetOwnerFunc(Func* func);
 
     Expression* GetOwnerExpression() const;
+
 
     BlockGroup* Clone(CHIRBuilder& builder, Func& newFunc) const;
     BlockGroup* Clone(CHIRBuilder& builder, Lambda& newLambda) const;

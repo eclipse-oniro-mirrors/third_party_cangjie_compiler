@@ -1,4 +1,4 @@
-# Cangjie Programming Language Compiler
+# Cangjie Programming Language Compiler(Beta Feature)
 
 ## Introduction
 
@@ -16,33 +16,33 @@ The overall architecture is shown below:
 
 - **Compiler Frontend**: Responsible for converting Cangjie source code from text to intermediate representation, including lexical, syntax, macro, and semantic analysis, ensuring code structure and semantics are correct, and preparing for backend code generation. This module depends on mingw-w64 to support Windows platform capabilities, enabling users to generate executable binaries that can call Windows APIs. It also relies on libboundscheck for safe function library access.
 
-  - **Lexer** breaks down Cangjie source code into meaningful tokens.
+    - **Lexer** breaks down Cangjie source code into meaningful tokens.
 
-  - **Parser** builds an Abstract Syntax Tree (AST) according to Cangjie grammar rules to reflect program structure.
+    - **Parser** builds an Abstract Syntax Tree (AST) according to Cangjie grammar rules to reflect program structure.
 
-  - **Semantic** performs type checking, type inference, and scope analysis on the AST to ensure semantic correctness.
+    - **Semantic** performs type checking, type inference, and scope analysis on the AST to ensure semantic correctness.
 
-  - **Mangler** handles symbol name mangling for Cangjie, and includes a demangler tool for reverse parsing.
+    - **Mangler** handles symbol name mangling for Cangjie, and includes a demangler tool for reverse parsing.
 
-  - **Package Management** manages and loads code modules, handles dependencies and namespace isolation, and supports multi-module collaborative development. This module uses the flatbuffer library for serialization and deserialization.
+    - **Package Management** manages and loads code modules, handles dependencies and namespace isolation, and supports multi-module collaborative development. This module uses the flatbuffer library for serialization and deserialization.
 
-  - **Macro** handles macro expansion, processing macro definitions and calls for code generation and reuse.
+    - **Macro** handles macro expansion, processing macro definitions and calls for code generation and reuse.
 
-  - **Condition Compile**: Conditional compilation allows compiling based on predefined or custom conditions; incremental compilation speeds up builds using previous compilation cache files.
+    - **Condition Compile**: Conditional compilation allows compiling based on predefined or custom conditions; incremental compilation speeds up builds using previous compilation cache files.
 
-  - **CHIR**: CHIR (Cangjie High Level IR) converts the AST to an intermediate representation and performs optimizations.
+    - **CHIR**: CHIR (Cangjie High Level IR) converts the AST to an intermediate representation and performs optimizations.
 
-  - **Codegen**: Translates the intermediate representation (CHIR) to LLVM IR, preparing for target machine code (LLVM BitCode) generation.
+    - **Codegen**: Translates the intermediate representation (CHIR) to LLVM IR, preparing for target machine code (LLVM BitCode) generation.
 
 - **LLVM**: Includes the compiler backend and related LLVM toolchain. The backend receives the intermediate representation from the frontend, optimizes it, generates target platform machine code, and links it into executable files.
 
-  - **opt**: Performs various optimizations on LLVM IR, such as constant folding and loop optimization, to improve code efficiency and quality.
+    - **opt**: Performs various optimizations on LLVM IR, such as constant folding and loop optimization, to improve code efficiency and quality.
 
-  - **llc**: Converts optimized LLVM IR to target platform machine code, supporting different hardware architectures.
+    - **llc**: Converts optimized LLVM IR to target platform machine code, supporting different hardware architectures.
 
-  - **ld**: Links multiple object files and libraries into the final executable, resolving symbol references and generating deployable program artifacts.
+    - **ld**: Links multiple object files and libraries into the final executable, resolving symbol references and generating deployable program artifacts.
 
-  - **debugger**: Provides debugging capabilities for the Cangjie language.
+    - **debugger**: Provides debugging capabilities for the Cangjie language.
 
 For more details on the LLVM toolchain and backend tools, refer to the [LLVM Command Guide](https://llvm.org/docs/CommandGuide/).
 

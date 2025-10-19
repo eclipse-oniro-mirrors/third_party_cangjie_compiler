@@ -4,14 +4,14 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-#include "gtest/gtest.h"
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/Basic/StringConvertor.h"
 #include "cangjie/Basic/Version.h"
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "cangjie/Utils/FileUtil.h"
 #include "cangjie/Utils/ICEUtil.h"
 #include "cangjie/Utils/Signal.h"
-
 #ifdef __unix__
 #include <cstdlib>
 #include <unistd.h>
@@ -246,7 +246,6 @@ CT(SIGTRAP, parser)
 CT(SIGBUS, parser)
 #endif
 CTSO(parser)
-
 // CT(SIGABRT, sema)
 // CT(SIGFPE, sema)
 // CT(SIGSEGV, sema)

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -419,6 +421,7 @@ Type* CreateNewTypeWithArgs(Type& oldType, const std::vector<Type*>& newArgs, CH
             CJC_ASSERT(newArgs.size() == 1);
             newType = builder.GetType<VArrayType>(newArgs[0], StaticCast<const VArrayType&>(oldType).GetSize());
             break;
+
         case Type::TypeKind::TYPE_BOXTYPE:
             CJC_ASSERT(newArgs.size() == 1);
             newType = builder.GetType<BoxType>(newArgs[0]);
@@ -1194,7 +1197,6 @@ bool IsConstructor(const Value& value)
     }
     return false;
 }
-
 bool MeetAutoEnvBase(const Type& subType, const Type& superType)
 {
     return subType.IsAutoEnvInstBase() && superType.IsAutoEnvGenericBase() &&

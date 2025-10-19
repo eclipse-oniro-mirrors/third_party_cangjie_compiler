@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CHIR_ANALYSIS_SINT_H
 #define CANGJIE_CHIR_ANALYSIS_SINT_H
 
@@ -368,12 +370,14 @@ struct SInt final {
     /// Extend this SInt as unsigned to a new width.
     SInt ZExt(IntWidth w) const;
 
+
     /// Region: manipulating functions
     /// Set all bits to one
     void SetAllBits();
 
     /// Set the selected bit \p pos to one
     void SetBit(unsigned pos);
+
 
     /// Set from \p lo to \p hi bits to one
     void SetBits(unsigned lo, unsigned hi);
@@ -386,6 +390,7 @@ struct SInt final {
 
     /// clear position to zero.
     void ClearBit(unsigned pos);
+
 
     /// flip all bits.
     void FlipAllBits();

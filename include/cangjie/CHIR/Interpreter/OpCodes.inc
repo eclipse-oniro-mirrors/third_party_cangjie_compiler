@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -57,6 +59,7 @@ OPCODE(VARRAY, "VARRAY", 1, false)         // size
 OPCODE(VARRAY_BY_VALUE, "VARRAY_BY_VALUE", 0, false)
 OPCODE(VARRAY_GET, "VARRAY_GET", 1, false) // path size
 OPCODE(FUNC, "FUNC", 1, false)
+
 // Terminators
 OPCODE(RETURN, "RETURN", 0, false) // return to call site
 OPCODE(JUMP, "JUMP", 1, false)   // Jump to subsequent index
@@ -88,6 +91,7 @@ OPCODE(BIN_MUL_EXC, "BIN_MUL_EXC", 3, true)
 OPCODE(BIN_DIV_EXC, "BIN_DIV_EXC", 3, true)
 OPCODE(BIN_MOD_EXC, "BIN_MOD_EXC", 3, true)
 OPCODE(BIN_EXP_EXC, "BIN_EXP_EXC", 3, true)
+
 OPCODE(BIN_LT, "BIN_LT", 2, false)
 OPCODE(BIN_GT, "BIN_GT", 2, false)
 OPCODE(BIN_LE, "BIN_LE", 2, false)

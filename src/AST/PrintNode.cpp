@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -36,6 +38,7 @@ const unsigned ONE_INDENT = 1u;
 const unsigned TWO_INDENT = 2u;
 const unsigned THREE_INDENT = 3u;
 #define UNKNOWN_TY (ANSI_COLOR_RED + "unknown" + ANSI_COLOR_RESET)
+
 
 void PrintModifiers(const Decl& decl, unsigned indent)
 {

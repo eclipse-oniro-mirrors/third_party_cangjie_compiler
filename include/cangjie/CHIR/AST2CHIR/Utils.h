@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CHIR_AST2CHIR_UTILS_H
 #define CANGJIE_CHIR_AST2CHIR_UTILS_H
 
@@ -116,6 +118,7 @@ bool IsSrcCodeImportedGlobalDecl(const AST::Decl& decl, const GlobalOptions& opt
 bool IsSymbolImportedDecl(const AST::Decl& decl, const GlobalOptions& opts);
 
 /**
+
  * @brief Checks if a function is local.
  *
  * @param func The function declaration.
@@ -163,7 +166,6 @@ bool IsOverflowOperator(const std::string& name);
  * @return True if the type can be an integer type, false otherwise.
  */
 bool CanBeIntegerType(const Type& type);
-
 void SetCompileTimeValueFlagRecursivly(Func& initFunc);
 } // namespace CHIR
 } // namespace Cangjie

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "IRBuilder.h"
 
 #include "llvm/IR/Value.h"
@@ -617,6 +619,7 @@ llvm::Instruction* IRBuilder2::CreateStore(const CGValue& cgVal, const CGValue& 
 }
 
 namespace {
+
 bool IsLoadExprForAllocatedGenericRef(const CHIR::Expression& chirExpr)
 {
     if (chirExpr.GetExprKind() != CHIR::ExprKind::LOAD) {

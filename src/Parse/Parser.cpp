@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -133,6 +135,7 @@ OwnedPtr<File> ParserImpl::ParseTopLevel()
     if (!scanDepPkg) {
         ParseTopLevelDecls(*ret, annos);
     }
+
     ret->end = lookahead.End();
     if (ret->end.IsZero()) {
         ret->end = ret->begin;

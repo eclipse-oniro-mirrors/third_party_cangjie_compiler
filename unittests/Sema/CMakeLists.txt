@@ -4,6 +4,8 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 add_executable(TypeCheckerTest TypeCheckerTest.cpp)
 target_link_libraries(
     TypeCheckerTest
@@ -25,7 +27,6 @@ target_link_libraries(
     GTest::gtest_main
     TestCompilerInstanceObject)
 add_test(NAME GenericTest COMMAND GenericTest)
-
 add_executable(CommentsTest CommentsTest.cpp)
 target_link_libraries(
     CommentsTest

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  * This file implements pattern decl parse apis.
@@ -1100,6 +1102,7 @@ OwnedPtr<StructBody> ParserImpl::ParseStructBody(StructDecl& sd)
             ret->decls.emplace_back(MakeOwned<InvalidDecl>(decl->begin));
             continue;
         }
+
         ret->decls.emplace_back(std::move(decl));
     }
     ret->rightCurlPos = lastToken.Begin();

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Checker/VarInitCheck.h"
 
 #include "cangjie/CHIR/Analysis/Engine.h"
@@ -49,6 +51,7 @@ void VarInitCheck::RunOnFunc(const Func* func)
     std::vector<MemberVarInfo> members;
     auto ctorInitInfo = std::make_unique<ConstructorInitInfo>();
     if (func->IsConstructor()) {
+
         auto customTypeDef = func->GetOuterDeclaredOrExtendedDef();
         CJC_NULLPTR_CHECK(customTypeDef);
         members = customTypeDef->GetAllInstanceVars();
@@ -58,6 +61,7 @@ void VarInitCheck::RunOnFunc(const Func* func)
             ctorInitInfo->localMemberNums = classDef->GetDirectInstanceVarNum();
             // We do a check here as class-Object does not have a super class.
             if (auto superClassDef = classDef->GetSuperClassDef(); superClassDef) {
+
                 ctorInitInfo->superClassDef = superClassDef;
                 ctorInitInfo->superMemberNums = members.size() - ctorInitInfo->localMemberNums;
             }

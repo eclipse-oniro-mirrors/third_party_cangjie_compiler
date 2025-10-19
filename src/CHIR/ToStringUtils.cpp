@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -96,6 +98,7 @@ std::string GetBlockStr(const Block& block, size_t indent)
             ss << res->GetIdentifier() << ": " << res->GetType()->ToString() << " = ";
         }
         ss << expr->ToString(indent + 1);
+
         ss << "\n";
     }
     return ss.str();
@@ -191,6 +194,7 @@ std::string GetLambdaStr(const Lambda& lambda, size_t indent)
     ss << "=> {";
     ss << " // ";
     ss << " srcCodeIdentifier: " << lambda.GetSrcCodeIdentifier();
+
     ss << GetGenericTypeParamsConstraintsStr(lambda.GetGenericTypeParams());
     ss << "\n" << GetBlockGroupStr(*lambda.GetBody(), indent + 1);
     ss << "}";
@@ -435,7 +439,6 @@ std::string BoolToString(bool flag)
         return "false";
     }
 }
-
 StringWrapper ThisTypeToString(const Type* thisType)
 {
     StringWrapper res;

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CHIR_TOSTRING_UTILS_H
 #define CANGJIE_CHIR_TOSTRING_UTILS_H
 
@@ -330,7 +332,6 @@ std::string CustomTypeKindToString(const CustomTypeDef& def);
  * @return A string representing the boolean value.
  */
 std::string BoolToString(bool flag);
-
 StringWrapper ThisTypeToString(const Type* thisType);
 std::string InstTypeArgsToString(const std::vector<Type*>& instTypeArgs);
 std::string ExprOperandsToString(const std::vector<Value*>& args);

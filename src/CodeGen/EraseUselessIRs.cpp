@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -46,6 +48,7 @@ void TryPropagateLocalConstantVars(llvm::Module& module)
     }
 }
 
+
 std::vector<llvm::Instruction*> CollectInstructions(
     llvm::BasicBlock* block, const std::function<bool(const llvm::Instruction&)>& condition = nullptr)
 {
@@ -68,6 +71,7 @@ std::vector<llvm::Instruction*> CollectInstructions(
     }
     return collectedInsts;
 }
+
 
 void EraseUselessLoad(llvm::Function* function)
 {
@@ -202,6 +206,7 @@ void CGModule::EraseUnusedFuncs(const std::function<bool(const llvm::GlobalObjec
 
 void CGModule::EraseUselessInstsAndDeclarations()
 {
+
     ClearLinkNameUsedInMeta();
     auto& funcList = module->getFunctionList();
     std::vector<llvm::Function*> funcs;
@@ -212,6 +217,7 @@ void CGModule::EraseUselessInstsAndDeclarations()
             EraseUnreachableBBs(func);
             MergeUselessBBIntoPreds(func);
             EraseUselessLoad(func);
+
             EraseUselessAlloca(func);
             EraseTmpMetadata(func);
         }
@@ -229,6 +235,7 @@ void CGModule::EraseUselessInstsAndDeclarations()
 
 void CGModule::EraseUselessGVAndFunctions()
 {
+
     if (GetCGContext().GetCompileOptions().enableCompileDebug || GetCGContext().GetCompileOptions().enableCoverage) {
         return;
     }

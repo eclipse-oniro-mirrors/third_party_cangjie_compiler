@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 BIND(0x0300, 0x036F)
 BIND(0x0483, 0x0486)
 BIND(0x0488, 0x0489)

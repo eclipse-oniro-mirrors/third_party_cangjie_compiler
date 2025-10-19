@@ -4,10 +4,12 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-add_executable(DriverTest DriverTest.cpp ToolchainTest.cpp TempFileManagerTest.cpp ${CANGJIE_SRC_OBJECTS})
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
+add_executable(DriverTests DriverTest.cpp ToolchainTest.cpp TempFileManagerTest.cpp ${CANGJIE_SRC_OBJECTS})
 target_link_libraries(
-    DriverTest
+    DriverTests
     GTest::gtest
     GTest::gtest_main
     ${LINK_LIBS})
-add_test(NAME DriverTest COMMAND DriverTest)
+add_test(NAME DriverTests COMMAND DriverTests)

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "Base/CGTypes/CGType.h"
 
 #include "llvm/IR/Constant.h"
@@ -14,6 +16,7 @@
 #include "Base/CGTypes/CGCPointerType.h"
 #include "Base/CGTypes/CGCStringType.h"
 #include "Base/CGTypes/CGClassType.h"
+
 #include "Base/CGTypes/CGEnumType.h"
 #include "Base/CGTypes/CGFunctionType.h"
 #include "Base/CGTypes/CGGenericType.h"
@@ -49,7 +52,6 @@ bool HasGenericTypeArg(const CHIR::Type& type)
     }
     return false;
 }
-
 bool CanMallocUseFixedSize(const CHIR::Type& chirType)
 {
     if (!chirType.IsClass()) {
@@ -126,6 +128,7 @@ CGType* CGTypeMgr::GetConcreteCGTypeFor(CGModule& cgMod, const CHIR::Type& chirT
             cgType = new CGRefType(cgMod, cgCtx, chirType, static_cast<unsigned>(extraInfo.addrspace));
             break;
         }
+
         case CHIR::Type::TypeKind::TYPE_BOXTYPE: {
             cgType = new CGBoxType(cgMod, cgCtx, StaticCast<const CHIR::BoxType&>(chirType));
             break;
@@ -479,6 +482,7 @@ CHIR::RefType* CGType::GetRefTypeOfCHIRInt8(CHIR::CHIRBuilder& chirBuilder)
     return GetRefTypeOf(chirBuilder, *chirBuilder.GetInt8Ty());
 }
 
+
 llvm::StructType* CGType::GetOrCreateTypeInfoType(llvm::LLVMContext& llvmCtx)
 {
     auto typeInfoType = llvm::StructType::getTypeByName(llvmCtx, "TypeInfo");
@@ -764,6 +768,7 @@ llvm::Constant* CGType::GenKindOfTypeInfo()
         {CHIR::Type::TypeKind::TYPE_VARRAY, UGTypeKind::UG_VARRAY},
         {CHIR::Type::TypeKind::TYPE_CPOINTER, UGTypeKind::UG_CPOINTER},
         {CHIR::Type::TypeKind::TYPE_CSTRING, UGTypeKind::UG_CSTRING},
+
         {CHIR::Type::TypeKind::TYPE_BOXTYPE, UGTypeKind::UG_CLASS},
         {CHIR::Type::TypeKind::TYPE_GENERIC, UGTypeKind::UG_GENERIC}};
     CJC_ASSERT(!chirType.IsRef() && "Unexpected CHIR type to generate typeinfo.");
@@ -892,6 +897,7 @@ bool CGType::IsReference() const
 }
 
 
+
 // for reflection only
 llvm::StructType* CGType::GetOrCreateGenericTypeInfoType(llvm::LLVMContext& llvmCtx)
 {
@@ -1009,6 +1015,7 @@ std::string GetTypeQualifiedNameForReflect(CGModule& cgMod, const CHIR::Type& t,
                 ")->" + GetTypeQualifiedNameForReflect(cgMod, *ft.GetReturnType(), forNameFieldOfTi);
             return name;
         }
+
         case ChirTypeKind::TYPE_GENERIC: {
             auto genericTypeName = StaticCast<const CHIR::GenericType&>(t).GetSrcCodeIdentifier();
             auto upperBounds = StaticCast<const CHIR::GenericType&>(t).GetUpperBounds();

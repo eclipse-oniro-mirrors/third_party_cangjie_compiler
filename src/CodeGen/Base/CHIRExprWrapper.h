@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -333,6 +335,7 @@ public:
         }
     }
 
+
     bool IsCalleeMethod() const override
     {
         return true;
@@ -441,6 +444,7 @@ public:
         }
     }
 
+
     std::vector<CHIR::Type*> GetInstantiatedTypeArgs() const override
     {
         if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
@@ -449,6 +453,7 @@ public:
             return StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetInstantiatedTypeArgs();
         }
     }
+
 
     bool IsCalleeMethod() const override
     {

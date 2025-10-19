@@ -4,9 +4,11 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Value.h"
 #include "cangjie/CHIR/CHIRCasting.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
+#include "cangjie/CHIR/Expression.h"
 #include "cangjie/CHIR/ToStringUtils.h"
 #include "cangjie/CHIR/Type/ClassDef.h"
 #include "cangjie/CHIR/Type/CustomTypeDef.h"
@@ -216,6 +218,7 @@ void Value::SetAnnoInfo(AnnoInfo&& info)
 {
     annoInfo = std::move(info);
 }
+
 
 void Value::ClearUsersOnly()
 {
@@ -1215,6 +1218,7 @@ std::vector<GenericType*> FuncBase::GetOriginalGenericTypeParams() const
 {
     return funcKind == LAMBDA ? originalLambdaInfo.genericTypeParams : GetGenericTypeParams();
 }
+
 
 Func::Func(Type* ty, const std::string& identifier, const std::string& srcCodeIdentifier,
     const std::string& rawMangledName, const std::string& packageName,

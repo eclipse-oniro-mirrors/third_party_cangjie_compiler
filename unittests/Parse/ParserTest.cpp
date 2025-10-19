@@ -4,11 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-#include <string>
-#include <unordered_set>
-#include <utility>
-#include <vector>
-#include "gtest/gtest.h"
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/Parse/Parser.h"
 #include "cangjie/AST/Match.h"
 #include "cangjie/AST/Node.h"
@@ -17,6 +14,7 @@
 #include "cangjie/Basic/DiagnosticEngine.h"
 #include "cangjie/Basic/Match.h"
 #include "cangjie/Utils/ConstantsUtils.h"
+
 
 using namespace Cangjie;
 using namespace AST;
@@ -540,6 +538,7 @@ TEST(ParserTest1, ClassInterfaceDecl)
     diag.SetSourceManager(&sm);
     Parser parser(code, diag, sm);
     OwnedPtr<File> file = parser.ParseTopLevel();
+
 
     Walker walkerClass(file.get(), [&classNames, &members](Ptr<Node> node) -> VisitAction {
         return match(*node)(

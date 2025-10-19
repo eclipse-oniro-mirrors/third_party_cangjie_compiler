@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/CHIR.h"
 #include "cangjie/CHIR/Interpreter/ConstEval.h"
 #include "cangjie/Utils/ProfileRecorder.h"
@@ -89,6 +91,7 @@ public:
         if (!res.empty()) {
             PushTypeAnno(type, std::move(res));
         }
+
 
         // collect custom annotations for members
         for (auto member : decl.GetMemberDeclPtrs()) {
@@ -238,6 +241,7 @@ private:
         var->EnableAttr(Attribute::CONST);
         var->EnableAttr(Attribute::NO_REFLECT_INFO);
         var->Set<LinkTypeInfo>(Linkage::INTERNAL);
+
         return var;
     }
     
@@ -333,6 +337,7 @@ void GlobalVarInitializer::InsertAnnotationVarInit(std::vector<Ptr<Value>>& init
             initFuncsForConstVar.emplace_back(func);
 #endif
             (void)initFuncs.emplace_back(func);
+
         }
     }
 }
@@ -495,6 +500,7 @@ private:
                 (void)diag.diag.DiagnoseRefactor(DiagKindRefactor::chir_annotation_not_applicable, *annotation.src,
                     annotation.src->identifier, std::string{ANNOTATION_TARGET_2_STRING[targetid]});
                 res = false;
+
             }
         }
         return res;

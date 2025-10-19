@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/AST/Node.h"
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
@@ -152,6 +154,7 @@ void Translator::SetRawMangledNameForIncrementalCompile(const AST::FuncDecl& ast
 
 bool NeedCreateDebugForFirstParam(const Func& func)
 {
+
     if (func.TestAttr(Attribute::STATIC)) {
         return false;
     }
@@ -208,6 +211,7 @@ Ptr<Value> Translator::Visit(const AST::FuncDecl& func)
     blockGroupStack.emplace_back(body);
     auto entry = builder.CreateBlock(body);
     body->SetEntryBlock(entry);
+
     if (NeedCreateDebugForFirstParam(*curFunc)) {
         auto thisVar = curFunc->GetParam(0);
         CreateAndAppendExpression<Debug>(builder.GetUnitTy(), thisVar, "this", curFunc->GetEntryBlock());
@@ -399,6 +403,7 @@ Ptr<Value> Translator::TranslateNestedFunc(const AST::FuncDecl& func)
         loc, funcTy, funcTy, currentBlock, true, lambdaMangleName, func.identifier, genericTys);
     CJC_ASSERT(lambda);
     lambda->InitBody(*body);
+
     if (func.isConst) {
         lambda->SetCompileTimeValue();
     }

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -11,7 +13,6 @@
  */
 
 #include "cangjie/CHIR/DebugLocation.h"
-
 #include <iostream>
 #include <sstream>
 
@@ -109,7 +110,6 @@ std::string DebugLocation::ToString() const
     }
     return ss.str();
 }
-
 void DebugLocation::Dump() const
 {
     std::cout << ToString() << std::endl;

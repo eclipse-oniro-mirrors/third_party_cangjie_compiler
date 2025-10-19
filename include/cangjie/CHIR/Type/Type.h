@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -105,6 +107,7 @@ public:
         TYPE_VOID,
         // composite type
         TYPE_TUPLE,
+
         TYPE_STRUCT,
         TYPE_ENUM,
         TYPE_FUNC,
@@ -199,6 +202,7 @@ public:
     {
         return kind == TYPE_TUPLE;
     }
+
 
     /**
      * @brief if this is a class type for representing the context of a closure, return true.
@@ -903,6 +907,7 @@ private:
     ~ThisType() override = default;
     friend class CHIRContext;
 };
+
 
 class RawArrayType : public BuiltinType {
 public:

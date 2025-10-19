@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -213,7 +215,6 @@ void DiagWeakVisibility(DiagnosticEngine& diag, const Decl& parent, const Decl& 
     }
     builder.AddNote(parentNote);
 }
-
 bool CompMemberSignatureByPosAndTy(Ptr<const MemberSignature> m1, Ptr<const MemberSignature> m2)
 {
     if (m1->decl != m2->decl) {
@@ -253,6 +254,7 @@ void StructInheritanceChecker::Check()
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     auto sortedExtends = GetAllNeedCheckExtended();
     extendDecls.insert(extendDecls.end(), sortedExtends.cbegin(), sortedExtends.cend());
+
 #endif
 
     for (auto decl : structDecls) {
@@ -994,6 +996,7 @@ void StructInheritanceChecker::CheckInheritanceAttributes(const MemberSignature&
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
         if ((!parentDecl->TestAttr(Attribute::OPEN) && notInInterface) || TestManager::IsDeclOpenToMock(*parentDecl)) {
             DiagCannotOverride(diag, child, *parentDecl);
+
 #endif
         } else if (child.TestAttr(Attribute::ABSTRACT) && notInInterface) {
             diag.Diagnose(child, DiagKind::sema_invalid_override_member_in_class, type, child.identifier.Val(), type);
@@ -1037,6 +1040,7 @@ void StructInheritanceChecker::DiagnoseForOverriddenMember(const MemberSignature
     std::string type = DeclKindToString(*childDecl);
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     if (childDecl->TestAttr(Attribute::OVERRIDE)) {
+
 #endif
         diag.Diagnose(*childDecl, DiagKind::sema_missing_overridden_func, type, childDecl->identifier.Val(), type);
     } else if (childDecl->TestAttr(Attribute::REDEF) && childDecl->TestAttr(Attribute::STATIC)) {

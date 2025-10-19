@@ -4,11 +4,12 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Type/EnumDef.h"
 
-#include <sstream>
 #include "cangjie/CHIR/CHIRCasting.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
+#include "cangjie/CHIR/Expression.h"
 #include "cangjie/CHIR/ToStringUtils.h"
 #include "cangjie/CHIR/Type/Type.h"
 #include "cangjie/CHIR/Value.h"
@@ -87,6 +88,7 @@ void EnumDef::AddCtor(EnumCtorInfo ctor)
 {
     ctors.emplace_back(ctor);
 }
+
 
 std::vector<EnumCtorInfo> EnumDef::GetCtors() const
 {

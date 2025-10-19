@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -269,7 +271,6 @@ std::set<Ptr<AST::Ty>> GetGenericParamsForDecl(const AST::Decl& decl);
 std::set<Ptr<AST::Ty>> GetGenericParamsForTy(const AST::Ty& ty);
 // get generic params for all decls used in the call
 std::set<Ptr<AST::Ty>> GetGenericParamsForCall(const AST::CallExpr& ce, const AST::FuncDecl& fd);
-
 OwnedPtr<AST::ThrowExpr> CreateThrowException(
     AST::ClassDecl& exceptionDecl, std::vector<OwnedPtr<AST::Expr>> args,
     AST::File& curFile, TypeManager& typeManager);

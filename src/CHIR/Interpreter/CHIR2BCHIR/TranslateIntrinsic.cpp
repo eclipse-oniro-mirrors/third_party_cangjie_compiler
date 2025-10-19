@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -58,6 +60,7 @@ template <typename T> void CHIR2BCHIR::TranslateIntrinsicExpression(Context& ctx
             }
             break;
         }
+
         case CHIR::IntrinsicKind::ARRAY_GET:
         case CHIR::IntrinsicKind::ARRAY_GET_UNCHECKED:
         case CHIR::IntrinsicKind::ARRAY_SET:

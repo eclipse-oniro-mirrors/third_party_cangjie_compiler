@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "DIBuilder.h"
 
 #include "Base/CGTypes/CGType.h"
@@ -138,9 +140,11 @@ void DIBuilder::Finalize()
     if (!enabled && !enableLineInfo) {
         return;
     }
+
     finalize();
     lexicalBlocks.clear();
 }
+
 
 void DIBuilder::CreateGlobalVar(const CHIR::GlobalVar& variable)
 {
@@ -660,6 +664,7 @@ llvm::DIType* DIBuilder::CreateDIType(const CHIR::Type& ty)
             encoding = llvm::dwarf::DW_ATE_boolean;
             break;
         }
+
         case CHIR::Type::TypeKind::TYPE_FUNC:
             return CreateVarFuncType(StaticCast<const CHIR::FuncType&>(ty));
         case CHIR::Type::TypeKind::TYPE_TUPLE:

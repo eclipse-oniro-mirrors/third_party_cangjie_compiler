@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -87,6 +89,7 @@ void CHIR2BCHIR::TranslateOthersExpression(Context& ctx, const Expression& expr)
             PushOpCodeWithAnnotations(ctx, OpCode::VARRAY, expr, vArraySize);
             break;
         }
+
         case ExprKind::BOX: {
             CJC_ASSERT(expr.GetNumOfOperands() == 1);
             auto boxExpr = StaticCast<const Box*>(&expr);
@@ -268,4 +271,5 @@ void CHIR2BCHIR::TranslateApplyExpression(Context& ctx, const Apply& apply)
     }
     PushOpCodeWithAnnotations<false, true>(ctx, OpCode::APPLY, apply, static_cast<unsigned>(apply.GetNumOfOperands()));
 }
+
 

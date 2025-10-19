@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  * This file implements the AST Loader related classes.
@@ -614,7 +616,6 @@ OwnedPtr<Pattern> ASTLoader::ASTLoaderImpl::LoadExceptTypePattern(const PackageF
     etp->pattern = LoadPattern(*pattern.patterns()->Get(0));
     return etp;
 }
-
 OwnedPtr<Pattern> ASTLoader::ASTLoaderImpl::LoadCommandTypePattern(const PackageFormat::Pattern& pattern)
 {
     auto ctp = CreateAndLoadBasicInfo<CommandTypePattern>(pattern, INVALID_FORMAT_INDEX);

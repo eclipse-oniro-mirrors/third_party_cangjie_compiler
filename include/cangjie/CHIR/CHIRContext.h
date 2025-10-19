@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -276,6 +278,7 @@ public:
     void DeleteAllocatedTys();
 
 private:
+
     /*
      * @brief Cached Pointer of allocated instance in CHIR.
      */
@@ -283,6 +286,7 @@ private:
 
     /* The file name string pool for debug location: fileID map to source path */
     std::unordered_map<unsigned int, std::string>* fileNameMap;
+
     /*
      * @brief Cached Pointer of allocated instance in CHIR.
      */

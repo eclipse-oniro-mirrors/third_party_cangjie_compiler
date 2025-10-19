@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/CHIR.h"
 
 #include "cangjie/CHIR/Analysis/CallGraphAnalysis.h"
@@ -163,6 +165,7 @@ static void UpdateOptEffectMapBecauseOfInit(OptEffectCHIRMap& oldMap, OptEffectS
     }
 }
 
+
 static void DropOutIllegalString(OptEffectStrMap& newMap)
 {
     auto mapIt = newMap.begin();
@@ -188,6 +191,7 @@ static void UpdateEffectMapToString(OptEffectCHIRMap& oldMap, OptEffectStrMap& n
     Utils::ProfileRecorder recorder("CHIR", "UpdateEffectMapToString");
     FlattenEffectMap(oldMap);
     UpdateOptEffectMapBecauseOfInit(oldMap, newMap);
+
     for (auto& mapIt : oldMap) {
         auto keyName = GetRawMangledName(*mapIt.first);
         if (!keyName.empty()) {
@@ -511,6 +515,7 @@ bool ToCHIR::RunConstantPropagation()
         std::vector<std::unique_ptr<CHIR::ConstPropagation>> cpList;
         for (size_t idx = 0; idx < funcNum; ++idx) {
             auto func = globalFuncs.at(idx);
+
             auto cp = std::make_unique<CHIR::ConstPropagation>(*builderList[idx], &constAnalysisWrapper, opts);
             taskQueue.AddTask<void>([constPropagation = cp.get(), func, isDebug, isCJLint]() {
                 return constPropagation->RunOnFunc(func, isDebug, isCJLint);
@@ -529,6 +534,7 @@ bool ToCHIR::RunConstantPropagation()
     DumpCHIRDebug("ConstantPropagation");
     return diag.GetErrorCount() == 0;
 }
+
 
 bool ToCHIR::RunConstantPropagationAndSafetyCheck()
 {
@@ -560,6 +566,7 @@ void ToCHIR::RunRangePropagation()
         std::vector<std::unique_ptr<CHIR::RangePropagation>> cpList;
         for (size_t idx = 0; idx < funcNum; ++idx) {
             auto func = globalFuncs.at(idx);
+
             auto cp = std::make_unique<CHIR::RangePropagation>(
                 *builderList[idx], &vra, &diag, opts.enIncrementalCompilation);
             taskQueue.AddTask<void>(
@@ -751,6 +758,7 @@ void ToCHIR::RecordCodeInfoAtTheBegin()
         return;
     }
     Utils::ProfileRecorder recorder("CHIR", "RecordCodeInfo");
+
     std::function<int64_t(void)> getASTNodeQuantity = [this]() -> int64_t {
         int64_t astNodeCnt = 0;
         AST::Walker(&pkg, [&astNodeCnt](auto /* node */) {
@@ -903,6 +911,7 @@ bool ToCHIR::RunAnalysisForCJLint()
     }
     return false;
 }
+
 
 void ToCHIR::EraseDebugExpr()
 {
@@ -1292,7 +1301,6 @@ bool ToCHIR::TranslateToCHIR(std::vector<const AST::Decl*>&& annoOnly)
         curVirtFuncWrapDep = ast2CHIR.GetCurVirtualFuncWrapperDepForIncr();
         delVirtFuncWrapForIncr = ast2CHIR.GetDeleteVirtualFuncWrapperForIncr();
     }
-
     srcCodeImportedFuncs = ast2CHIR.GetSrcCodeImportedFuncs();
     srcCodeImportedVars = ast2CHIR.GetSrcCodeImportedVars();
     implicitFuncs = ast2CHIR.GetImplicitFuncs();

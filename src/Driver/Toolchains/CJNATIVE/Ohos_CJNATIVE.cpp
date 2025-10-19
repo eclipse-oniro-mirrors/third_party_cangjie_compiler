@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -52,6 +54,7 @@ void Ohos_CJNATIVE::GenerateLinkingTool(const std::vector<TempFileInfo>& objFile
     tool->AppendArg("-o", outputFile);
     if (driverOptions.IsLTOEnabled()) {
         GenerateLinkOptionsForLTO(*tool.get());
+
     } else if (driverOptions.EnableHwAsan()) {
         // same args as lto except GenerateLinkOptionsForLTO
         tool->AppendArg("-z", "notext");

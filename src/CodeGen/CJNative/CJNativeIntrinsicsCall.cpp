@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "IRBuilder.h"
 
 #include "Base/CGTypes/CGArrayType.h"
@@ -1262,6 +1264,7 @@ llvm::Value* IRBuilder2::CreateTypeInfo(const CHIR::Type& gt,
     const std::unordered_map<const CHIR::Type*, std::function<llvm::Value*(IRBuilder2&)>>& map, bool canChangeBB)
 {
     auto baseType = DeRef(const_cast<CHIR::Type&>(gt));
+
     if (baseType->IsThis()) {
         CJC_ASSERT(cgFunction && "Should not reach here.");
         auto cgFuncType = cgFunction->GetCGFunctionType();
@@ -1307,6 +1310,7 @@ llvm::Value* IRBuilder2::CreateTypeInfo(const CHIR::Type& gt,
         }
     } else if (cgType->IsConcrete()) {
         res = cgType->GetOrCreateTypeInfo();
+
     } else if (cgType->IsStaticGI()) {
         res = cgType->GetOrCreateTypeInfo();
     } else if (baseType->IsTuple()) {
@@ -1389,7 +1393,6 @@ llvm::Value* IRBuilder2::CreateTypeInfo(const CHIR::Type* type, bool canChangeBB
     }
     return CreateTypeInfo(*type, canChangeBB);
 }
-
 llvm::Value* IRBuilder2::CallInteropIntrinsics(
     const CHIRIntrinsicWrapper& intrinsic, const std::vector<CGValue*>& parameters)
 {

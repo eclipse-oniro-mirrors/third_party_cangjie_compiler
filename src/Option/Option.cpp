@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -233,6 +235,7 @@ bool GlobalOptions::PerformPostActions()
     success = success && CheckCompileMacro();
     success = success && ReprocessCoverageOptions();
     success = success && CheckScanDependencyOptions();
+
     success = success && CheckSanitizerOptions();
     success = success && CheckLtoOptions();
     success = success && CheckPgoOptions();
@@ -437,6 +440,7 @@ bool GlobalOptions::CheckScanDependencyOptions() const
     }
     return true;
 }
+
 
 bool GlobalOptions::CheckSanitizerOptions() const
 {

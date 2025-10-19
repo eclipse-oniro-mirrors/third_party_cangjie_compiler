@@ -3,6 +3,7 @@
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 /**
  * @file
  *
@@ -89,7 +90,6 @@ void CHIRPrinter::PrintPackage(const Package& package, const std::string& fullPa
     fout << package.ToString() << std::endl;
     fout.close();
 }
-
 void CHIRPrinter::PrintCHIRSerializeInfo(ToCHIR::Phase phase, const std::string& path)
 {
     if (path.empty()) {

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Transformation/BoxRecursionValueType.h"
 
 #include "cangjie/CHIR/CHIRCasting.h"
@@ -145,6 +147,7 @@ std::pair<bool, std::vector<size_t>> TupleNeedBox(const Tuple& tuple)
         return retVal;
     }
     auto operands = tuple.GetOperands();
+
     auto indexExpr = StaticCast<Constant*>(StaticCast<LocalVar*>(operands[0])->GetExpr());
     size_t index = 0;
     if (indexExpr->IsBoolLit()) {

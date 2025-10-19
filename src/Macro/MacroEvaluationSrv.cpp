@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -163,6 +165,7 @@ void MacroEvaluation::RunMacroSrv()
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     RuntimeInit::GetInstance().InitRuntime(
         ci->invocation.GetRuntimeLibPath(), ci->invocation.globalOptions.environment.allVariables);
+
 #endif
     // close unused pipe
     close(MacroProcMsger::GetInstance().pipefdP2C[1]);

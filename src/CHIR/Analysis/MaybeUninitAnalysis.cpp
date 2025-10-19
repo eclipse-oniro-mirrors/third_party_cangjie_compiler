@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Analysis/MaybeUninitAnalysis.h"
 
 #include "cangjie/CHIR/Analysis/Utils.h"
@@ -153,6 +155,7 @@ void MaybeUninitAnalysis::HandleAllocateExpr(MaybeUninitDomain& state, const All
     if (auto it = allocateIdxMap.find(res); it != allocateIdxMap.end()) {
         auto allcoateIdx = it->second;
         state.Gen(allcoateIdx);
+
     }
 }
 
@@ -164,6 +167,7 @@ void MaybeUninitAnalysis::HandleStoreExpr(MaybeUninitDomain& state, const Store*
         state.Kill(allcoateIdx);
         auto debugLoc = store->GetDebugLocation();
         state.maybeInitedPos[allcoateIdx].emplace(debugLoc.GetBeginPos().line);
+
     }
 }
 
@@ -184,6 +188,7 @@ void MaybeUninitAnalysis::HandleStoreElemRefExpr(MaybeUninitDomain& state, const
     state.Kill(memberStateIdx);
     auto& debugLoc = store->GetDebugLocation();
     state.maybeInitedPos[memberStateIdx].emplace(debugLoc.GetBeginPos().line);
+
 }
 
 void MaybeUninitAnalysis::HandleApplyExpr(MaybeUninitDomain& state, const Apply* apply) const
@@ -194,6 +199,7 @@ void MaybeUninitAnalysis::HandleApplyExpr(MaybeUninitDomain& state, const Apply*
     // Check if it is a call to super init function of this class
     if (apply->IsSuperCall()) {
         state.Kill(domainSize - 1);
+
         return;
     }
     // Check if it is a call to another init function of this class/struct
@@ -207,6 +213,7 @@ void MaybeUninitAnalysis::HandleApplyExpr(MaybeUninitDomain& state, const Apply*
             if (ctorInitInfo->superClassDef) {
                 state.Kill(domainSize - 1);
             }
+
         }
     }
 }

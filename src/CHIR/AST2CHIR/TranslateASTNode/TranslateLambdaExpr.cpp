@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/AST/Node.h"
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
@@ -30,6 +32,7 @@ Ptr<Value> Translator::Visit(const AST::LambdaExpr& lambdaExpr)
     // cjdb need src code name to show the stack, or core dump will occurred in some case
     auto lambda = CreateAndAppendExpression<Lambda>(loc, funcTy, funcTy, currentBlock, true, mangledName, "$lambda");
     lambda->InitBody(*body);
+
 
     std::vector<DebugLocation> paramLoc;
     for (auto& astParam : lambdaExpr.funcBody->paramLists[0]->params) {

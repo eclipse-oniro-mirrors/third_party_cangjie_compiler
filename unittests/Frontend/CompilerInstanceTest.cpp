@@ -4,12 +4,14 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-#include "gtest/gtest.h"
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/AST/Match.h"
 #include "cangjie/AST/Node.h"
 #include "cangjie/Basic/SourceManager.h"
 #include "cangjie/FrontendTool/DefaultCompilerInstance.h"
 #include "cangjie/Utils/FileUtil.h"
+
 
 #include <memory>
 #include <string>

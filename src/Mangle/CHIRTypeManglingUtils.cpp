@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -68,6 +70,7 @@ std::string MangleType(const CHIR::TupleType& t, const std::vector<std::string>&
     ss << MANGLE_SUFFIX;
     return ss.str();
 }
+
 
 // Type mangling for CHIR::StructType
 std::string MangleType(const CHIR::StructType& t, const std::vector<std::string>& genericsTypeStack,
@@ -230,6 +233,7 @@ std::string MangleType(const CHIR::Type& t, const std::vector<std::string>& gene
     switch (k) {
         case ChirTypeKind::TYPE_TUPLE:
             return MangleType(StaticCast<const TupleType&>(t), genericsTypeStack, useGenericName);
+
         case ChirTypeKind::TYPE_STRUCT:
             return MangleType(StaticCast<const StructType&>(t), genericsTypeStack, useGenericName);
         case ChirTypeKind::TYPE_ENUM:
@@ -336,6 +340,7 @@ std::string GetTypeQualifiedName(const CHIR::Type& t, bool forNameFieldOfTi)
                 GetTypeQualifiedName(*ft.GetReturnType(), forNameFieldOfTi);
             return name;
         }
+
         case ChirTypeKind::TYPE_GENERIC:
             return static_cast<const GenericType&>(t).GetSrcCodeIdentifier();
         case ChirTypeKind::TYPE_VOID:

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "EmitGlobalVariableIR.h"
 
 #include "Base/ExprDispatcher/ExprDispatcher.h"
@@ -72,6 +74,7 @@ void GlobalVariableGeneratorImpl::EmitIR()
                 cgMod.GetLLVMContext(), {llvm::MDString::get(cgMod.GetLLVMContext(), MangleType(*chirGV->GetType()))});
             rawGV->setMetadata(GC_GLOBAL_VAR_TYPE, fieldMeta);
         }
+
     }
 }
 #endif

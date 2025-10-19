@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_IRBUILDER2_H
 #define CANGJIE_IRBUILDER2_H
 
@@ -254,6 +256,7 @@ public:
     }
 
     llvm::Value* CallIntrinsicRef2Null(llvm::Value* value);
+
     llvm::Value* CreateStringLiteral(const std::string& str);
 
     void CallArrayInit(

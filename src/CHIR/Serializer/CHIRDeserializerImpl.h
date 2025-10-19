@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CHIR_DESERIALIZER_IMPL_H
 #define CANGJIE_CHIR_DESERIALIZER_IMPL_H
 
@@ -70,7 +72,6 @@ private:
 
     // lazy GenericType config
     std::vector<std::pair<GenericType*, const PackageFormat::GenericType*>> genericTypeConfig;
-
     void ResetImportedValuesUnderPackage();
     void ResetImportedDefsUnderPackage();
 };

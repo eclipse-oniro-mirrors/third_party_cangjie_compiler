@@ -4,9 +4,10 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Type/ExtendDef.h"
 
-#include <sstream>
 #include "cangjie/CHIR/CHIRCasting.h"
 #include "cangjie/CHIR/ToStringUtils.h"
 #include "cangjie/Utils/CastingTemplate.h"

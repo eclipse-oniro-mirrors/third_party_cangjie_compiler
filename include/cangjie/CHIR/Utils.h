@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -303,6 +305,7 @@ inline void SetSkipPrintWarning(Ptr<Value> value)
     value->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
 }
 
+
 inline void MergeEffectMap(const OptEffectCHIRMap& from, OptEffectCHIRMap& to)
 {
     for (auto fromIt : from) {
@@ -314,6 +317,7 @@ inline void MergeEffectMap(const OptEffectCHIRMap& from, OptEffectCHIRMap& to)
         }
     }
 }
+
 
 /**
  * @brief Checks if a type has a "nothing" type.

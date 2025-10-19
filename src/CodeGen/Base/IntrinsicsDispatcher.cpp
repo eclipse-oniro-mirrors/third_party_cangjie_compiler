@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -396,7 +398,6 @@ llvm::Value* GenerateMathIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWr
         [](const CGValue* value) { return value->GetRawValue(); });
     return irBuilder.CallMathIntrinsics(intrinsic, args);
 }
-
 llvm::Value* GenerateInteropIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
 {
     auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());

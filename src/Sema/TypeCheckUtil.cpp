@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -761,6 +763,7 @@ std::vector<Ptr<Ty>> GetParamTysInArgsOrder(
                 // For C FFI variable-length arguments.
                 tyInArgOrder.emplace_back(tyMgr.GetCTypeTy());
             } else if (HasJavaAttr(fd)) {
+
                 tyInArgOrder.emplace_back(tyMgr.GetAnyTy());
             } else {
                 // Cangjie's variable-length arguments are handled by `ChkVariadicCallExpr`.
@@ -1005,7 +1008,6 @@ std::set<Ptr<AST::Ty>> GetGenericParamsForCall(const AST::CallExpr& ce, const AS
     }
     return ret;
 }
-
 std::optional<std::pair<Ptr<FuncDecl>, Ptr<Ty>>> FindInitDecl(
     InheritableDecl& decl,
     TypeManager& typeManager,

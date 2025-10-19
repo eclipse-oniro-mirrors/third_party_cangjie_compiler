@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -958,6 +960,7 @@ bool SpanningFuncDeclTree(std::vector<std::unique_ptr<Entity>>& entities, std::s
             RecursionHelper(funcName, treeIdMap, mid, compressed, false);
         }
     }
+
     bool isFunc = false;
     std::tie(isFunc, idx, compressed) = SpanningFuncSubTree(treeIdMap, mangled, compressed, idx, mid, isCompressed);
     if (idx < n) {
@@ -1048,6 +1051,7 @@ std::string RecursionFuncEntity(const std::unique_ptr<Entity>& entity,
     bool isReplaced = std::get<1>(exInfo);
     size_t idx = ForwardName(entity->mangledName, isCompressed);
     std::string funcName = entity->mangledName.substr(0, idx);
+
     RecursionHelper(funcName, treeIdMap, mid, compressed, isReplaced);
     FunctionEntity* fe = static_cast<FunctionEntity*>(entity.get());
     if (isGeneric) {

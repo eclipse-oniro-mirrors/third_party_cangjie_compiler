@@ -4,11 +4,11 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-#include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+#include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
+#include "cangjie/CHIR/Expression.h"
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-#include "AnnoFactoryInfo.h"
 #include "cangjie/Mangle/CHIRManglingUtils.h"
 #endif
 
@@ -21,6 +21,7 @@ static const std::string& GetIdentifierToPrint(const AST::Decl& decl)
         if (!prop->getters.empty()) {
             return prop->getters[0]->identifier;
         }
+
     }
     return decl.identifier;
 }

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -735,6 +737,7 @@ std::unordered_map<Options::ID, std::function<bool(GlobalOptions&, OptionArgInst
         if (arg.value == "hotreload") {
             opts.outputMode = GlobalOptions::OutputMode::SHARED_LIB;
             opts.enableHotReload = true;
+
             opts.linkStaticStd = false; // waiting for hotreload's bugfix
         } else {
             CJC_ASSERT(OUTPUT_MODE_MAP.count(arg.value) != 0);

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -14,6 +16,7 @@
 #include "cangjie/AST/Walker.h"
 
 namespace Cangjie::AST {
+
 void ASTChecker::CheckNode(Ptr<Node> node)
 {
     ZERO_POSITION_CHECK(node, node->begin);
@@ -546,6 +549,7 @@ void ASTChecker::CheckQuoteExpr(Ptr<Node> node)
     ZERO_POSITION_CHECK(node, qe->quotePos);
     ZERO_POSITION_CHECK(node, qe->leftParenPos);
     ZERO_POSITION_CHECK(node, qe->rightParenPos);
+
 }
 void ASTChecker::CheckRangeExpr(Ptr<Node> node)
 {
@@ -703,7 +707,6 @@ void ASTChecker::CheckExceptTypePattern(Ptr<Node> node)
     VEC_AST_NULLPTR_CHECK(node, etp->types);
     VEC_ZERO_POS_CHECK(node, etp->bitOrPosVector);
 }
-
 void ASTChecker::CheckCommandTypePattern(Ptr<Node> node)
 {
     auto etp = StaticAs<ASTKind::COMMAND_TYPE_PATTERN>(node);

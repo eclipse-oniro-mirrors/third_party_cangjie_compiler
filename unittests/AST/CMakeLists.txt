@@ -4,12 +4,14 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 include_directories(${CMAKE_SOURCE_DIR}/src/Sema)
 include_directories(${CMAKE_SOURCE_DIR}/src/AST)
 
-add_executable(WalkerTest WalkerTest.cpp)
+add_executable(WalkerTests WalkerTest.cpp)
 target_link_libraries(
-    WalkerTest
+    WalkerTests
     ${CMAKE_DL_LIBS}
     cangjie-lsp
     GTest::gtest

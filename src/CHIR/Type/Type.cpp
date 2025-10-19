@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -45,6 +47,7 @@ static const std::string PrintArgTys(const std::vector<Type*>& argTys)
     ss << ">";
     return ss.str();
 }
+
 
 Type::Type(TypeKind kind) : kind(kind)
 {
@@ -987,6 +990,7 @@ std::string TupleType::ToString() const
     return ss.str();
 }
 
+
 std::string RawArrayType::ToString() const
 {
     CJC_ASSERT(!argTys.empty());
@@ -1145,6 +1149,7 @@ std::string GenericType::ToString() const
 }
 
 namespace Cangjie::CHIR {
+
 Type* GetFieldOfType(Type& baseTy, uint64_t index, CHIRBuilder& builder)
 {
     Type* type = nullptr;
@@ -1167,6 +1172,7 @@ Type* GetFieldOfType(Type& baseTy, uint64_t index, CHIRBuilder& builder)
         if (index < memberTys.size()) {
             type = memberTys[index];
         }
+
     } else if (baseTy.IsRawArray()) {
         type = StaticCast<RawArrayType&>(baseTy).GetElementType();
     }

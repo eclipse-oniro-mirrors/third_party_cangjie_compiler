@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -446,6 +448,7 @@ void IncrementalGen::EraseUselessFunctions()
         auto f = injectedModule->begin();
         while (f != injectedModule->end()) {
             auto cur = f++;
+
             bool isFromCFFI = (cur->hasFnAttribute(C2CJ_ATTR) || cur->hasFnAttribute(CJSTUB_ATTR));
             if (!cur->hasFnAttribute(FUNC_USED_BY_CLOSURE)) {
                 continue;

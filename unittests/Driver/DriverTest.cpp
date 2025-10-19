@@ -4,8 +4,10 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-#include "gtest/gtest.h"
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/Driver/Driver.h"
+#include "gtest/gtest.h"
 
 #include <algorithm>
 #include <string>
@@ -18,7 +20,6 @@ using namespace Cangjie;
 class DriverTest : public ::testing::Test {
 public:
     std::unique_ptr<Driver> driver;
-
 protected:
     void SetUp() override
     {

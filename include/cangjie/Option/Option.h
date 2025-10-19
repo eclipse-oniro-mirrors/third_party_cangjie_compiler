@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -553,6 +555,7 @@ public:
     // The 'linkStaticStd' is 'std::nullopt' when cjc neither uses '--static-std' nor '--dy-std' link option.
     std::optional<bool> linkStaticStd = std::nullopt;
 
+
     // LTO optimization options
     enum class LTOMode : uint8_t { FULL_LTO, THIN_LTO, NO_LTO };
     LTOMode ltoMod = LTOMode::NO_LTO;
@@ -1040,6 +1043,7 @@ private:
     bool CheckOutputPathLength() const;
     bool ReprocessInputs();
     bool ReprocessCoverageOptions();
+
     bool ReprocessReflectionOption();
     bool CheckScanDependencyOptions() const;
     bool CheckSanitizerOptions() const;

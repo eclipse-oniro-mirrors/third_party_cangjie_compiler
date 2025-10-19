@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -323,6 +325,7 @@ OPTION("--dy-libs", DY_LIBS, FLAG, { BACKEND(CJNATIVE) },
 OPTION("--lto", LTO, SEPARATED, {BACKEND(CJNATIVE)},
     {GROUP(DRIVER) COMMA GROUP(STABLE) COMMA GROUP(VISIBLE)}, nullptr, lto_mode, SINGLE_OCCURRENCE,
     "Enable LTO to either 'full' or 'thin' (Not available for Windows target)")
+
 OPTION("--profile-compile-time", PROFILE_COMPILE_TIME, FLAG, { BACKEND(ALL) },
     { GROUP(GLOBAL) COMMA GROUP(VISIBLE) COMMA GROUP(STABLE) }, nullptr, {}, MULTIPLE_OCCURRENCE,
     "Print time spent of all phases in the compilation")

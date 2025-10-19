@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Checker/UnreachableBranchCheck.h"
 
 using namespace Cangjie::CHIR;
@@ -43,6 +45,7 @@ void UnreachableBranchCheck::RunOnPackage(const Package& package, size_t threadN
             if (func->Get<SkipCheck>() == SkipKind::SKIP_DCE_WARNING) {
                 continue;
             }
+
             RunOnFunc(func);
         }
     } else {
@@ -52,6 +55,7 @@ void UnreachableBranchCheck::RunOnPackage(const Package& package, size_t threadN
             if (func->Get<SkipCheck>() == SkipKind::SKIP_DCE_WARNING) {
                 continue;
             }
+
             taskQueue.AddTask<void>([this, func]() { return RunOnFunc(func); });
         }
         taskQueue.RunAndWaitForAllTasksCompleted();

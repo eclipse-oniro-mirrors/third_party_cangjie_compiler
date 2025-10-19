@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -296,11 +298,13 @@ void ColllectPattern(Ptr<Pattern> pattern, std::unordered_map<Ptr<Decl>, Ptr<Dec
         default:
             break;
     }
+
 }
 
 // NOTE: l from .cj.d, r from .cjo.
 bool IsSameDeclByIdentifier(Ptr<Decl> l, Ptr<Decl> r)
 {
+
     auto lId = l->astKind == ASTKind::PRIMARY_CTOR_DECL ? "init" : l->identifier.Val();
     auto lKind = l->astKind == ASTKind::PRIMARY_CTOR_DECL ? ASTKind::FUNC_DECL : l->astKind;
     bool fastQuit =

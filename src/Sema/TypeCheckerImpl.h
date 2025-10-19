@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -543,7 +545,6 @@ private:
     void ReArrangeForInIterExpr(ASTContext& ctx, AST::ForInExpr& forInExpr);
     void ReArrangeForInStringExpr(ASTContext& ctx, AST::ForInExpr& forInExpr);
     void DesugarTryWithResourcesExpr(ASTContext& ctx, AST::TryExpr& te);
-
     OwnedPtr<AST::Expr> ConstructOptionMatch(OwnedPtr<AST::Expr> selector, OwnedPtr<AST::Block> someExpr,
         OwnedPtr<AST::Block> otherExpr, AST::RefExpr& someVar, Ptr<AST::Ty> someTy) const;
 

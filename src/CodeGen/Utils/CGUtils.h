@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CGUTILS_H
 #define CANGJIE_CGUTILS_H
 
@@ -95,6 +97,7 @@ inline std::string GetMangledNameOfCompilerAddedClass(const std::string& classNa
     return MANGLE_NESTED_PREFIX + MangleName(className) + "E";
 }
 
+
 const std::unordered_map<CHIR::ExprKind, std::string> OPERATOR_KIND_TO_OP_MAP = {
     {CHIR::ExprKind::ADD, "add"},
     {CHIR::ExprKind::SUB, "sub"},
@@ -139,6 +142,7 @@ inline bool HasNoUse(const llvm::Value& value)
 {
     return !value.hasNUsesOrMore(1);
 }
+
 
 inline const CHIR::Type* DeRef(const CHIR::Type& chirTy)
 {

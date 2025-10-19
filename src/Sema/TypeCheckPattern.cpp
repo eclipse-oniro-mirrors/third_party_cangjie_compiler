@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -615,7 +617,6 @@ bool TypeChecker::TypeCheckerImpl::ChkExceptTypePattern(
     }
     return Check(ctx, etp.ty, etp.pattern.get());
 }
-
 bool TypeChecker::TypeCheckerImpl::ChkHandlePatterns(ASTContext& ctx, Handler& h,
     std::vector<Ptr<Ty>>& included)
 {

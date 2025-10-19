@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CHIR_ATTRIBUTEINFO_H
 #define CANGJIE_CHIR_ATTRIBUTEINFO_H
 
@@ -34,6 +36,7 @@ enum class Attribute {
     MUT,      ///< Mark whether a declaration is a mutable one.
     FINAL,    /**< Mark a Func override a parent class's func, and this func self does not have VIRTUAL Attribute. */
     OPERATOR, ///< Mark whether a declaration is a operator one.
+
     READONLY,             ///< 'let x = xxx', 'x' enable READONLY attribute
     CONST,                ///< correspond `const` keyword in Cangjie source code.
     IMPORTED,             ///< Mark whether variable、func、enum、struct、class is imported from other package.

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CGCONTEXT_H
 #define CANGJIE_CGCONTEXT_H
 
@@ -319,6 +321,7 @@ public:
     }
 
     void AddNullableReference(llvm::Value* value);
+
 
     void SetBasePtr(const llvm::Value* val, llvm::Value* basePtr);
     llvm::Value* GetBasePtrOf(llvm::Value* val) const;

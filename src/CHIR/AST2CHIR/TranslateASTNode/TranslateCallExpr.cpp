@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
 #include "cangjie/AST/Walker.h"
@@ -537,6 +539,7 @@ void Translator::TranslateTrivialArgs(
     }
 }
 
+
 Ptr<Value> Translator::TranslateIntrinsicCall(const AST::CallExpr& expr)
 {
     // Conditions to check if this is a call to intrinsic
@@ -821,6 +824,7 @@ Value* Translator::TranslateStructOrClassCtorCall(const AST::CallExpr& expr)
         }
         auto load = CreateAndAppendExpression<Load>(loc, thisTy, thisArg, currentBlock);
         // this load should be removed if it is a super/this call, but it will trigger IRChecker error in:
+
         if (IsSuperOrThisCall(expr)) {
             load->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
             // should be: return nullptr;

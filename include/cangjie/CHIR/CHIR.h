@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -151,6 +153,7 @@ private:
     bool RunVarInitChecking();
     bool RunConstantPropagationAndSafetyCheck();
     bool RunConstantPropagation();
+
     void RunRangePropagation();
     void RunArrayListConstStartOpt();
     void RunFunctionInline(DevirtualizationInfo& devirtInfo);
@@ -172,6 +175,7 @@ private:
     void RunConstantAnalysis();
     // run semantic checks that have to be performed on CHIR
     bool RunAnnotationChecks();
+
     void EraseDebugExpr();
     void CFFIFuncWrapper();
     void RemoveUnusedImports(bool removeSrcCodeImported);

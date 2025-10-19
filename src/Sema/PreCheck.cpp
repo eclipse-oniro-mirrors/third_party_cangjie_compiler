@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -513,6 +515,7 @@ Ptr<Ty> TypeChecker::TypeCheckerImpl::GetTyFromASTType(ASTContext& ctx, VArrayTy
     auto le = StaticAs<ASTKind::LIT_CONST_EXPR>(expr);
 #if CANGJIE_CODEGEN_CJNATIVE_BACKEND
     auto lengthLimitKind = TypeKind::TYPE_INT64;
+
 #endif
     le->constNumValue.asInt.InitIntLiteral(le->stringValue, lengthLimitKind);
     le->constNumValue.asInt.SetOutOfRange(Cangjie::TypeManager::GetPrimitiveTy(lengthLimitKind));
@@ -520,6 +523,7 @@ Ptr<Ty> TypeChecker::TypeCheckerImpl::GetTyFromASTType(ASTContext& ctx, VArrayTy
         (void)diag.DiagnoseRefactor(DiagKindRefactor::sema_exceed_num_value_range, *le, le->stringValue,
 #if CANGJIE_CODEGEN_CJNATIVE_BACKEND
             "Int64");
+
 #endif
         return TypeManager::GetInvalidTy();
     }

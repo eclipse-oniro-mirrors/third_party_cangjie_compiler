@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
 
 #include "cangjie/AST/Utils.h"
@@ -25,6 +27,7 @@ inline std::map<Cangjie::AST::Attribute, Attribute> g_attrMap = {
     {Cangjie::AST::Attribute::IMPLICIT_ADD, Attribute::NO_DEBUG_INFO},
     {Cangjie::AST::Attribute::GENERIC, Attribute::GENERIC}, {Cangjie::AST::Attribute::IMPORTED, Attribute::IMPORTED},
     {Cangjie::AST::Attribute::NO_REFLECT_INFO, Attribute::NO_REFLECT_INFO}};
+
 
 void TranslateFunctionGenericUpperBounds(CHIRType& chirTy, const AST::FuncDecl& func)
 {
@@ -199,6 +202,7 @@ bool IsSymbolImportedDecl(const AST::Decl& decl, const GlobalOptions& opts)
     return decl.TestAttr(AST::Attribute::IMPORTED) && !IsSrcImportedDecl(decl, opts);
 }
 
+
 AST::Decl* GetOuterDecl(const AST::Decl& decl)
 {
     auto outerDecl = decl.outerDecl;
@@ -261,7 +265,6 @@ std::string OverflowStrategyPrefix(OverflowStrategy ovf)
             return "%";
     }
 }
-
 void SetCompileTimeValueFlagRecursivly(Func& initFunc)
 {
     auto setConstFlagForLambda = [](BlockGroup& body) {

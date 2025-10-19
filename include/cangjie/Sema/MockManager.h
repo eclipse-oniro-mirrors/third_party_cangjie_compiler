@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -26,7 +28,6 @@ enum class MockKind : uint8_t;
 class MockManager {
 public:
     explicit MockManager(ImportManager& importManager, TypeManager& typeManager, const Ptr<MockUtils> mockUtils);
-
     struct GeneratedClassResult {
         Ptr<AST::ClassDecl> classDecl;
         bool generated;
@@ -73,6 +74,7 @@ private:
     std::map<std::string, OwnedPtr<AST::ClassDecl>> mockedClassDecls;
     std::map<Ptr<AST::ClassLikeDecl>, int> instantiationCounters;
     std::map<Ptr<const AST::FuncDecl>, bool> defaultForTypePresence;
+
 
     Ptr<AST::ClassDecl> objectDecl;
 
@@ -161,7 +163,6 @@ private:
     void HandleMockAnnotatedLambdaWithMemberAccess(AST::MemberAccess& ma, AST::Expr& injectTo);
     void HandleMockAnnotatedLambdaWithRefExpr(const AST::RefExpr& refExpr, AST::Expr& injectTo);
     void HandleMockAnnotatedLambdaWithAssignExpr(AST::AssignExpr& assignExpr);
-
     OwnedPtr<AST::Expr> GetCurrentStaticHandler(const Ptr<AST::File> curFile);
     OwnedPtr<AST::Expr> GetMockedObjectHandler(OwnedPtr<AST::RefExpr> objRef, const Ptr<AST::File> curFile);
     OwnedPtr<AST::LambdaExpr> GenerateCallHandlerLambda(

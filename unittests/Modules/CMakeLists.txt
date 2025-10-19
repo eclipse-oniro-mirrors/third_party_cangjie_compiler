@@ -4,13 +4,15 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-add_executable(PackageTest PackageTest.cpp)
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-target_include_directories(PackageTest PRIVATE ${FLATBUFFERS_INCLUDE_DIR})
-target_include_directories(PackageTest PRIVATE ${CMAKE_SOURCE_DIR}/src/IncrementalCompilation)
+add_executable(PackageTests PackageTest.cpp)
+
+target_include_directories(PackageTests PRIVATE ${FLATBUFFERS_INCLUDE_DIR})
+target_include_directories(PackageTests PRIVATE ${CMAKE_SOURCE_DIR}/src/IncrementalCompilation)
 
 target_link_libraries(
-    PackageTest
+    PackageTests
     cangjie-lsp
     ${LINK_LIBS}
     boundscheck-static

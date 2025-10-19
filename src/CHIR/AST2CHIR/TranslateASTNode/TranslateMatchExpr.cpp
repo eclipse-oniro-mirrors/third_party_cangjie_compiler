@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 
 using namespace Cangjie::CHIR;
@@ -597,6 +599,7 @@ Ptr<Value> Translator::HandleTypePattern(const AST::TypePattern& typePattern, Pt
         // When pattern is always matched, do not return condition value.
         return nullptr;
     }
+
     auto targetTy = TranslateType(*typePattern.type->ty);
     queue.push(std::make_pair(typePattern.pattern.get(), value));
     if (typePattern.needRuntimeTypeCheck) {
@@ -607,6 +610,7 @@ Ptr<Value> Translator::HandleTypePattern(const AST::TypePattern& typePattern, Pt
         return expr->GetResult();
     }
 }
+
 
 void Translator::TranslateConditionMatches(const AST::MatchExpr& matchExpr, Ptr<Value> retVal)
 {

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Transformation/RangePropagation.h"
 #include "cangjie/CHIR/Analysis/ConstAnalysis.h"
 #include "cangjie/CHIR/Analysis/Engine.h"
@@ -48,6 +50,7 @@ const OptEffectCHIRMap& RangePropagation::GetEffectMap() const
 void RangePropagation::RunOnPackage(const Ptr<const Package>& package, bool isDebug)
 {
     for (auto func : package->GetGlobalFuncs()) {
+
         RunOnFunc(func, isDebug);
     }
 }
@@ -117,6 +120,7 @@ Ptr<LiteralValue> RangePropagation::GenerateConstExpr(const Ptr<Type>& type, con
                 return builder.CreateLiteralValue<IntLiteral>(type, intValue.value().UVal());
             }
             break;
+
     }
     return nullptr;
 }

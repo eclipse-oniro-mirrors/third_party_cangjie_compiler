@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Type/CHIRType.h"
 
 #include "cangjie/CHIR/Type/ClassDef.h"
@@ -27,6 +29,7 @@ Type* CHIRType::TranslateTupleType(AST::TupleTy& tupleTy)
     for (auto argTy : tupleTy.typeArgs) {
         argTys.emplace_back(TranslateType(*argTy));
     }
+
     return builder.GetType<TupleType>(argTys);
 }
 
@@ -44,6 +47,7 @@ Type* CHIRType::TranslateFuncType(const AST::FuncTy& fnTy)
     auto funcTy = builder.GetType<FuncType>(paramTys, retTy, fnTy.hasVariableLenArg, fnTy.IsCFunc());
     return funcTy;
 }
+
 
 Type* CHIRType::TranslateStructType(AST::StructTy& structTy)
 {

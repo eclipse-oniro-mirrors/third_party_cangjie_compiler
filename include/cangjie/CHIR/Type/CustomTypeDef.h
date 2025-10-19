@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CUSTOMTYPE_H
 #define CANGJIE_CUSTOMTYPE_H
 
@@ -28,6 +30,7 @@ struct MemberVarInfo {
     AttributeInfo attributeInfo;
     DebugLocation loc;
     AnnoInfo annoInfo;
+
     bool TestAttr(Attribute attr) const
     {
         return attributeInfo.TestAttr(attr);
@@ -195,6 +198,7 @@ public:
     // ===--------------------------------------------------------------------===//
     AnnoInfo GetAnnoInfo() const;
     void SetAnnoInfo(const AnnoInfo& info);
+
 
     // ===--------------------------------------------------------------------===//
     // Vtable

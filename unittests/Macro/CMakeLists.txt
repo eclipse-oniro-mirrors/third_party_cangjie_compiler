@@ -4,14 +4,16 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 include_directories(${CMAKE_SOURCE_DIR}/src/Sema)
 if(CANGJIE_CODEGEN_CJNATIVE_BACKEND)
-    add_executable(TokenSerializationTest TokenSerializationTest.cpp)
-    add_executable(NodeSerializationTest NodeSerializationTest.cpp)
-    add_executable(MacroTest MacroTest.cpp)
+    add_executable(TokenSerializationTests TokenSerializationTest.cpp)
+    add_executable(NodeSerializationTests NodeSerializationTest.cpp)
+    add_executable(MacroTests MacroTest.cpp)
 
     target_link_libraries(
-        TokenSerializationTest
+        TokenSerializationTests
         cangjie-lsp
         ${LINK_LIBS}
         boundscheck-static

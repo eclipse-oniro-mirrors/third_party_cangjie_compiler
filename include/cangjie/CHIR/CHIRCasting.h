@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -32,6 +34,7 @@ DEFINE_NODE_TYPE_KIND(CHIR::UnitType, CHIR::Type::TypeKind::TYPE_UNIT);
 DEFINE_NODE_TYPE_KIND(CHIR::NothingType, CHIR::Type::TypeKind::TYPE_NOTHING);
 DEFINE_NODE_TYPE_KIND(CHIR::VoidType, CHIR::Type::TypeKind::TYPE_VOID);
 DEFINE_NODE_TYPE_KIND(CHIR::TupleType, CHIR::Type::TypeKind::TYPE_TUPLE);
+
 DEFINE_NODE_TYPE_KIND(CHIR::StructType, CHIR::Type::TypeKind::TYPE_STRUCT);
 DEFINE_NODE_TYPE_KIND(CHIR::EnumType, CHIR::Type::TypeKind::TYPE_ENUM);
 DEFINE_NODE_TYPE_KIND(CHIR::FuncType, CHIR::Type::TypeKind::TYPE_FUNC);

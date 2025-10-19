@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Transformation/ConstPropagation.h"
 
 #include "cangjie/CHIR/Analysis/Engine.h"
@@ -20,6 +22,7 @@ ConstPropagation::ConstPropagation(CHIRBuilder& builder, ConstAnalysisWrapper* c
 void ConstPropagation::RunOnPackage(const Ptr<const Package>& package, bool isDebug, bool isCJLint)
 {
     for (auto func : package->GetGlobalFuncs()) {
+
         RunOnFunc(func, isDebug, isCJLint);
     }
 }

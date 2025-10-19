@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -162,6 +164,7 @@ private:
     // should be set true, and set false while leaving.
     bool enableThis{false};
     bool deadlocked{false};
+
     bool inForeignBlock{false};
     bool enableCustomAnno{false}; // parse macrocall as custom annotation.
 
@@ -307,6 +310,7 @@ private:
     std::list<std::pair<unsigned, unsigned>> allTokensInOneFile;
     TokenVecMap commentsMap;
     uint8_t Precedence(TokenKind kind) const;
+
 
     /// Common initializer shared among constructors.
     void Init();
@@ -613,6 +617,7 @@ private:
     OwnedPtr<AST::FuncParam> ParseParamInParamList(
         const ScopeKind& scopeKind, Ptr<AST::FuncParam>& meetNamedParameter, Ptr<AST::FuncParam>& meetMemberParams);
     void ParseInterfaceDeclOrClassDeclGeneric(AST::InheritableDecl& ret);
+
     void SetDefaultFunc(ScopeKind scopeKind, AST::Decl& decl) const;
     void ParseCaseBody(AST::EnumDecl& enumDecl);
     void ParseEnumBody(AST::EnumDecl& enumDecl);

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  * This file implements the AST Writer related classes.
@@ -842,7 +844,6 @@ TPatternOffset ASTWriter::ASTWriterImpl::SaveExceptTypePattern(const ExceptTypeP
     dbuilder.add_patterns(patternsIdx);
     return dbuilder.Finish();
 }
-
 TPatternOffset ASTWriter::ASTWriterImpl::SaveCommandTypePattern(const CommandTypePattern& ctp)
 {
     auto pIdx = SavePattern(*ctp.pattern);

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -70,6 +72,7 @@ struct Env {
         bp = local.size();
     }
 
+
     /** @brief set base pointer to newBP and clean environment stack after bp. */
     void RestoreStackFrameTo(size_t newBP)
     {
@@ -82,6 +85,7 @@ struct Env {
     {
         return bp;
     }
+
 
 private:
     size_t numberOfGlobals;

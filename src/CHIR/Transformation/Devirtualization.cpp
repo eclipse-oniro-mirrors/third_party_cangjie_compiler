@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Transformation/Devirtualization.h"
 
 #include "cangjie/CHIR/Transformation/DeadCodeElimination.h"
@@ -27,6 +29,7 @@ void Devirtualization::RunOnFuncs(const std::vector<Func*>& funcs, CHIRBuilder& 
 {
     rewriteInfos.clear();
     for (auto func : funcs) {
+
         RunOnFunc(func, builder);
     }
     RewriteToApply(builder, rewriteInfos, isDebug);
@@ -476,6 +479,7 @@ std::pair<FuncBase*, Type*> Devirtualization::FindRealCallee(
         return res;
     }
 }
+
 
 static bool IsOpenClass(const ClassDef& def)
 {

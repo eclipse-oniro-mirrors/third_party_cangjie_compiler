@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -72,6 +74,7 @@ void Linux_CJNATIVE::GenerateLinkingTool(const std::vector<TempFileInfo>& objFil
     if (driverOptions.IsLTOEnabled()) {
         tool->SetLdLibraryPath(FileUtil::JoinPath(FileUtil::GetDirPath(ldPath), "../lib"));
         GenerateLinkOptionsForLTO(*tool.get());
+
     } else if (driverOptions.EnableHwAsan()) {
         // same args as lto except GenerateLinkOptionsForLTO
         tool->SetLdLibraryPath(FileUtil::JoinPath(FileUtil::GetDirPath(ldPath), "../lib"));

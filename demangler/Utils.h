@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 
 #ifndef CANGJIE_DEMANGLER_UTILS_H
 #define CANGJIE_DEMANGLER_UTILS_H
@@ -73,6 +75,7 @@ enum class OperatorKind : size_t {
 };
 
 const std::unordered_map<const char*, const char*, StdPkgHash, StdPkgCompare> MANGLE_STDPKG_MAP = {
+
     {"ab", "std.sync"},
     {"ac", "std.collection"},
     {"ad", "std.deriving"},

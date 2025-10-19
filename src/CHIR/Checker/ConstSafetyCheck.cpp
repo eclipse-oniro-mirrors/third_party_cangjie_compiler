@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/Checker/ConstSafetyCheck.h"
 #include "cangjie/CHIR/Analysis/Engine.h"
 
@@ -22,6 +24,7 @@ void ConstSafetyCheck::RunOnPackage(const Package& package, size_t threadNum) co
     } else {
         Utils::TaskQueue taskQueue(threadNum);
         for (auto func : package.GetGlobalFuncs()) {
+
             taskQueue.AddTask<void>([this, func]() { return RunOnFunc(func); });
         }
         taskQueue.RunAndWaitForAllTasksCompleted();

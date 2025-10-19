@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/CHIR/AST2CHIR/GenerateVTable/WrapVirtualFunc.h"
 
 #include "cangjie/CHIR/CHIRBuilder.h"
@@ -302,6 +304,7 @@ void WrapVirtualFunc::CreateVirtualWrapperFunc(Func& func, FuncType& wrapperTy,
     for (size_t i = 0; i < paramInstTy.size(); ++i) {
         args[i] = TypeCastOrBoxIfNeeded(*args[i], *paramInstTy[i], builder, *entry, INVALID_LOCATION);
     }
+
     std::vector<Type*> instArgTypes;
     instArgTypes.reserve(genericTable.funcGenericTypeParams.size());
     for (auto& funcGenericParam : genericTable.funcGenericTypeParams) {

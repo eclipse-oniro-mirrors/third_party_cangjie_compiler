@@ -4,5 +4,7 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 file(GLOB TRANSLATEASTNODE_SRC *.cpp)
 set(AST2CHIR_SRC ${AST2CHIR_SRC} ${TRANSLATEASTNODE_SRC} PARENT_SCOPE)

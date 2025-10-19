@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "CGModule.h"
 
 #include "llvm/IR/Attributes.h"
@@ -287,7 +289,6 @@ CGFunction* CGModule::GetOrInsertCGFunction(const CHIR::Value* func, bool forWra
         AddFnAttr(function, llvm::Attribute::get(module->getContext(), STRUCT_MUT_FUNC_ATTR)); // Deprecated
         AddFnAttr(function, llvm::Attribute::get(module->getContext(), THIS_PARAM_HAS_BP));
     }
-
     auto chirFunc = VirtualCast<const CHIR::FuncBase*>(func);
     auto chirLinkage = chirFunc->Get<CHIR::LinkTypeInfo>();
     if (func->IsFuncWithBody()) {

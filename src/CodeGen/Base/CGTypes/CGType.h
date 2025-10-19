@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_CGTYPE_H
 #define CANGJIE_CGTYPE_H
 
@@ -243,6 +245,7 @@ public:
         return cgGenericKind == CGGenericKind::DYNAMIC_GI;
     }
 
+
     void GenTypeInfo();
 
     void SetCGExtensionDef(CGExtensionDef* ed)
@@ -275,6 +278,7 @@ public:
     /// To get a RefType of chir
     static CHIR::RefType* GetRefTypeOf(CHIR::CHIRBuilder& chirBuilder, const CHIR::Type& typeOfCHIR);
     static CHIR::RefType* GetRefTypeOfCHIRInt8(CHIR::CHIRBuilder& chirBuilder);
+
 
     static CGType* GetCGTI(CGModule& cgModule);
 

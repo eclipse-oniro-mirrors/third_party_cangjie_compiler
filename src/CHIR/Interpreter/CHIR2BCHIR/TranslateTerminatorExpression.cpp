@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -107,12 +109,14 @@ void CHIR2BCHIR::TranslateTerminatorExpression(Context& ctx, const Expression& e
             TranslateTryTerminatorJumps(ctx, *intOpWithException);
             break;
         }
+
         case ExprKind::ALLOCATE_WITH_EXCEPTION: {
             CJC_ASSERT(expr.GetNumOfOperands() == 0);
             TranslateAllocate(ctx, expr);
             TranslateTryTerminatorJumps(ctx, *StaticCast<const Terminator*>(&expr));
             break;
         }
+
         default: {
             // unreachable
             CJC_ASSERT(false);
@@ -203,3 +207,4 @@ void CHIR2BCHIR::TranslateIntOpWithException(Context& ctx, const IntOpWithExcept
         ctx.def.Push(static_cast<Bchir::ByteCodeContent>(expr.GetOperand(1)->GetType()->GetTypeKind()));
     }
 }
+

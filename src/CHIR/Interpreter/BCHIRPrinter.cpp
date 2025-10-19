@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -293,6 +295,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintPath()
     }
 }
 
+
 void BCHIRPrinter::DefinitionPrinter::PrintOPIntrinsic(OpCode opCode)
 {
     auto kind = static_cast<CHIR::IntrinsicKind>(bytecode[index]);
@@ -320,6 +323,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOPIntrinsic(OpCode opCode)
     auto overflow = sit->second;
     Print(index, std::move(overflow));
 }
+
 
 
 void BCHIRPrinter::DefinitionPrinter::PrintOP()
@@ -473,6 +477,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOP()
             PrintAtIndex();
             return;
         }
+
         case OpCode::STORE:
         case OpCode::RETURN:
         case OpCode::EXIT:
@@ -525,6 +530,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOP()
         case OpCode::BIN_DIV_EXC:
         case OpCode::BIN_MOD_EXC:
         case OpCode::BIN_EXP_EXC:
+
         case OpCode::BIN_LSHIFT_EXC:
         case OpCode::BIN_RSHIFT_EXC: {
             PrintOPBinRshift(opCode); // type kind, overflow strategy
@@ -587,6 +593,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOP()
             return;
         }
         case OpCode::CAPPLY: {
+
             return;
         }
         case OpCode::ASG: {
@@ -601,6 +608,7 @@ void BCHIRPrinter::DefinitionPrinter::PrintOP()
             return;
         }
         case OpCode::SYSCALL: {
+
             return;
         }
         case OpCode::INTRINSIC0:

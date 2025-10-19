@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "cangjie/Sema/MockSupportManager.h"
 
 #include "TypeCheckUtil.h"
@@ -311,6 +313,7 @@ std::vector<OwnedPtr<MatchCase>> MockSupportManager::GenerateHandlerMatchCases(
     auto handlerRetTy = typeManager.GetAnyTy();
     auto optionFuncRetTy = typeManager.GetEnumTy(*mockUtils->optionDecl, { handlerRetTy });
 
+
     std::vector<OwnedPtr<MatchCase>> handlerResultCases;
     auto handlerResultPattern = MakeOwned<EnumPattern>();
     auto handlerResultPatternConstructor = LookupEnumMember(
@@ -423,6 +426,7 @@ void MockSupportManager::PrepareStaticDecl(Decl& decl)
         generatedMockDecls.insert(std::move(newVarDecl));
         genericMockVarsDecls.emplace(&decl, varDecl);
     }
+
 
     auto varDeclRef = CreateRefExpr(*varDecl);
     varDeclRef->ty = optionFuncTy;
@@ -736,6 +740,7 @@ OwnedPtr<FuncDecl> MockSupportManager::GenerateErasedFuncAccessor(FuncDecl& meth
 {
     auto outerClassDecl = As<ASTKind::CLASS_DECL>(methodDecl.outerDecl);
     CJC_ASSERT(outerClassDecl);
+
 
     OwnedPtr<FuncDecl> methodAccessor = ASTCloner::Clone(Ptr(&methodDecl));
 

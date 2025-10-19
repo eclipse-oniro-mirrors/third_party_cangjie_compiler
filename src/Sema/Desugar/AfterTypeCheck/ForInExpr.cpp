@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "Desugar/AfterTypeCheck.h"
 
 #include "cangjie/Driver/StdlibMap.h"
@@ -378,6 +380,7 @@ void TypeChecker::TypeCheckerImpl::DesugarForInCloseRange(ASTContext& ctx, AST::
     // Add file for all created ast.
     forInExpr.desugarExpr = std::move(blockExpr);
 
+
     ctx.DeleteInvertedIndexes(forInExpr.inExpression.get());
     forInExpr.inExpression = nullptr;
 }
@@ -454,6 +457,7 @@ void TypeChecker::TypeCheckerImpl::DesugarForInNonCloseRange(ASTContext& ctx, AS
     CJC_ASSERT(blockExprTy && blockExprTy->kind != TypeKind::TYPE_INVALID);
     // Add file for all created ast.
     forInExpr.desugarExpr = std::move(blockExpr);
+
 
     ctx.DeleteInvertedIndexes(forInExpr.inExpression.get());
     forInExpr.inExpression = nullptr;

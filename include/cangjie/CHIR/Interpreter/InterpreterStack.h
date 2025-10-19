@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -350,6 +352,7 @@ struct InterpreterStack {
         std::swap(argStack[(argStack.size() - offsetFromEnd) + i], argStack[(argStack.size() - offsetFromEnd) + j]);
     }
 
+
     const ControlState& CtrlTop() const
     {
         return controlStack.back();
@@ -376,6 +379,7 @@ struct InterpreterStack {
     {
         return controlStack.empty();
     }
+
 
     const std::vector<ControlState>& GetCtrlStack() const
     {

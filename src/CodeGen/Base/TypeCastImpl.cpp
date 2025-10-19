@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -610,6 +612,7 @@ llvm::Value* GenerateTypeCast(IRBuilder2& irBuilder, const CHIRTypeCastWrapper& 
     }
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
+
     if (srcType->IsPointerType(1) && targetType->IsPointerType(1)) {
         return srcValue;
     }

@@ -4,9 +4,17 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_USERBASE_H
 #define CANGJIE_USERBASE_H
 
+#ifdef CANGJIE_WRITE_PROFILE
+#include "cangjie/Utils/CheckUtils.h"
+#endif
+
+#include <fstream>
+#include <iostream>
 #include <string>
 
 namespace Cangjie {

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 /**
  * @file
  *
@@ -91,9 +93,11 @@ void TypeChecker::TypeCheckerImpl::PerformDesugarAfterInstantiation([[maybe_unus
         PerformToAnyInsertion(pkg);
     }
 #endif
+
     PerformRecursiveTypesElimination();
     UpdateDeclAttributes(pkg, ci->invocation.globalOptions.exportForTest);
 }
+
 
 bool AutoBoxing::NeedBoxOption(Ty& child, Ty& target)
 {

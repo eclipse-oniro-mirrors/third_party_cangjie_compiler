@@ -9,6 +9,10 @@
 // TOKEN(token id, token value for human reading, token literal, token priority)
 // Note that stdlib/ast/AnyKind.cj should be modified at the same time that this file has been changed.
 #ifdef TOKEN
+#ifndef EXPERIMENTAL_TOKEN
+#define EXPERIMENTAL_TOKEN TOKEN
+#define EXPERIMENTAL_TOKEN_DEFAULT
+#endif
 TOKEN(DOT, "dot", ".", 0)
 TOKEN(COMMA, "comma", ",", 0)
 TOKEN(LPAREN, "l_paren", "(", 0)

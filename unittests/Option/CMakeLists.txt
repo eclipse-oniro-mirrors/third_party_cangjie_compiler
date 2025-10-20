@@ -6,7 +6,7 @@
 
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-add_executable(OptionTests OptionTest.cpp OptionTableTest.cpp ${CANGJIE_SRC_OBJECTS})
+add_executable(OptionTest OptionTest.cpp OptionTableTest.cpp ${CANGJIE_SRC_OBJECTS})
 if(CANGJIE_CODEGEN_CJNATIVE_BACKEND)
     set(CJNATIVE_BACKEND "cjnative")
     string(TOLOWER ${CMAKE_SYSTEM_NAME}_${CMAKE_SYSTEM_PROCESSOR}_${CJNATIVE_BACKEND} output_lib_dir)

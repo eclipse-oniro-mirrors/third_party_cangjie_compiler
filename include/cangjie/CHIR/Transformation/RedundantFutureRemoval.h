@@ -9,7 +9,7 @@
 #ifndef CANGJIE_CHIR_TRANSFORMATION_REDUNDANT_FUTURE_REMOVAL_H
 #define CANGJIE_CHIR_TRANSFORMATION_REDUNDANT_FUTURE_REMOVAL_H
 
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/Package.h"
 #include "cangjie/CHIR/Value.h"
 

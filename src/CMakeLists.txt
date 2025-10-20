@@ -418,7 +418,6 @@ endif()
 if (CANGJIE_CODEGEN_CJNATIVE_BACKEND)
     add_subdirectory(CHIR)
     add_subdirectory(CodeGen)
-
 endif()
 
 set(AST_FFI_OBJECTS

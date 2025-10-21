@@ -6,19 +6,17 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "CHIRDeserializerImpl.h"
-
 #include <algorithm>
-#include <cstddef>
 #include <type_traits>
 
 #include "cangjie/CHIR/CHIRCasting.h"
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
+#include "cangjie/CHIR/GeneratedFromForIn.h"
 #include "cangjie/CHIR/Type/ClassDef.h"
+#include "cangjie/CHIR/Type/CustomTypeDef.h"
 #include "cangjie/CHIR/Type/EnumDef.h"
 #include "cangjie/CHIR/Type/StructDef.h"
 #include "cangjie/CHIR/Type/Type.h"
-#include "cangjie/CHIR/Type/CustomTypeDef.h"
 #include "cangjie/CHIR/UserDefinedType.h"
 #include "cangjie/CHIR/Utils.h"
 #include "cangjie/Utils/FileUtil.h"
@@ -145,6 +143,7 @@ AttributeInfo CreateAttr(const uint64_t attrs)
 {
     return AttributeInfo(attrs);
 }
+
 std::string GetMangleNameFromIdentifier(std::string& identifier)
 {
     CJC_ASSERT(!identifier.empty());
@@ -274,6 +273,7 @@ template <> EnumDef* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const P
     auto packageName = obj->base()->packageName()->str();
     auto attrs = CreateAttr(obj->base()->attributes());
     auto imported = attrs.TestAttr(CHIR::Attribute::IMPORTED);
+
     auto result = builder.CreateEnum(DebugLocation(), srcCodeIdentifier, GetMangleNameFromIdentifier(identifier),
         packageName, imported, obj->nonExhaustive());
     result->AppendAttributeInfo(attrs);
@@ -287,6 +287,7 @@ template <> StructDef* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const
     auto packageName = obj->base()->packageName()->str();
     auto attrs = CreateAttr(obj->base()->attributes());
     auto imported = attrs.TestAttr(CHIR::Attribute::IMPORTED);
+
     auto result = builder.CreateStruct(
         DebugLocation(), srcCodeIdentifier, GetMangleNameFromIdentifier(identifier), packageName, imported);
     result->AppendAttributeInfo(attrs);
@@ -301,6 +302,7 @@ template <> ClassDef* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const 
     auto isClass = obj->kind() == PackageFormat::ClassDefKind::ClassDefKind_CLASS;
     auto attrs = CreateAttr(obj->base()->attributes());
     auto imported = attrs.TestAttr(CHIR::Attribute::IMPORTED);
+
     auto result = builder.CreateClass(
         DebugLocation(), srcCodeIdentifier, GetMangleNameFromIdentifier(identifier), packageName, isClass, imported);
     result->AppendAttributeInfo(attrs);
@@ -1205,7 +1207,6 @@ template <>
 InvokeWithException* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const PackageFormat::InvokeWithException* obj)
 {
     auto operands = GetValue<Value>(obj->base()->base()->operands());
-
     auto args = std::vector<Value*>(operands.begin() + 1, operands.end());
     // Exceptions
     auto sucBlock = GetValue<Block>(obj->base()->successors()->Get(0));
@@ -1315,7 +1316,6 @@ SpawnWithException* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const Pa
     auto operands = GetValue<Value>(obj->base()->base()->operands());
     auto val = operands[0];
     auto func = GetValue<FuncBase>(obj->executeClosure());
-
     auto resultTy = GetType<Type>(obj->base()->base()->resultTy());
     // Exceptions
     auto sucBlock = GetValue<Block>(obj->base()->successors()->Get(0));
@@ -1762,7 +1762,6 @@ Value* CHIRDeserializer::CHIRDeserializerImpl::GetValue(uint32_t id)
             case PackageFormat::ValueElem_ImportedFunc:
                 id2Value[id] = Deserialize<ImportedFunc>(
                     static_cast<const PackageFormat::ImportedFunc*>(pool->values()->Get(id - 1)));
-
                 break;
             case PackageFormat::ValueElem_Block:
                 id2Value[id] =
@@ -1824,7 +1823,6 @@ Type* CHIRDeserializer::CHIRDeserializerImpl::GetType(uint32_t id)
                 id2Type[id] =
                     Deserialize<TupleType>(static_cast<const PackageFormat::TupleType*>(pool->types()->Get(id - 1)));
                 break;
-
             case PackageFormat::TypeElem_RawArrayType:
                 id2Type[id] = Deserialize<RawArrayType>(
                     static_cast<const PackageFormat::RawArrayType*>(pool->types()->Get(id - 1)));

@@ -9,7 +9,7 @@
 #include "cangjie/CHIR/Transformation/MarkClassHasInited.h"
 
 #include "cangjie/CHIR/CHIRCasting.h"
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/Type/ClassDef.h"
 
 using namespace Cangjie::CHIR;

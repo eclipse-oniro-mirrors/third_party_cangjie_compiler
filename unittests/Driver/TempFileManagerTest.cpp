@@ -6,11 +6,11 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+#include "gtest/gtest.h"
 #include "cangjie/Driver/TempFileManager.h"
 #include "cangjie/Driver/TempFileInfo.h"
 #include "cangjie/Option/Option.h"
 #include "cangjie/Utils/FileUtil.h"
-
 
 using namespace Cangjie;
 

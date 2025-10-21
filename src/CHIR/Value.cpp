@@ -8,7 +8,7 @@
 
 #include "cangjie/CHIR/Value.h"
 #include "cangjie/CHIR/CHIRCasting.h"
-#include "cangjie/CHIR/Expression.h"
+#include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/ToStringUtils.h"
 #include "cangjie/CHIR/Type/ClassDef.h"
 #include "cangjie/CHIR/Type/CustomTypeDef.h"

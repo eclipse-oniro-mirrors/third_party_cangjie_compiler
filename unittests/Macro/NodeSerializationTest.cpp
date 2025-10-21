@@ -6,11 +6,12 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+#include <string>
+#include "gtest/gtest.h"
 #include "cangjie/Macro/NodeSerialization.h"
 #include "cangjie/Basic/DiagnosticEngine.h"
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "cangjie/Parse/Parser.h"
-
 
 using namespace Cangjie;
 using namespace AST;

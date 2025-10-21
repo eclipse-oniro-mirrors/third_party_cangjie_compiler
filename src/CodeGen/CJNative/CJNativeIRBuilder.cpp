@@ -619,7 +619,6 @@ llvm::Instruction* IRBuilder2::CreateStore(const CGValue& cgVal, const CGValue& 
 }
 
 namespace {
-
 bool IsLoadExprForAllocatedGenericRef(const CHIR::Expression& chirExpr)
 {
     if (chirExpr.GetExprKind() != CHIR::ExprKind::LOAD) {

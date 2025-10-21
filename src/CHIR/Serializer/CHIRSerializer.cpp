@@ -7,6 +7,7 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "cangjie/CHIR/Serializer/CHIRSerializer.h"
+#include "AnnoFactoryInfo.h"
 #include "CHIRSerializerImpl.h"
 #include "cangjie/CHIR/CHIRCasting.h"
 #include "cangjie/CHIR/GeneratedFromForIn.h"
@@ -300,7 +301,6 @@ flatbuffers::Offset<PackageFormat::EnumCtorInfo> CHIRSerializer::CHIRSerializerI
 }
 
 template <>
-
 flatbuffers::Offset<PackageFormat::AbstractMethodParam> CHIRSerializer::CHIRSerializerImpl::Serialize(
     const AbstractMethodParam& obj)
 {
@@ -382,7 +382,6 @@ flatbuffers::Offset<PackageFormat::TupleType> CHIRSerializer::CHIRSerializerImpl
 }
 
 template <>
-
 flatbuffers::Offset<PackageFormat::RawArrayType> CHIRSerializer::CHIRSerializerImpl::Serialize(const RawArrayType& obj)
 {
     auto base = Serialize<PackageFormat::Type>(static_cast<const Type&>(obj));
@@ -509,7 +508,6 @@ flatbuffers::Offset<PackageFormat::ClassType> CHIRSerializer::CHIRSerializerImpl
 }
 
 // ======================= Value Serializers ===================================
-
 template <> flatbuffers::Offset<PackageFormat::Value> CHIRSerializer::CHIRSerializerImpl::Serialize(const Value& obj)
 {
     auto base = Serialize<PackageFormat::Base>(static_cast<const Base&>(obj));
@@ -1364,7 +1362,6 @@ template <> flatbuffers::Offset<void> CHIRSerializer::CHIRSerializerImpl::Dispat
         case Type::TypeKind::TYPE_TUPLE:
             typeKind[GetId<Type>(&obj) - 1] = static_cast<uint8_t>(PackageFormat::TypeElem_TupleType);
             return Serialize<PackageFormat::TupleType>(static_cast<const TupleType&>(obj)).Union();
-
         case Type::TypeKind::TYPE_STRUCT:
             typeKind[GetId<Type>(&obj) - 1] = static_cast<uint8_t>(PackageFormat::TypeElem_StructType);
             return Serialize<PackageFormat::StructType>(static_cast<const StructType&>(obj)).Union();

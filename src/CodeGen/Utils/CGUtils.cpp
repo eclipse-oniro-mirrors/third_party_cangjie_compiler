@@ -83,6 +83,31 @@ int64_t GetIntMaxOrMin(IRBuilder2& irBuilder, const CHIR::IntType& ty, bool isMa
     return isMax ? minMax.second : minMax.first;
 }
 
+
+std::vector<llvm::Metadata*> UnwindGenericRelateType(llvm::LLVMContext& llvmCtx, const CHIR::Type& ty)
+{
+    std::vector<llvm::Metadata*> tyArgMeta{};
+    if (ty.IsGeneric()) {
+        return tyArgMeta;
+    }
+
+    if (ty.GetTypeArgs().size() > 0) {
+        std::string ttName = CGType::GetNameOfTypeTemplateGV(ty);
+        tyArgMeta.emplace_back(llvm::MDString::get(llvmCtx, ttName));
+        auto tyArg = ty.GetTypeArgs()[0];
+        if (tyArg->IsValueType()) {
+            std::string tiName = CGType::GetNameOfTypeInfoGV(*tyArg);
+            tyArgMeta.emplace_back(llvm::MDString::get(llvmCtx, tiName));
+        } else {
+            auto ti = UnwindGenericRelateType(llvmCtx, *DeRef(*tyArg));
+            if (!ti.empty()) {
+                tyArgMeta.emplace_back(llvm::MDTuple::get(llvmCtx, ti));
+            }
+        }
+    }
+    return tyArgMeta;
+}
+
 uint64_t GetUIntMax(IRBuilder2& irBuilder, const CHIR::IntType& ty)
 {
     auto tyKind = irBuilder.GetTypeKindFromType(ty);

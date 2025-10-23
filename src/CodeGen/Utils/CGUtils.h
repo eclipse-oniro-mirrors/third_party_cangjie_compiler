@@ -36,6 +36,8 @@ namespace CodeGen {
 class IRBuilder2;
 class CGValue;
 
+std::vector<llvm::Metadata*> UnwindGenericRelateType(llvm::LLVMContext& llvmCtx, const CHIR::Type& ty);
+
 inline std::string GenNameForBB(const std::string& name, [[maybe_unused]] uint64_t extraInfo = 0)
 {
     return name;

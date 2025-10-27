@@ -13,6 +13,7 @@
 #include "cangjie/CHIR/Analysis/ValueRangeAnalysis.h"
 #include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/Package.h"
+#include "cangjie/CHIR/Transformation/DeadCodeElimination.h"
 #include "cangjie/CHIR/Utils.h"
 #include "cangjie/CHIR/Value.h"
 
@@ -57,6 +58,11 @@ public:
      */
     const OptEffectCHIRMap& GetEffectMap() const;
 
+    /**
+     * @brief Get all funcs need to remove unreachable blocks.
+     * @return functions
+     */
+    const std::vector<const Func*>& GetFuncsNeedRemoveBlocks() const;
 private:
     struct RewriteInfo {
         Expression* oldExpr;
@@ -101,6 +107,7 @@ private:
     DiagAdapter* diag;
     bool enIncre;
     static OptEffectCHIRMap effectMap;
+    std::vector<const Func*> funcsNeedRemoveBlocks;
 };
 
 } // namespace Cangjie::CHIR

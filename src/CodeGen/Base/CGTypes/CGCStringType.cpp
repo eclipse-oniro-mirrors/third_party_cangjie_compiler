@@ -8,6 +8,7 @@
 
 #include "Base/CGTypes/CGCStringType.h"
 
+#include "CGModule.h"
 #include "CGContext.h"
 
 namespace Cangjie::CodeGen {
@@ -24,5 +25,12 @@ llvm::Type* CGCStringType::GenLLVMType()
         layoutType = llvm::StructType::create(llvmCtx, {llvmType}, "CString.Type");
     }
     return llvmType;
+}
+
+void CGCStringType::CalculateSizeAndAlign()
+{
+    llvm::DataLayout layOut = cgMod.GetLLVMModule()->getDataLayout();
+    size = layOut.getTypeAllocSize(llvmType);
+    align = layOut.getABITypeAlignment(llvmType);
 }
 } // namespace Cangjie::CodeGen

@@ -216,6 +216,8 @@ void RecordCodeInfoInCodeGen(const std::string& suffix, const CGModule& cgMod)
         }
     }
     std::string suffixWithModuleName = suffix + "(" + cgMod.GetLLVMModule()->getSourceFileName() + ")";
+    static std::mutex profileMutex;
+    std::lock_guard g{profileMutex};
     Utils::ProfileRecorder::RecordCodeInfo(
         "all generic ins llvm ir after " + suffixWithModuleName, static_cast<int64_t>(allInstantiated));
     Utils::ProfileRecorder::RecordCodeInfo(
@@ -247,6 +249,7 @@ void SpecifyPackageInitFunc(const CGModule& cgMod)
     cgMod.GetLLVMModule()
         ->getOrInsertNamedMetadata("pkg_init_func")
         ->addOperand(llvm::MDTuple::get(llvmCtx, llvm::MDString::get(llvmCtx, pkgInitFuncName)));
+    cgMod.GetCGContext().AddLLVMUsedVars(pkgInitFuncName);
 }
 
 void SetSymbolLinkageType(const CGModule& cgMod)

@@ -21,7 +21,6 @@
 
 namespace Cangjie {
 class ASTLoader;
-class ImportManager;
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
 const uint8_t CJO_MAJOR_VERSION = 0;
@@ -44,6 +43,7 @@ public:
     void AddImportedPackageFromASTNode(OwnedPtr<AST::Package>&& pkg) const;
     bool LoadPackageHeader(const std::string& fullPackageName, const std::string& cjoPath) const;
     void LoadAllDeclsAndRefs() const;
+    bool NeedCollectDependency(std::string curName, bool isCurMacro, std::string depName) const;
     /**
      * Loads the declaration of each package in packages on demand.
      * If @p fromLsp is false, only the dependent packages of each package in @p packages are loaded.
@@ -62,6 +62,8 @@ public:
     std::string GetPackageDepInfo(const std::string& cjoPath) const;
 
     Ptr<AST::PackageDecl> GetPackageDecl(const std::string& fullPackageName) const;
+    std::optional<std::vector<std::string>> PreReadCommonPartCjoFiles();
+    Ptr<ASTLoader> GetCommonPartCjo(std::string expectedName) const;
     Ptr<AST::Package> GetPackage(const std::string& fullPackageName) const;
     std::vector<Ptr<AST::PackageDecl>> GetAllPackageDecls(bool includeMacroPkg = false) const;
 
@@ -73,9 +75,13 @@ public:
         const std::string& fullPackageName, const std::string& name) const;
     Ptr<AST::Decl> GetImplicitPackageMembersByName(const std::string& fullPackageName, const std::string& name) const;
 
+    std::optional<std::string> GetPackageCjoPath(std::string fullPackageName) const;
     /** return {fullPackageName, cjoPath} */
     std::pair<std::string, std::string> GetPackageCjo(const AST::ImportSpec& importSpec) const;
     std::vector<std::string> GetFullPackageNames(const AST::ImportSpec& import) const;
+    // for single import "import a.b.c", the possible imported cjo's are a.b and a.b.c
+    // for other import specs, the possible name is unique.
+    std::vector<std::string> GetPossibleCjoNames(const AST::ImportSpec& import) const;
     std::string GetPackageNameByImport(const AST::ImportSpec& importSpec) const;
 
     bool IsImportPackage(const AST::ImportSpec& importSpec) const;

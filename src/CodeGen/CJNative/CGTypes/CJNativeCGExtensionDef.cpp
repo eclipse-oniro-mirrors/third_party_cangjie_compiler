@@ -135,7 +135,7 @@ llvm::Value* CGExtensionDef::CreateCompareArgs(
         llvm::Value* tiPtr = irBuilder.CreateConstGEP1_32(typeInfoPtrType, typeInfos, i);
         auto ti = irBuilder.LLVMIRBuilder2::CreateLoad(typeInfoPtrType, tiPtr, std::to_string(i) + "ti");
         auto chirType = typeArgs[i];
-        innerTypeInfoMap.emplace(chirType, ti);
+        innerTypeMap.emplace(chirType, InnerTiInfo{ti, true});
         irBuilder.SetInsertPoint(backupBB, backupIt);
         auto idxStr = prefix + "_" + std::to_string(i);
         if (i == 0) {
@@ -187,7 +187,7 @@ bool CGExtensionDef::FoundGenericTypeAndCollectPath(
 
 llvm::Value* CGExtensionDef::GetTypeInfoWithPath(IRBuilder2& irBuilder, const CHIR::Type& type,
     llvm::Value* entryTypeArgs, std::queue<size_t>&& remainPath,
-    std::unordered_map<const CHIR::Type*, llvm::Value*>& innerTypeInfoMap)
+    std::unordered_map<const CHIR::Type*, InnerTiInfo>& innerTypeMap)
 {
     auto typeInfoType = CGType::GetOrCreateTypeInfoType(irBuilder.GetLLVMContext());
     auto typeInfoPtrType = typeInfoType->getPointerTo();
@@ -201,9 +201,9 @@ llvm::Value* CGExtensionDef::GetTypeInfoWithPath(IRBuilder2& irBuilder, const CH
         irBuilder.SetInsertPointForPreparingTypeInfo();
         auto curTiPtr = irBuilder.CreateConstGEP1_32(typeInfoPtrType, typeArgs, idx);
         auto curTi = irBuilder.LLVMIRBuilder2::CreateLoad(typeInfoPtrType, curTiPtr);
-        // Also update 'innerTypeInfoMap'.
+        // Also update 'innerTypeMap'.
         curType = DeRef(*curType)->GetTypeArgs()[idx];
-        (void)innerTypeInfoMap.emplace(curType, curTi);
+        (void)innerTypeMap.emplace(curType, InnerTiInfo{curTi, true});
         irBuilder.SetInsertPoint(backupBB, backupIt);
         if (!remainPath.empty()) {
             auto typeInfosPtr = irBuilder.CreateStructGEP(typeInfoType, curTi, static_cast<size_t>(TYPEINFO_TYPE_ARGS));
@@ -211,7 +211,7 @@ llvm::Value* CGExtensionDef::GetTypeInfoWithPath(IRBuilder2& irBuilder, const CH
             typeArgs = irBuilder.CreateBitCast(typeArgs, typeInfoPtrType->getPointerTo());
         }
     }
-    return innerTypeInfoMap.at(curType);
+    return innerTypeMap.at(curType).value;
 }
 
 llvm::Value* CGExtensionDef::GetTypeInfoOfGeneric(IRBuilder2& irBuilder, CHIR::GenericType& gt)
@@ -233,9 +233,11 @@ llvm::Value* CGExtensionDef::GetTypeInfoOfGeneric(IRBuilder2& irBuilder, CHIR::G
     while (!candidates.empty()) {
         auto [typeArg, remainPathQ] = candidates.top();
         candidates.pop();
-        auto found = innerTypeInfoMap.find(typeArg);
-        if (found != innerTypeInfoMap.end()) {
-            return GetTypeInfoWithPath(irBuilder, *typeArg, found->second, std::move(remainPathQ), innerTypeInfoMap);
+        auto found = innerTypeMap.find(typeArg);
+        if (found != innerTypeMap.end()) {
+            auto typeArgs =
+                found->second.isTypeInfo ? irBuilder.GetTypeArgsFromTypeInfo(found->second.value) : found->second.value;
+            return GetTypeInfoWithPath(irBuilder, *typeArg, typeArgs, std::move(remainPathQ), innerTypeMap);
         }
     }
     InternalError("Failed to load generic type info for extended type '" + targetType->ToString() + "'");
@@ -308,12 +310,12 @@ llvm::Constant* CGExtensionDef::GenerateWhereConditionFn()
     fn->addFnAttr("native-interface-fn");
     auto entryBB = llvm::BasicBlock::Create(llvmCtx, "entry", fn);
     IRBuilder2 irBuilder(cgMod, entryBB);
-    auto typeInfos = fn->getArg(1);
-    innerTypeInfoMap.emplace(targetType, typeInfos); // Parameter with index 1 is an array of typeinfo.
+    auto typeInfos = fn->getArg(1); // Parameter with index 1 is an array of typeinfo.
+    innerTypeMap.emplace(targetType, InnerTiInfo{typeInfos, false});
     llvm::Value* retVal = CreateCompareArgs(irBuilder, typeInfos, targetType->GetTypeArgs());
     retVal = CheckGenericParams(irBuilder, retVal);
     irBuilder.CreateRet(retVal);
-    innerTypeInfoMap.clear();
+    innerTypeMap.clear();
     whereCondFn = llvm::ConstantExpr::getBitCast(fn, i8PtrTy);
     return whereCondFn;
 }
@@ -371,11 +373,11 @@ std::pair<llvm::Constant*, bool> CGExtensionDef::GenerateInterfaceFn(const CHIR:
     interfaceFn->addFnAttr("native-interface-fn");
     auto entryBB = llvm::BasicBlock::Create(llvmCtx, "entry", interfaceFn);
     // Parameter with index 1 is an array of typeinfo.
-    innerTypeInfoMap.emplace(targetType, interfaceFn->getArg(1));
+    innerTypeMap.emplace(targetType, InnerTiInfo{interfaceFn->getArg(1), false});
     IRBuilder2 irBuilder(cgMod, entryBB);
     auto derefType = DeRef(inheritedType);
     llvm::Value* ti = irBuilder.CreateTypeInfo(*derefType, genericParamsMap, false);
-    innerTypeInfoMap.clear();
+    innerTypeMap.clear();
     llvm::Value* retVal = irBuilder.CreateBitCast(ti, i8PtrTy);
     irBuilder.CreateRet(retVal);
     return {llvm::ConstantExpr::getBitCast(interfaceFn, i8PtrTy), false};
@@ -401,9 +403,10 @@ std::vector<llvm::Constant*> CGExtensionDef::GetEmptyExtensionDefContent(CGModul
 }
 
 bool CGExtensionDef::CreateExtensionDefForType(CGModule& cgMod, const std::string& extensionDefName,
-    const std::vector<llvm::Constant*>& content, bool isForExternalType)
+    const std::vector<llvm::Constant*>& content, const CHIR::ClassType& inheritedType, bool isForExternalType)
 {
-    auto extensionDefType = CGType::GetOrCreateExtensionDefType(cgMod.GetLLVMContext());
+    auto& llvmCtx = cgMod.GetLLVMContext();
+    auto extensionDefType = CGType::GetOrCreateExtensionDefType(llvmCtx);
     auto extensionDef =
         llvm::cast<llvm::GlobalVariable>(cgMod.GetLLVMModule()->getOrInsertGlobal(extensionDefName, extensionDefType));
     CJC_ASSERT(extensionDef);
@@ -413,6 +416,14 @@ bool CGExtensionDef::CreateExtensionDefForType(CGModule& cgMod, const std::strin
     extensionDef->setLinkage(llvm::GlobalValue::PrivateLinkage);
     extensionDef->setInitializer(llvm::ConstantStruct::get(extensionDefType, content));
     extensionDef->addAttribute(GC_MTABLE_ATTR);
+    if (inheritedType.GetTypeArgs().size() == 1) {
+        auto inheritedTypeMeta = UnwindGenericRelateType(llvmCtx, inheritedType);
+        extensionDef->setMetadata("inheritedType", llvm::MDTuple::get(llvmCtx, inheritedTypeMeta));
+    } else if (inheritedType.GetTypeArgs().empty()) {
+        auto inheritedTypeMeta = CGType::GetNameOfTypeInfoGV(inheritedType);
+        extensionDef->setMetadata(
+            "inheritedType", llvm::MDTuple::get(llvmCtx, llvm::MDString::get(llvmCtx, inheritedTypeMeta)));
+    }
     if (isForExternalType) {
         cgMod.AddExternalExtensionDef(extensionDef);
     } else {
@@ -441,7 +452,7 @@ bool CGExtensionDef::CreateExtensionDefForType(const CHIR::ClassType& inheritedT
     content[static_cast<size_t>(FUNC_TABLE)] =
         GenerateFuncTableForType(funcTableSize == 0 ? std::vector<CHIR::VirtualFuncInfo>() : found->second);
 
-    return CreateExtensionDefForType(cgMod, extendDefName, content, isForExternalType);
+    return CreateExtensionDefForType(cgMod, extendDefName, content, inheritedType, isForExternalType);
 }
 
 namespace {
@@ -494,6 +505,9 @@ void GetOrderedParentTypesRecusively(
             continue;
         }
         parents.emplace_back(interface);
+        if (def.TestAttr(CHIR::Attribute::COMPILER_ADD) && def.IsExtend()) {
+            continue;
+        }
         GetOrderedParentTypesRecusively(*interface, parents, builder);
     }
 }

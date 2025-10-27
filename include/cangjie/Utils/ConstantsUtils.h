@@ -93,6 +93,8 @@ inline const std::string MACRO_OBJECT_NAME = "MACRO_OBJECT";
 constexpr std::string_view IF_AVAILABLE = "IfAvailable";
 
 // Standard library package name
+// Please do not change the const char[] type to std::string type because the initialization order of 
+// std::string and std::map types across translation units is undefined,especially on the Windows platform.
 inline const std::string DEFAULT_PACKAGE_NAME = "default";
 inline constexpr const char CORE_PACKAGE_NAME[] = "std.core";
 inline constexpr const char SYNC_PACKAGE_NAME[] = "std.sync";
@@ -103,6 +105,7 @@ inline constexpr const char UNICODE_PACKAGE_NAME[] = "std.unicode";
 inline constexpr const char UNITTEST_MOCK_PACKAGE_NAME[] = "std.unittest.mock";
 inline constexpr const char UNITTEST_MOCK_INTERNAL_PACKAGE_NAME[] = "std.unittest.mock.internal";
 inline constexpr const char AST_PACKAGE_NAME[] = "std.ast";
+inline constexpr const char INTEROP_PACKAGE_NAME[] = "std.interop";
 inline constexpr const char NET_PACKAGE_NAME[] = "std.net";
 inline constexpr const char REFLECT_PACKAGE_NAME[] = "std.reflect";
 inline constexpr const char REF_PACKAGE_NAME[] = "std.ref";
@@ -132,8 +135,21 @@ inline const std::string INST_VIRTUAL_FUNC = "$InstVirtualFunc";
 // CFFI
 inline const std::string CFFI_FUNC_SUFFIX = "$real";
 
+
+namespace Interop::Java {
+inline const std::string INTEROP_JOBJECT_NAME = "JObject";
+inline const std::string INTEROP_JSTRING_NAME = "JString";
+inline const std::string INTEROP_JARRAY_NAME = "JArray";
+inline const std::string INTEROP_JAVA_LANG_PACKAGE = "java.lang";
+inline const std::string JAVA_REF_FIELD_NAME = "$javaref";
+constexpr auto JAVA_REF_GETTER_FUNC_NAME = "$getJavaRef";
+constexpr auto INTEROPLIB_CFFI_JAVA_ENTITY = "Java_CFFI_JavaEntity";
+} // namespace Cangjie::Interop::Java
+
 // Headless instrinsics
 inline const std::string GET_TYPE_FOR_TYPE_PARAMETER_FUNC_NAME = "getTypeForTypeParameter";
 inline const std::string IS_SUBTYPE_TYPES_FUNC_NAME = "isSubtypeTypes";
+ 
+constexpr std::string_view ORG_NAME_SEPARATOR{"@"};
 } // namespace Cangjie
 #endif // CANGJIE_CONSTANTSUTILS_H

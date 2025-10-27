@@ -28,62 +28,62 @@ using namespace AST;
 namespace Cangjie {
 const std::unordered_map<PackageFormat::AccessLevel, AST::AccessLevel> ACCESS_LEVEL_RMAP = {
 #define ACCESS_LEVEL(AST_KIND, FBS_KIND) {PackageFormat::AccessLevel_##FBS_KIND, AST::AccessLevel::AST_KIND},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef ACCESS_LEVEL
 };
 
 const std::unordered_map<PackageFormat::AccessModifier, std::pair<TokenKind, AST::Attribute>> ACCESS_MODIFIER_RMAP = {
 #define ACCESS_MODIFIER(AST_KIND, FBS_KIND)                                                                            \
     {PackageFormat::AccessModifier_##FBS_KIND, {TokenKind::AST_KIND, AST::Attribute::AST_KIND}},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef ACCESS_MODIFIER
 };
 
 const std::unordered_map<PackageFormat::BuiltInType, AST::BuiltInType> BUILTIN_TYPE_RMAP = {
 #define BUILTIN_TYPE(AST_KIND, FBS_KIND) {PackageFormat::BuiltInType_##FBS_KIND, AST::BuiltInType::AST_KIND},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef BUILTIN_TYPE
 };
 
 const std::unordered_map<PackageFormat::OverflowPolicy, OverflowStrategy> STRATEGY_RMAP = {
 #define OVERFLOW_STRATEGY(AST_KIND, FBS_KIND) {PackageFormat::OverflowPolicy_##FBS_KIND, OverflowStrategy::AST_KIND},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef OVERFLOW_STRATEGY
 };
 
 const std::unordered_map<PackageFormat::TypeKind, AST::TypeKind> TYPE_KIND_RMAP = {
 #define TYPE_KIND(AST_KIND, FBS_KIND) {PackageFormat::TypeKind_##FBS_KIND, AST::TypeKind::AST_KIND},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef TYPE_KIND
 };
 
 const std::unordered_map<PackageFormat::OperatorKind, TokenKind> OP_KIND_RMAP = {
 #define OPERATOR_KIND(AST_KIND, FBS_KIND) {PackageFormat::OperatorKind_##FBS_KIND, TokenKind::AST_KIND},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef OPERATOR_KIND
 };
 
 const std::unordered_map<PackageFormat::CallKind, AST::CallKind> CALL_KIND_RMAP = {
 #define CALL_KIND(AST_KIND, FBS_KIND) {PackageFormat::CallKind_##FBS_KIND, AST::CallKind::AST_KIND},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef CALL_KIND
 };
 
 const std::unordered_map<PackageFormat::LitConstKind, AST::LitConstKind> LIT_CONST_KIND_RMAP = {
 #define LIT_CONST_KIND(AST_KIND, FBS_KIND) {PackageFormat::LitConstKind_##FBS_KIND, AST::LitConstKind::AST_KIND},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef LIT_CONST_KIND
 };
 
 const std::unordered_map<PackageFormat::StringKind, AST::StringKind> STRING_KIND_RMAP = {
 #define STRING_KIND(AST_KIND, FBS_KIND) {PackageFormat::StringKind_##FBS_KIND, AST::StringKind::AST_KIND},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef STRING_KIND
 };
 
 const std::unordered_map<PackageFormat::ForInKind, AST::ForInKind> FOR_IN_KIND_RMAP = {
 #define FOR_IN_KIND(AST_KIND, FBS_KIND) {PackageFormat::ForInKind_##FBS_KIND, AST::ForInKind::AST_KIND},
-#include "Mapping.h"
+#include "Mapping.inc"
 #undef FOR_IN_KIND
 };
 } // namespace Cangjie
@@ -147,7 +147,6 @@ void SetOuterDeclForMemberDecl(Decl& member, Decl& parentDecl)
     } else if (auto func = DynamicCast<FuncDecl*>(&member); func && func->funcBody) {
         SetOuterDeclForParamDecl(*func, parentDecl);
     }
-    member.EnableAttr(Attribute::INITIALIZED); // Imported members must have been initialized.
 }
 } // namespace
 
@@ -170,6 +169,39 @@ std::string ASTLoader::GetImportedPackageName() const
 {
     CJC_NULLPTR_CHECK(pImpl);
     return pImpl->importedPackageName;
+}
+
+std::string ASTLoader::PreReadAndSetPackageName()
+{
+    return pImpl->PreReadAndSetPackageName();
+}
+
+std::string ASTLoader::ASTLoaderImpl::PreReadAndSetPackageName()
+{
+    if (!package) {
+        package = PackageFormat::GetPackage(data.data());
+    }
+    CJC_NULLPTR_CHECK(package);
+    CJC_NULLPTR_CHECK(package->fullPkgName());
+    importedPackageName = package->fullPkgName()->str();
+
+    return importedPackageName;
+}
+
+std::vector<std::string> ASTLoader::ReadFileNames() const
+{
+    return pImpl->ReadFileNames();
+}
+
+std::vector<std::string> ASTLoader::ASTLoaderImpl::ReadFileNames() const
+{
+    std::vector<std::string> files;
+    auto allFiles = package->allFiles();
+    CJC_NULLPTR_CHECK(allFiles);
+    for (uoffset_t i = 0; i < allFiles->size(); i++) {
+        files.push_back(allFiles->Get(i)->str());
+    }
+    return files;
 }
 
 const std::vector<std::string> ASTLoader::GetDependentPackageNames() const
@@ -222,6 +254,83 @@ OwnedPtr<Package> ASTLoader::ASTLoaderImpl::LoadPackageDependencies()
     return PreLoadImportedPackageNode();
 }
 
+// Deserialize common part of package into already existing Package node
+void ASTLoader::PreloadCommonPartOfPackage(AST::Package& pkg) const
+{
+    CJC_NULLPTR_CHECK(pImpl);
+    pImpl->deserializingCommon = true;
+    return pImpl->PreloadCommonPartOfPackage(pkg);
+}
+
+std::vector<OwnedPtr<ImportSpec>> ASTLoader::ASTLoaderImpl::LoadImportSpecs(const PackageFormat::Imports* imports)
+{
+    std::vector<OwnedPtr<ImportSpec>> importSpecsVec;
+    auto importSpecs = imports->importSpecs();
+    CJC_NULLPTR_CHECK(importSpecs);
+    for (uoffset_t i = 0; i < importSpecs->size(); i++) {
+        auto rawImportSpec = importSpecs->Get(i);
+        OwnedPtr<ImportSpec> importSpec = MakeOwned<ImportSpec>();
+        auto begin = rawImportSpec->begin();
+        auto end = rawImportSpec->end();
+        importSpec->begin = LoadPos(begin);
+        importSpec->end = LoadPos(end);
+
+        importSpec->EnableAttr(Attribute::IMPORTED);
+        // This is WA to pass checks, because attributes do not deserialized for ImportSpec
+        bool compilerAdded = rawImportSpec->end()->line() == 0;
+        if (compilerAdded) {
+            importSpec->EnableAttr(Attribute::COMPILER_ADD);
+        }
+        auto [modifierKind, attr] = ACCESS_MODIFIER_RMAP.at(rawImportSpec->reExport());
+        importSpec->modifier = MakeOwned<Modifier>(modifierKind, DEFAULT_POSITION);
+        importSpec->EnableAttr(attr);
+
+        LoadImportContent(importSpec->content, *rawImportSpec);
+        LoadNodePos(*rawImportSpec, *importSpec);
+
+        importSpecsVec.emplace_back(std::move(importSpec));
+    }
+    return importSpecsVec;
+}
+
+void ASTLoader::ASTLoaderImpl::PreloadCommonPartOfPackage(AST::Package& pkg)
+{
+    if (!VerifyForData("ast")) {
+        CJC_ABORT();
+    }
+
+    package = PackageFormat::GetPackage(data.data());
+    CJC_NULLPTR_CHECK(package);
+
+    curPackage = &pkg; // Deserialize common part AST into current platform package AST
+
+    allTypes.resize(package->allTypes()->size(), nullptr);
+    auto fileSize = package->allFiles()->size();
+    allFileIds.resize(fileSize);
+    for (uoffset_t i = 0; i < fileSize; i++) {
+        CJC_NULLPTR_CHECK(package->allFileImports());
+        auto&& importInfos = LoadImportSpecs(package->allFileImports()->Get(i));
+        CJC_NULLPTR_CHECK(package->allFileInfo());
+        // Load file info for CJMP
+        auto fileInfo = package->allFileInfo()->Get(i);
+        allFileIds[i] = fileInfo->fileID();
+        auto file = CreateFileNode(*curPackage, fileInfo->fileID(), std::move(importInfos));
+        file->EnableAttr(Attribute::COMMON);
+        file->isCommon = true;
+        file->begin = LoadPos(fileInfo->begin());
+        file->end = LoadPos(fileInfo->end());
+        pkg.files.emplace_back(std::move(file));
+    }
+    AddCurFile(pkg);
+    auto imports = package->imports();
+    CJC_NULLPTR_CHECK(imports);
+    uoffset_t nImports = imports->size();
+    for (uoffset_t i = 0; i < nImports; i++) {
+        std::string importItem = imports->Get(i)->str();
+        importedFullPackageNames.emplace_back(importItem);
+    }
+}
+
 void ASTLoader::LoadPackageDecls() const
 {
     pImpl->LoadPackageDecls();
@@ -256,7 +365,7 @@ void ASTLoader::ASTLoaderImpl::LoadPackageDecls()
             }
             // In this branch, decl's 'curFile' nodes must exist in current package.
             CJC_ASSERT(tmpDecl->curFile->curPackage == curPackage);
-            if (tmpDecl->IsExportedDecl()) {
+            if (tmpDecl->IsExportedDecl() || tmpDecl->TestAttr(Attribute::FROM_COMMON_PART)) {
                 tmpDecl->curFile->decls.emplace_back(std::move(tmpDecl));
             } else {
                 tmpDecl->curFile->exportedInternalDecls.emplace_back(std::move(tmpDecl));
@@ -267,7 +376,10 @@ void ASTLoader::ASTLoaderImpl::LoadPackageDecls()
     Utils::EraseIf(
         importNonGenericSrcFuncDecls, [](auto it) { return IsInDeclWithAttribute(*it, Attribute::GENERIC); });
     curPackage->srcImportedNonGenericDecls = importNonGenericSrcFuncDecls;
-    curPackage->hasSourceImportedDecl = !allLoadedExprs.empty() || curPackage->TestAttr(Attribute::TOOL_ADD);
+    // hasSourceImportedDecl true will trait as import package, but common part is not when compile platform
+    if (!deserializingCommon) {
+        curPackage->hasSourceImportedDecl = !allLoadedExprs.empty() || curPackage->TestAttr(Attribute::TOOL_ADD);
+    }
     AddCurFile(*curPackage); // Guarantees all nodes have 'curFile'.
 }
 
@@ -313,20 +425,7 @@ OwnedPtr<AST::Package> ASTLoader::ASTLoaderImpl::PreLoadImportedPackageNode()
         auto tmpFilePath = package->allFiles()->Get(i)->str();
         auto tmpFileId = sourceManager.AddSource(tmpFilePath, "", package->fullPkgName()->str());
         allFileIds[i] = tmpFileId;
-        std::vector<OwnedPtr<ImportSpec>> importInfos;
-        for (auto importInfo : *package->allFileImports()->Get(i)->importSpecs()) {
-            OwnedPtr<ImportSpec> tmpImport = MakeOwned<ImportSpec>();
-            tmpImport->begin =
-                Position(importInfo->begin()->file(), importInfo->begin()->line(), importInfo->begin()->column());
-            tmpImport->end =
-                Position(importInfo->end()->file(), importInfo->end()->line(), importInfo->end()->column());
-            auto [modifierKind, attr] = ACCESS_MODIFIER_RMAP.at(importInfo->reExport());
-            tmpImport->modifier = MakeOwned<Modifier>(modifierKind, DEFAULT_POSITION);
-            tmpImport->EnableAttr(attr);
-            LoadImportContent(tmpImport->content, *importInfo);
-            LoadNodePos(*importInfo, *tmpImport);
-            importInfos.emplace_back(std::move(tmpImport));
-        }
+        auto&& importInfos = LoadImportSpecs(package->allFileImports()->Get(i));
         packageNode->files.emplace_back(CreateFileNode(*packageNode, tmpFileId, std::move(importInfos)));
     }
     AddCurFile(*packageNode);
@@ -351,6 +450,7 @@ void ASTLoader::ASTLoaderImpl::LoadImportContent(ImportContent& content, const P
         content.prefixPoses.emplace_back(DEFAULT_POSITION);
         content.prefixDotPoses.emplace_back(DEFAULT_POSITION);
     }
+    content.hasDoubleColon = is.hasDoubleColon();
     content.identifier = is.identifier()->str();
     content.identifier.SetPos(DEFAULT_POSITION, DEFAULT_POSITION);
     content.asPos = DEFAULT_POSITION;
@@ -489,7 +589,9 @@ void ASTLoader::ASTLoaderImpl::LoadDeclBasicInfo(const PackageFormat::Decl& decl
     }
     astDecl.identifier.SetPos(pos, endPos);
     astDecl.CopyAttrs(GetAttributes(decl));
-    astDecl.EnableAttr(Attribute::IMPORTED);
+    if (!astDecl.TestAttr(Attribute::FROM_COMMON_PART) || !deserializingCommon) {
+        astDecl.EnableAttr(Attribute::IMPORTED);
+    }
     // Position is loaded in 'CreateAndLoadBasicInfo'.
     // Load mangle and hash for incremental compilation.
     astDecl.rawMangleName = decl.mangledBeforeSema()->str();
@@ -519,9 +621,19 @@ OwnedPtr<Annotation> ASTLoader::ASTLoaderImpl::LoadAnnotation(const PackageForma
         annotation->kind = AnnotationKind::DEPRECATED;
     } else if (rawAnno.kind() == PackageFormat::AnnoKind_TestRegistration) {
         annotation->kind = AnnotationKind::ATTRIBUTE;
-        annotation->attrs.emplace_back("TEST_REGISTER");
+        annotation->attrs.emplace_back(TokenKind::IDENTIFIER, "TEST_REGISTER");
     } else if (rawAnno.kind() == PackageFormat::AnnoKind_Frozen) {
         annotation->kind = AnnotationKind::FROZEN;
+    } else if (rawAnno.kind() == PackageFormat::AnnoKind_JavaMirror) {
+        annotation->kind = AnnotationKind::JAVA_MIRROR;
+    } else if (rawAnno.kind() == PackageFormat::AnnoKind_JavaImpl) {
+        annotation->kind = AnnotationKind::JAVA_IMPL;
+    } else if (rawAnno.kind() == PackageFormat::AnnoKind_ObjCMirror) {
+        annotation->kind = AnnotationKind::OBJ_C_MIRROR;
+    } else if (rawAnno.kind() == PackageFormat::AnnoKind_ObjCImpl) {
+        annotation->kind = AnnotationKind::OBJ_C_IMPL;
+    } else if (rawAnno.kind() == PackageFormat::AnnoKind_ForeignName) {
+        annotation->kind = AnnotationKind::FOREIGN_NAME;
     } else if (rawAnno.kind() == PackageFormat::AnnoKind_Custom) {
         annotation->kind = AnnotationKind::CUSTOM;
         annotation->isCompileTimeVisible = true;
@@ -564,7 +676,7 @@ OwnedPtr<Decl> ASTLoader::ASTLoaderImpl::LoadVarDecl(const PackageFormat::Decl& 
     varDecl->isMemberParam = info->isMemberParam();
     varDecl->isConst = info->isConst();
     LoadDeclBasicInfo(decl, *varDecl);
-    if (importSrcCode) {
+    if ((importSrcCode && !varDecl->TestAttr(AST::Attribute::FROM_COMMON_PART)) || deserializingCommon) {
         varDecl->initializer = LoadExpr(info->initializer());
     }
     if (varDecl->initializer && IsGlobalOrMember(*varDecl)) {

@@ -64,6 +64,10 @@ public:
     {
         return loadedPackages.emplace(pkgName);
     }
+    bool AlreadyLoaded(std::string pkgName)
+    {
+        return std::find(loadedPackages.begin(), loadedPackages.end(), pkgName) != loadedPackages.end();
+    }
     bool IsReExportBy(const std::string& srcPackage, const std::string& reExportPackage) const;
     void AddImportedPackageName(Ptr<const AST::ImportSpec> importSpec, std::pair<std::string, bool> pkgNamePair)
     {
@@ -121,6 +125,8 @@ public:
     {
         visitedPkgs.clear();
     }
+    std::optional<std::vector<std::string>> PreReadCommonPartCjoFiles(CjoManager& cjoManager);
+    Ptr<ASTLoader> GetCommonPartCjo(std::string expectedName);
     const GlobalOptions& GetGlobalOptions()
     {
         return globalOptions;

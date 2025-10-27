@@ -7,6 +7,8 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
+
+#include "cangjie/CHIR/AST2CHIR/Utils.h"
 #include "cangjie/CHIR/LiteralValue.h"
 
 using namespace Cangjie::CHIR;
@@ -185,7 +187,7 @@ Value* Translator::TranslateCompoundAssign(const AssignExpr& assign)
 
     // 4) Implement the store
     if (!lhsLeftValuePath.empty()) {
-        CreateAndAppendExpression<StoreElementRef>(
+        CreateAndAppendExpression<StoreElementByName>(
             loc, builder.GetUnitTy(), compoundValue, lhsLeftValueBase, lhsLeftValuePath, currentBlock);
     } else {
         CreateAndAppendExpression<Store>(loc, builder.GetUnitTy(), compoundValue, lhsLeftValueBase, currentBlock);
@@ -200,7 +202,7 @@ Value* Translator::TranslateTrivialAssign(const AST::AssignExpr& assign)
     auto rightValLoc = TranslateLocation(*assign.rightExpr);
 
     Value* rhs;
-    std::vector<uint64_t> path;
+    std::vector<std::string> path;
     Value* lhs;
 
     if (assign.leftValue->mapExpr) {
@@ -228,9 +230,9 @@ Value* Translator::TranslateTrivialAssign(const AST::AssignExpr& assign)
     CJC_ASSERT(lhs && lhs->GetType()->IsRef());
     if (!path.empty()) {
         auto lhsCustomType = StaticCast<CustomType*>(lhs->GetType()->StripAllRefs());
-        auto memberType = lhsCustomType->GetInstMemberTypeByPath(path, builder);
+        auto memberType = GetInstMemberTypeByName(*lhsCustomType, path, builder);
         rhs = TypeCastOrBoxIfNeeded(*rhs, *memberType, loc);
-        CreateAndAppendExpression<StoreElementRef>(loc, builder.GetUnitTy(), rhs, lhs, path, currentBlock);
+        CreateAndAppendExpression<StoreElementByName>(loc, builder.GetUnitTy(), rhs, lhs, path, currentBlock);
     } else {
         rhs = TypeCastOrBoxIfNeeded(*rhs, *StaticCast<RefType*>(lhs->GetType())->GetBaseType(), loc);
         CreateAndAppendExpression<Store>(loc, builder.GetUnitTy(), rhs, lhs, currentBlock);

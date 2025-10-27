@@ -14,6 +14,7 @@ set(BASE_UTIL_SRC
     $<TARGET_OBJECTS:CangjieTempFilesUtil>
     $<TARGET_OBJECTS:CangjieOption>
     $<TARGET_OBJECTS:CangjieUnicodeUtils>
+    $<TARGET_OBJECTS:CangjieLex>
 )
 
 add_executable(UtilsTests UtilsTests.cpp)
@@ -24,15 +25,6 @@ target_link_libraries(
     ${BASE_UTIL_SRC}
     $<TARGET_OBJECTS:CangjieProfileUtils>
     $<TARGET_OBJECTS:CangjieUnittestsMangle>
-    GTest::gtest
-    GTest::gtest_main)
-else()
-target_link_libraries(
-    UtilsTests
-    ${CMAKE_DL_LIBS}
-    ${BASE_UTIL_SRC}
-    $<TARGET_OBJECTS:CangjieProfileUtils>
-    $<TARGET_OBJECTS:CangjieMangle>
     GTest::gtest
     GTest::gtest_main)
 endif()

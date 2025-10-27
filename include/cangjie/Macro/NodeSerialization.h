@@ -56,6 +56,7 @@ using AstEnumPattern = Ptr<const Cangjie::AST::EnumPattern>;
 using AstMatchCase = Ptr<const Cangjie::AST::MatchCase>;
 using AstMatchCaseOther = Ptr<const Cangjie::AST::MatchCaseOther>;
 using AstFile = Ptr<const Cangjie::AST::File>;
+using AstFeaturesDirective = Ptr<const Cangjie::AST::FeaturesDirective>;
 using AstPackageSpec = Ptr<const Cangjie::AST::PackageSpec>;
 using AstImportSpec = Ptr<const Cangjie::AST::ImportSpec>;
 
@@ -194,6 +195,7 @@ private:
     flatbuffers::Offset<NodeFormat::Decl> SerializeInterfaceDecl(AstDecl decl);
     flatbuffers::Offset<NodeFormat::Decl> SerializeEnumDecl(AstDecl decl);
     flatbuffers::Offset<NodeFormat::Decl> SerializePrimaryCtorDecl(AstDecl decl);
+    flatbuffers::Offset<NodeFormat::Decl> SerializeMacroExpandParamOfDecl(const AST::Decl* decl);
     flatbuffers::Offset<NodeFormat::VarDecl> SerializeVarDecl(const AST::VarDecl* varDecl);
     flatbuffers::Offset<NodeFormat::MainDecl> SerializeMainDecl(const AST::MainDecl* mainDecl);
     flatbuffers::Offset<NodeFormat::FuncDecl> SerializeFuncDecl(const AST::FuncDecl* funcDecl);
@@ -216,6 +218,8 @@ private:
     flatbuffers::Offset<NodeFormat::ImportSpec> SerializeImportSpec(AstImportSpec importSpec);
     flatbuffers::Offset<NodeFormat::ImportContent> SerializeImportContent(const AST::ImportContent& content);
     flatbuffers::Offset<NodeFormat::PackageSpec> SerializePackageSpec(AstPackageSpec packageSpec);
+    flatbuffers::Offset<NodeFormat::FeaturesDirective> SerializeFeaturesDirective(AstFeaturesDirective featureDirective);
+    flatbuffers::Offset<NodeFormat::FeatureId> SerializeFeatureId(const AST::FeatureId& featureId);
 };
 
 template <typename K, typename U, typename V>

@@ -132,7 +132,7 @@ private:
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     bool PerformPlugin(CHIR::Package& package);
 #endif
-    void DumpCHIRDebug(const std::string& suffix);
+    void DumpCHIRDebug(const std::string& suffix, bool checkFlag = true);
     void DoClosureConversion();
     void ReportUnusedCode();
     void Devirtualization(DevirtualizationInfo& devirtInfo);
@@ -155,6 +155,7 @@ private:
     bool RunConstantPropagation();
 
     void RunRangePropagation();
+    bool RunNativeFFIChecks();
     void RunArrayListConstStartOpt();
     void RunFunctionInline(DevirtualizationInfo& devirtInfo);
     void RunArrayLambdaOpt();
@@ -166,7 +167,7 @@ private:
     void RunUnitUnify();
     DevirtualizationInfo CollectDevirtualizationInfo();
     bool RunConstantEvaluation();
-    bool RunIRChecker(const Phase& phase) const;
+    bool RunIRChecker(const Phase& phase);
     void UpdatePosOfMacroExpandNode();
     void RecordCodeInfoAtTheBegin();
     void RecordCodeInfoAtTheEnd();
@@ -181,6 +182,8 @@ private:
     void RemoveUnusedImports(bool removeSrcCodeImported);
     void ReplaceSrcCodeImportedValueWithSymbol();
     void CreateBoxTypeForRecursionValueType();
+    void CreateVTableAndUpdateFuncCall();
+    void UpdateMemberVarPath();
 
     template <typename T>
     std::pair<Value*, Apply*> DoCFFIFuncWrapper(T& curFunc, bool isForeign, bool isExternal = true);

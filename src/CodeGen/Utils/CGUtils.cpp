@@ -19,6 +19,7 @@
 #include "Base/CGTypes/CGEnumType.h"
 #include "Utils/CGCommonDef.h"
 #include "CGModule.h"
+#include "IRBuilder.h"
 #include "cangjie/Basic/Linkage.h"
 #include "cangjie/Basic/StringConvertor.h"
 #include "cangjie/CHIR/Expression/Terminator.h"
@@ -77,15 +78,42 @@ void GetGenericArgsFromCHIRTypeHelper(const Cangjie::CHIR::Type& type, std::vect
 
 namespace Cangjie {
 namespace CodeGen {
-int64_t GetIntMaxOrMin(const CHIR::IntType::TypeKind& typeKind, bool isMax)
+int64_t GetIntMaxOrMin(IRBuilder2& irBuilder, const CHIR::IntType& ty, bool isMax)
 {
-    auto minMax = G_SIGNED_INT_MAP.at(typeKind);
+    auto tyKind = irBuilder.GetTypeKindFromType(ty);
+    auto minMax = G_SIGNED_INT_MAP.at(tyKind);
     return isMax ? minMax.second : minMax.first;
 }
 
-uint64_t GetUIntMax(const CHIR::IntType::TypeKind& typeKind)
+
+std::vector<llvm::Metadata*> UnwindGenericRelateType(llvm::LLVMContext& llvmCtx, const CHIR::Type& ty)
 {
-    return G_UNSIGNED_INT_MAP.at(typeKind);
+    std::vector<llvm::Metadata*> tyArgMeta{};
+    if (ty.IsGeneric()) {
+        return tyArgMeta;
+    }
+
+    if (ty.GetTypeArgs().size() > 0) {
+        std::string ttName = CGType::GetNameOfTypeTemplateGV(ty);
+        tyArgMeta.emplace_back(llvm::MDString::get(llvmCtx, ttName));
+        auto tyArg = ty.GetTypeArgs()[0];
+        if (tyArg->IsValueType()) {
+            std::string tiName = CGType::GetNameOfTypeInfoGV(*tyArg);
+            tyArgMeta.emplace_back(llvm::MDString::get(llvmCtx, tiName));
+        } else {
+            auto ti = UnwindGenericRelateType(llvmCtx, *DeRef(*tyArg));
+            if (!ti.empty()) {
+                tyArgMeta.emplace_back(llvm::MDTuple::get(llvmCtx, ti));
+            }
+        }
+    }
+    return tyArgMeta;
+}
+
+uint64_t GetUIntMax(IRBuilder2& irBuilder, const CHIR::IntType& ty)
+{
+    auto tyKind = irBuilder.GetTypeKindFromType(ty);
+    return G_UNSIGNED_INT_MAP.at(tyKind);
 }
 
 std::string GetTypeName(const CGType* type)

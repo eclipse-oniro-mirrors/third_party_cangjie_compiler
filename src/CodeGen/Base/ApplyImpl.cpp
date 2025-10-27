@@ -93,6 +93,7 @@ void AddAttributeForWrapper(const IRBuilder2& builder, const CHIR::FuncType& fun
 void GenerateWrapperFuncBody(IRBuilder2& builder, const CHIR::FuncType& funcTy, llvm::FunctionType* varFuncTy,
     llvm::Function* function, const bool sret)
 {
+    CJC_ASSERT(varFuncTy && function);
     llvm::IRBuilderBase::InsertPointGuard builderGuard(builder);
     auto entryBB = builder.CreateEntryBasicBlock(function, "entry");
     builder.SetInsertPoint(entryBB);
@@ -178,6 +179,7 @@ llvm::Function* GetIndirectCFuncCallWrapper(IRBuilder2& builder, const CHIR::Fun
 llvm::Function* UpdateCFuncCalleeAndArgs(
     IRBuilder2& builder, const CHIR::FuncType& funcTy, llvm::Value* callee, std::vector<CGValue*>& args)
 {
+    CJC_NULLPTR_CHECK(callee);
     CJC_ASSERT(funcTy.IsCFunc());
     if (!llvm::isa<llvm::Function>(callee)) {
         auto calleeType = callee->getType();
@@ -255,7 +257,7 @@ llvm::Value* CreateCFuncCallOrInvoke(IRBuilder2& irBuilder, llvm::Function& call
         }
     }
 #ifdef __APPLE__
-    const bool macOnMx = !nonAarch64 && target.os == Triple::OSType::DARWIN;
+    const bool macOnMx = !nonAarch64 && (target.os == Triple::OSType::DARWIN || target.os == Triple::OSType::IOS);
     if (macOnMx) {
         for (auto ext : {llvm::Attribute::SExt, llvm::Attribute::ZExt}) {
             if (callee.hasRetAttribute(ext)) {
@@ -276,6 +278,7 @@ llvm::Value* CreateCFuncCallOrInvoke(IRBuilder2& irBuilder, llvm::Function& call
 
 CGValue* HandleVarargTypePromotion(IRBuilder2& irBuilder, CGValue* argVal)
 {
+    CJC_NULLPTR_CHECK(argVal);
     using CHIRTypeKind = CHIR::Type::TypeKind;
     auto& cgMod = irBuilder.GetCGModule();
     auto chirArgTy = argVal->GetCGType()->GetOriginal();

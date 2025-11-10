@@ -45,7 +45,6 @@ void UnreachableBranchCheck::RunOnPackage(const Package& package, size_t threadN
             if (func->Get<SkipCheck>() == SkipKind::SKIP_DCE_WARNING) {
                 continue;
             }
-
             RunOnFunc(func);
         }
     } else {
@@ -55,7 +54,6 @@ void UnreachableBranchCheck::RunOnPackage(const Package& package, size_t threadN
             if (func->Get<SkipCheck>() == SkipKind::SKIP_DCE_WARNING) {
                 continue;
             }
-
             taskQueue.AddTask<void>([this, func]() { return RunOnFunc(func); });
         }
         taskQueue.RunAndWaitForAllTasksCompleted();

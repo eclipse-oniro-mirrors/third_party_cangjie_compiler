@@ -146,11 +146,9 @@ void DIBuilder::Finalize()
     if (!enabled && !enableLineInfo) {
         return;
     }
-
     finalize();
     lexicalBlocks.clear();
 }
-
 
 void DIBuilder::CreateGlobalVar(const CHIR::GlobalVar& variable)
 {
@@ -672,7 +670,6 @@ llvm::DIType* DIBuilder::CreateDIType(const CHIR::Type& ty)
             encoding = llvm::dwarf::DW_ATE_boolean;
             break;
         }
-
         case CHIR::Type::TypeKind::TYPE_FUNC:
             return CreateVarFuncType(StaticCast<const CHIR::FuncType&>(ty));
         case CHIR::Type::TypeKind::TYPE_TUPLE:

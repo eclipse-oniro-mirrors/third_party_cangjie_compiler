@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef CANGJIE_SEMA_NATIVE_FFI_JAVA_DIAGS
 #define CANGJIE_SEMA_NATIVE_FFI_JAVA_DIAGS
 

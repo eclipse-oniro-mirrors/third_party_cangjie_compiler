@@ -1045,7 +1045,6 @@ void MacroEvaluation::Evaluate()
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     findMethodFlag = RuntimeInit::GetInstance().InitRuntime(
         ci->invocation.GetRuntimeLibPath(), ci->invocation.globalOptions.environment.allVariables);
-
 #endif
     if (findMethodFlag) {
         EvalMacros();

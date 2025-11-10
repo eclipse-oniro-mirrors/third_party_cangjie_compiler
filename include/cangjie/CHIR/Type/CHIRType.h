@@ -49,7 +49,6 @@ public:
     Type* TranslateType(AST::Ty& ty);
     
     /**
-
      * @brief Fills the generic argument types.
      *
      * @param ty The AST generics type to be processed.

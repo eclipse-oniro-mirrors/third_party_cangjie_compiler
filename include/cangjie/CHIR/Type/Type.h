@@ -107,7 +107,6 @@ public:
         TYPE_VOID,
         // composite type
         TYPE_TUPLE,
-
         TYPE_STRUCT,
         TYPE_ENUM,
         TYPE_FUNC,
@@ -207,7 +206,6 @@ public:
     {
         return kind == TYPE_TUPLE;
     }
-
 
     /**
      * @brief if this is a class type for representing the context of a closure, return true.
@@ -938,7 +936,6 @@ private:
     ~ThisType() override = default;
     friend class CHIRContext;
 };
-
 
 class RawArrayType : public BuiltinType {
 public:

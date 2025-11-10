@@ -88,7 +88,6 @@ Translator::LeftValueInfo Translator::TranslateEnumMemberVarRef(const AST::RefEx
     }
 }
 
-
 Translator::LeftValueInfo Translator::TranslateVarRefAsLeftValue(const AST::RefExpr& refExpr)
 {
     auto target = refExpr.ref.target;

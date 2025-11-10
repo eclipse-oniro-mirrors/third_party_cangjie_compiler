@@ -103,7 +103,6 @@ Cangjie::CHIR::Value* IVal2CHIR::ConvertToChir(
         case Type::TYPE_REFTYPE: {
             return ConvertRefToChir(StaticCast<RefType&>(ty), val, insertExpr, parent);
         }
-
         case Type::TYPE_UNIT: {
             // Unit is not supported as a global variable initializer
             auto expr = chirBuilder.CreateConstantExpression<UnitLiteral>(&ty, &parent);
@@ -312,7 +311,6 @@ Cangjie::CHIR::ClassType* IVal2CHIR::FindClassType(const std::string& mangledNam
     return chirBuilder.GetType<ClassType>(resultClassDef);
 }
 
-
 Cangjie::CHIR::Value* IVal2CHIR::ConvertArrayToChir(
     VArrayType& ty, const IArray& val, std::function<void(Expression*)>& insertExpr, Block& parent)
 {
@@ -487,7 +485,6 @@ std::optional<Cangjie::CHIR::BlockGroup*> ConstEvalPass::CreateNewInitializer(
 
     return newBody;
 }
-
 
 void ConstEvalPass::PrintDebugMessage(
     const DebugLocation& loc, const Func& oldInit, const std::optional<BlockGroup*>& newInit) const

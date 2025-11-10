@@ -4,5 +4,7 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 file(GLOB EXPRESSION_SRC *.cpp)
 set(CHIR_BASE_SRC ${CHIR_BASE_SRC} ${EXPRESSION_SRC} PARENT_SCOPE)

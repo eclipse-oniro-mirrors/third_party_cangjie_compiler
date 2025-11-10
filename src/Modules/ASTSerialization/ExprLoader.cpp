@@ -616,6 +616,7 @@ OwnedPtr<Pattern> ASTLoader::ASTLoaderImpl::LoadExceptTypePattern(const PackageF
     etp->pattern = LoadPattern(*pattern.patterns()->Get(0));
     return etp;
 }
+
 OwnedPtr<Pattern> ASTLoader::ASTLoaderImpl::LoadCommandTypePattern(const PackageFormat::Pattern& pattern)
 {
     auto ctp = CreateAndLoadBasicInfo<CommandTypePattern>(pattern, INVALID_FORMAT_INDEX);

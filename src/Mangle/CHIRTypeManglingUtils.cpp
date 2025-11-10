@@ -71,7 +71,6 @@ std::string MangleType(const CHIR::TupleType& t, const std::vector<std::string>&
     return ss.str();
 }
 
-
 // Type mangling for CHIR::StructType
 std::string MangleType(const CHIR::StructType& t, const std::vector<std::string>& genericsTypeStack,
     bool useGenericName)
@@ -233,7 +232,6 @@ std::string MangleType(const CHIR::Type& t, const std::vector<std::string>& gene
     switch (k) {
         case ChirTypeKind::TYPE_TUPLE:
             return MangleType(StaticCast<const TupleType&>(t), genericsTypeStack, useGenericName);
-
         case ChirTypeKind::TYPE_STRUCT:
             return MangleType(StaticCast<const StructType&>(t), genericsTypeStack, useGenericName);
         case ChirTypeKind::TYPE_ENUM:
@@ -340,7 +338,6 @@ std::string GetTypeQualifiedName(const CHIR::Type& t, bool forNameFieldOfTi)
                 GetTypeQualifiedName(*ft.GetReturnType(), forNameFieldOfTi);
             return name;
         }
-
         case ChirTypeKind::TYPE_GENERIC:
             return static_cast<const GenericType&>(t).GetSrcCodeIdentifier();
         case ChirTypeKind::TYPE_VOID:

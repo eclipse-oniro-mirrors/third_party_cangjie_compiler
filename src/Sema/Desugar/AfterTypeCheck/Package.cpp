@@ -45,7 +45,6 @@ bool ShouldInsertReturnUnit(const FuncBody& fb)
     }
 
     // If a function or lambda's return type is ANNOTATED as Unit, then insert return ().
-
     // A trick: after type checking, if no error is reported, then e : Unit is a fact. So the check here is not needed.
     if (fb.retType && fb.retType->ty && fb.retType->ty->IsUnit()) {
         Ptr<Node> last = fb.body->body.back().get();

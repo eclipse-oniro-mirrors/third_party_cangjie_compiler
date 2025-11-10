@@ -14,7 +14,6 @@
 #ifndef CANGJIE_SEMA_AUTO_BOX_H
 #define CANGJIE_SEMA_AUTO_BOX_H
 
-
 #include "cangjie/AST/ASTContext.h"
 #include "cangjie/AST/Node.h"
 #include "cangjie/AST/Walker.h"
@@ -28,7 +27,6 @@ public:
     {
     }
     ~AutoBoxing() = default;
-
 
     void AddOptionBox(AST::Package& pkg);
 

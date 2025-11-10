@@ -29,6 +29,7 @@ enum class MockKind : uint8_t;
 class MockManager {
 public:
     explicit MockManager(ImportManager& importManager, TypeManager& typeManager, const Ptr<MockUtils> mockUtils);
+
     struct GeneratedClassResult {
         Ptr<AST::ClassDecl> classDecl;
         bool generated;
@@ -62,7 +63,6 @@ private:
     std::map<std::string, OwnedPtr<AST::ClassDecl>> mockedClassDecls;
     std::map<Ptr<AST::ClassLikeDecl>, int> instantiationCounters;
     std::map<Ptr<const AST::FuncDecl>, bool> defaultForTypePresence;
-
 
     Ptr<AST::ClassDecl> objectDecl;
 
@@ -151,6 +151,7 @@ private:
     void HandleMockAnnotatedLambdaWithMemberAccess(AST::MemberAccess& ma, AST::Expr& injectTo);
     void HandleMockAnnotatedLambdaWithRefExpr(const AST::RefExpr& refExpr, AST::Expr& injectTo);
     void HandleMockAnnotatedLambdaWithAssignExpr(AST::AssignExpr& assignExpr);
+
     OwnedPtr<AST::Expr> GetCurrentStaticHandler(const Ptr<AST::File> curFile);
     OwnedPtr<AST::Expr> GetMockedObjectHandler(OwnedPtr<AST::RefExpr> objRef, const Ptr<AST::File> curFile);
     OwnedPtr<AST::LambdaExpr> GenerateCallHandlerLambda(

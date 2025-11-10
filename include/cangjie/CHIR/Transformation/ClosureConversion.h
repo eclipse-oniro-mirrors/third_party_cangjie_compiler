@@ -146,7 +146,6 @@ private:
     Func* CreateGenericMethodInAutoEnvWrapper(ClassDef& autoEnvWrapperDef);
     void CreateInstMethodInAutoEnvWrapper(ClassDef& autoEnvWrapperDef, Func& genericFunc);
 
-
     std::unordered_map<std::string, ClassDef*> genericAutoEnvBaseDefs;
     std::unordered_map<std::string, ClassDef*> instAutoEnvBaseDefs;
     std::unordered_map<std::string, ClassDef*> instAutoEnvWrapperDefs;

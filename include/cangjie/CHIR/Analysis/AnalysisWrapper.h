@@ -46,7 +46,6 @@ public:
      * @tparam Args the args type of analysis.
      * @param package package to do optimization.
      * @param isDebug flag whether print debug log.
-
      * @param threadNum thread num to do analysis
      * @param args args of analysis
      */

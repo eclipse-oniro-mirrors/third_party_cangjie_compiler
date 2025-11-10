@@ -92,7 +92,6 @@ llvm::Type* CGFunctionType::GenLLVMType()
         auto llvmType = cgType->GetLLVMType();
 
         (void)realParamIndices.emplace_back(realArgIdx);
-
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
         /// Effect Overview
         // The parameter that requires additional basePtr must meet and the function should not be 'mut'

@@ -6,9 +6,9 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "gtest/gtest.h"
 #include <cstdlib>
 #include <string>
+#include "gtest/gtest.h"
 
 #include "TestCompilerInstance.h"
 #include "cangjie/AST/Match.h"
@@ -274,6 +274,7 @@ TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP)
     // error: macro evaluation has failed for macro call 'B2'
     EXPECT_EQ(diag.GetErrorCount(), 2);
 }
+
 TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP_Paralle)
 {
     Cangjie::ICE::TriggerPointSetter iceSetter(static_cast<int64_t>(Cangjie::ICE::UNITTEST_TP));

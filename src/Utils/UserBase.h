@@ -9,12 +9,6 @@
 #ifndef CANGJIE_USERBASE_H
 #define CANGJIE_USERBASE_H
 
-#ifdef CANGJIE_WRITE_PROFILE
-#include "cangjie/Utils/CheckUtils.h"
-#endif
-
-#include <fstream>
-#include <iostream>
 #include <string>
 
 namespace Cangjie {

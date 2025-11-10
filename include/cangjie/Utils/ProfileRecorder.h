@@ -54,7 +54,6 @@ private:
     std::string title_;
     std::string subtitle_;
     std::string desc_;
-
 };
 } // namespace Cangjie::Utils
 

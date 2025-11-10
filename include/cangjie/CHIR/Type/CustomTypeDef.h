@@ -32,7 +32,6 @@ struct MemberVarInfo {
     AnnoInfo annoInfo;
     FuncBase* initializerFunc = nullptr; /**< Func with initializer evaluation if any */
     const CustomTypeDef* outerDef = nullptr;
-
     bool TestAttr(Attribute attr) const
     {
         return attributeInfo.TestAttr(attr);
@@ -207,7 +206,6 @@ public:
     // ===--------------------------------------------------------------------===//
     AnnoInfo GetAnnoInfo() const;
     void SetAnnoInfo(const AnnoInfo& info);
-
 
     // ===--------------------------------------------------------------------===//
     // Vtable

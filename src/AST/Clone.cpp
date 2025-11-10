@@ -496,7 +496,6 @@ OwnedPtr<QuoteExpr> ASTCloner::CloneQuoteExpr(const QuoteExpr& qe, const VisitFu
     expr->quotePos = qe.quotePos;
     expr->leftParenPos = qe.leftParenPos;
     expr->rightParenPos = qe.rightParenPos;
-
     return expr;
 }
 
@@ -537,6 +536,7 @@ OwnedPtr<TryExpr> ASTCloner::CloneTryExpr(const TryExpr& te, const VisitFunc& vi
         expr->catchBlocks.push_back(CloneExpr(te.catchBlocks[i].get(), visitor));
         expr->catchPatterns.push_back(ClonePattern(te.catchPatterns[i].get(), visitor));
     }
+
     for (const auto& handler : te.handlers) {
         auto cloned = Handler();
         cloned.pos = handler.pos;

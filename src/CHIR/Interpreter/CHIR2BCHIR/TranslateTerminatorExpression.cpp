@@ -109,14 +109,12 @@ void CHIR2BCHIR::TranslateTerminatorExpression(Context& ctx, const Expression& e
             TranslateTryTerminatorJumps(ctx, *intOpWithException);
             break;
         }
-
         case ExprKind::ALLOCATE_WITH_EXCEPTION: {
             CJC_ASSERT(expr.GetNumOfOperands() == 0);
             TranslateAllocate(ctx, expr);
             TranslateTryTerminatorJumps(ctx, *StaticCast<const Terminator*>(&expr));
             break;
         }
-
         default: {
             // unreachable
             CJC_ASSERT(false);
@@ -207,4 +205,3 @@ void CHIR2BCHIR::TranslateIntOpWithException(Context& ctx, const IntOpWithExcept
         ctx.def.Push(static_cast<Bchir::ByteCodeContent>(expr.GetOperand(1)->GetType()->GetTypeKind()));
     }
 }
-

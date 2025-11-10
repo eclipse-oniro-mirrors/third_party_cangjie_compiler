@@ -29,7 +29,6 @@ inline std::map<Cangjie::AST::Attribute, Attribute> g_attrMap = {
     {Cangjie::AST::Attribute::NO_REFLECT_INFO, Attribute::NO_REFLECT_INFO},
     {Cangjie::AST::Attribute::COMMON, Attribute::COMMON}, {Cangjie::AST::Attribute::PLATFORM, Attribute::PLATFORM}};
 
-
 void TranslateFunctionGenericUpperBounds(CHIRType& chirTy, const AST::FuncDecl& func)
 {
     CJC_NULLPTR_CHECK(func.funcBody);
@@ -222,7 +221,6 @@ bool IsSymbolImportedDecl(const AST::Decl& decl, const GlobalOptions& opts)
     return decl.TestAttr(AST::Attribute::IMPORTED) && !IsSrcImportedDecl(decl, opts);
 }
 
-
 AST::Decl* GetOuterDecl(const AST::Decl& decl)
 {
     auto outerDecl = decl.outerDecl;
@@ -285,6 +283,7 @@ std::string OverflowStrategyPrefix(OverflowStrategy ovf)
             return "%";
     }
 }
+
 void SetCompileTimeValueFlagRecursivly(Func& initFunc)
 {
     auto setConstFlagForLambda = [](BlockGroup& body) {

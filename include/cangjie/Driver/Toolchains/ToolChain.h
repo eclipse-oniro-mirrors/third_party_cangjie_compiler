@@ -143,7 +143,6 @@ protected:
         return "";
     }
 
-
     // Generate the link options of built-in libraries.
     void GenerateLinkOptionsOfBuiltinLibs(Tool& tool) const;
 

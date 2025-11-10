@@ -255,7 +255,6 @@ bool GlobalOptions::PerformPostActions()
     success = success && CheckCompileMacro();
     success = success && ReprocessCoverageOptions();
     success = success && CheckScanDependencyOptions();
-
     success = success && CheckSanitizerOptions();
     success = success && CheckLtoOptions();
     success = success && CheckCompileAsExeOptions();
@@ -461,7 +460,6 @@ bool GlobalOptions::CheckScanDependencyOptions() const
     }
     return true;
 }
-
 
 bool GlobalOptions::CheckSanitizerOptions() const
 {

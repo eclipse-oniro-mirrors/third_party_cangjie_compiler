@@ -12,6 +12,7 @@
 #include "cangjie/CHIR/Package.h"
 #include "cangjie/CHIR/Visitor/Visitor.h"
 #include "cangjie/CHIR/CHIRCasting.h"
+#include "cangjie/Utils/CheckUtils.h"
 #include "cangjie/Utils/ProfileRecorder.h"
 
 namespace Cangjie::CHIR {
@@ -26,7 +27,6 @@ public:
         if (incr || val.TestAttr(Attribute::NON_RECOMPILE)) {
             return false;
         }
-
         if (auto func = DynamicCast<const ImportedFunc*>(&val)) {
             // 1. implicit imported functions will be used in runtime
             if (implicitFuncs.find(func->GetIdentifierWithoutPrefix()) != implicitFuncs.end()) {
@@ -57,7 +57,6 @@ public:
         skipVirtualFunc = skip;
     }
 private:
-
     const std::unordered_map<std::string, FuncBase*>& implicitFuncs;
     bool incr;
     bool skipVirtualFunc;
@@ -273,7 +272,6 @@ private:
             }
         }
     }
-
 
     void VisitValue(Value& v)
     {
@@ -805,6 +803,7 @@ void ToCHIR::ReplaceSrcCodeImportedValueWithSymbol()
 void ToCHIR::RemoveUnusedImports(bool removeSrcCodeImported)
 {
     Utils::ProfileRecorder r{"CHIR", "RemoveUnusedImports"};
+
     if (removeSrcCodeImported) {
         ReplaceSrcCodeImportedValueWithSymbol();
     }

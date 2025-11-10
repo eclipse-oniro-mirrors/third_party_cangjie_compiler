@@ -41,7 +41,6 @@ public:
     static std::fstream GetBCHIROutputFile(
         const GlobalOptions& options, const std::string& fullPackageName, const std::string& stageName);
 
-
 private:
     std::ostream& os;
     const Bchir& bchir;

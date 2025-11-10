@@ -74,7 +74,6 @@ void GlobalVariableGeneratorImpl::EmitIR()
                 cgMod.GetLLVMContext(), {llvm::MDString::get(cgMod.GetLLVMContext(), MangleType(*chirGV->GetType()))});
             rawGV->setMetadata(GC_GLOBAL_VAR_TYPE, fieldMeta);
         }
-
     }
 }
 #endif

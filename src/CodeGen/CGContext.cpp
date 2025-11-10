@@ -21,7 +21,6 @@ CGContext::CGContext(const SubCHIRPackage& subCHIRPackage, CGPkgContext& cgPkgCo
     llvmContext = new llvm::LLVMContext(); // This `llvmContext` will be released in the de-constructor of `CGModule`.
     llvmContext->setOpaquePointers(cgPkgContext.GetGlobalOptions().enableOpaque);
     impl = std::make_unique<CGContextImpl>();
-
 }
 #endif
 
@@ -124,7 +123,6 @@ void CGContext::AddNullableReference(llvm::Value* value)
 {
     (void)impl->nullableReference.emplace(value);
 }
-
 #endif
 } // namespace CodeGen
 } // namespace Cangjie

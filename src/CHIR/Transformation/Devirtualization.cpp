@@ -29,7 +29,6 @@ void Devirtualization::RunOnFuncs(const std::vector<Func*>& funcs, CHIRBuilder& 
 {
     rewriteInfos.clear();
     for (auto func : funcs) {
-
         RunOnFunc(func, builder);
     }
     RewriteToApply(builder, rewriteInfos, isDebug);
@@ -488,7 +487,6 @@ std::pair<FuncBase*, Type*> Devirtualization::FindRealCallee(
         return res;
     }
 }
-
 
 static bool IsOpenClass(const ClassDef& def)
 {

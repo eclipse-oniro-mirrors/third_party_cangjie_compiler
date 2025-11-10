@@ -154,7 +154,6 @@ void Translator::SetRawMangledNameForIncrementalCompile(const AST::FuncDecl& ast
 
 bool NeedCreateDebugForFirstParam(const Func& func)
 {
-
     if (func.TestAttr(Attribute::STATIC)) {
         return false;
     }
@@ -212,7 +211,6 @@ Ptr<Value> Translator::Visit(const AST::FuncDecl& func)
     blockGroupStack.emplace_back(body);
     auto entry = builder.CreateBlock(body);
     body->SetEntryBlock(entry);
-
     if (NeedCreateDebugForFirstParam(*curFunc)) {
         auto thisVar = curFunc->GetParam(0);
         CreateAndAppendExpression<Debug>(builder.GetUnitTy(), thisVar, "this", curFunc->GetEntryBlock());
@@ -492,7 +490,6 @@ Ptr<Value> Translator::TranslateNestedFunc(const AST::FuncDecl& func)
         loc, funcTy, funcTy, currentBlock, true, lambdaMangleName, func.identifier, genericTys);
     CJC_ASSERT(lambda);
     lambda->InitBody(*body);
-
     if (func.isConst) {
         lambda->SetCompileTimeValue();
     }

@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 // This files declares the entry of ComputeAnnotationsBeforeCheck stage.
 
 #ifndef CANGJIE_CHIR_CHECKER_COMPUTEANNOTATIONS_H

@@ -85,7 +85,6 @@ void Translator::StoreRValueToLValue(const AST::VarDecl& decl, Value& rval, Ptr<
     } else {
         auto warnPos = GetVarLoc(builder.GetChirContext(), decl);
         lval = TypeCastOrBoxIfNeeded(rval, *leftType, varPos);
-
         // If disable `-g` option, let variable still need create `Debug` node for DCE print warning.
         // Note: there is a special case exist only disable '-g' option: the LocalVar's debug node will be overwritten,
         // but does not affect debugging information, because disable '-g' option, codegen will skip `Debug` node.

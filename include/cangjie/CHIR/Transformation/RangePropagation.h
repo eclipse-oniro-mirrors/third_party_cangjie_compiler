@@ -89,7 +89,6 @@ private:
      */
     void RewriteToConstExpr(const RewriteInfo& rewriteInfo, bool isDebug) const;
 
-
     // ==================== Rewrite Terminator Expressions ==================== //
 
     /**

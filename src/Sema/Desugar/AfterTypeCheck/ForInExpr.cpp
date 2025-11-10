@@ -380,7 +380,6 @@ void TypeChecker::TypeCheckerImpl::DesugarForInCloseRange(ASTContext& ctx, AST::
     // Add file for all created ast.
     forInExpr.desugarExpr = std::move(blockExpr);
 
-
     ctx.DeleteInvertedIndexes(forInExpr.inExpression.get());
     forInExpr.inExpression = nullptr;
 }
@@ -457,7 +456,6 @@ void TypeChecker::TypeCheckerImpl::DesugarForInNonCloseRange(ASTContext& ctx, AS
     CJC_ASSERT(blockExprTy && blockExprTy->kind != TypeKind::TYPE_INVALID);
     // Add file for all created ast.
     forInExpr.desugarExpr = std::move(blockExpr);
-
 
     ctx.DeleteInvertedIndexes(forInExpr.inExpression.get());
     forInExpr.inExpression = nullptr;

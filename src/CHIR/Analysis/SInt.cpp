@@ -685,7 +685,6 @@ void SInt::SetBit(unsigned pos)
     val |= MaskBit(pos);
 }
 
-
 // Set from \p lo to \p hi bits to one
 void SInt::SetBits(unsigned lo, unsigned hi)
 {
@@ -714,7 +713,6 @@ void SInt::ClearBit(unsigned pos)
     CJC_ASSERT(pos < width);
     val &= ~MaskBit(pos);
 }
-
 
 void SInt::FlipAllBits()
 {
@@ -988,7 +986,6 @@ SInt SInt::SExt(IntWidth w) const
     CJC_ASSERT(this->width <= w);
     return {w, static_cast<WordType>(SignExtend64(val, static_cast<unsigned>(this->width)))};
 }
-
 
 SInt SInt::SAddOvf(const SInt& rhs, bool& overflow) const
 {

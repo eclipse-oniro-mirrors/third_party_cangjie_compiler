@@ -398,6 +398,7 @@ llvm::Value* GenerateMathIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWr
         [](const CGValue* value) { return value->GetRawValue(); });
     return irBuilder.CallMathIntrinsics(intrinsic, args);
 }
+
 llvm::Value* GenerateInteropIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
 {
     auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());

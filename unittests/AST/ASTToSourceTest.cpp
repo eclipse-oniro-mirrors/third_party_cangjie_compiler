@@ -6,9 +6,9 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "gtest/gtest.h"
 #include <algorithm>
 #include <string>
+#include "gtest/gtest.h"
 
 #include "cangjie/AST/ASTCasting.h"
 #include "cangjie/AST/Create.h"

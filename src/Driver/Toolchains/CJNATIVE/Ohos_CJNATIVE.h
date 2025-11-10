@@ -40,7 +40,6 @@ protected:
 
     void HandleSanitizerDependencies(Tool& tool) override;
 
-
     std::string GetClangRTProfileLibraryName() const override
     {
         return "libclang_rt.profile.a";

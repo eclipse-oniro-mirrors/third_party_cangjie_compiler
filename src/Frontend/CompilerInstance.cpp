@@ -733,7 +733,6 @@ bool CompilerInstance::PerformMangling()
         }
         mangler->CollectVarOrLambda(*mangler->manglerCtxTable.at(pkgName), *package->srcPackage);
     }
-
 #endif
     mangler->lambdaCounter = cachedInfo.lambdaCounter;
     ManglingHelpFunction(*mangler);

@@ -18,7 +18,6 @@
 
 #include <bitset>
 #include <limits>
-
 #include <memory>
 #include <optional>
 #include <set>
@@ -2883,6 +2882,10 @@ struct File : Node {
     bool operator==(const File& r) const
     {
         return fileName == r.fileName && filePath == r.filePath && fileHash == r.fileHash;
+    }
+    bool operator!=(const File& r) const
+    {
+        return !(*this == r);
     }
 };
 

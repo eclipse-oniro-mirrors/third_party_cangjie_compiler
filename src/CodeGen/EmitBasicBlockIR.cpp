@@ -8,7 +8,7 @@
 
 #include "EmitBasicBlockIR.h"
 
-#include <set>
+#include <deque>
 
 #include "CGModule.h"
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND

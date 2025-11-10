@@ -24,7 +24,6 @@ public:
      */
     explicit MergeBlocks() = default;
 
-
     /**
      * @brief Main process to do block merge.
      * @param package package to do optimization.
@@ -40,7 +39,6 @@ public:
      * @param opts global options from Cangjie inputs.
      */
     static void RunOnFunc(const BlockGroup& body, CHIRBuilder& builder, const GlobalOptions& opts);
-
 };
 } // namespace Cangjie::CHIR
 

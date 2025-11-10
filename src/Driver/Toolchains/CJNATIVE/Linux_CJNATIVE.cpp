@@ -74,7 +74,6 @@ void Linux_CJNATIVE::GenerateLinkingTool(const std::vector<TempFileInfo>& objFil
     if (driverOptions.IsLTOEnabled()) {
         tool->SetLdLibraryPath(FileUtil::JoinPath(FileUtil::GetDirPath(ldPath), "../lib"));
         GenerateLinkOptionsForLTO(*tool.get());
-
     } else if (driverOptions.EnableHwAsan()) {
         // same args as lto except GenerateLinkOptionsForLTO
         tool->SetLdLibraryPath(FileUtil::JoinPath(FileUtil::GetDirPath(ldPath), "../lib"));

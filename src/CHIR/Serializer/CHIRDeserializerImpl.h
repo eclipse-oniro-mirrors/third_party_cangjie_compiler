@@ -72,6 +72,7 @@ private:
 
     // lazy GenericType config
     std::vector<std::pair<GenericType*, const PackageFormat::GenericType*>> genericTypeConfig;
+
     void ResetImportedValuesUnderPackage();
     void ResetImportedDefsUnderPackage();
 };

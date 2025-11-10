@@ -25,7 +25,6 @@ using namespace NodeSerialization;
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeWildcardExpr(AstExpr expr)
 {
     auto wildcardExpr = RawStaticCast<const WildcardExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(wildcardExpr);
     auto fbWildcardExpr = NodeFormat::CreateWildcardExpr(builder, fbNodeBase);
     return NodeFormat::CreateExpr(builder, fbNodeBase, NodeFormat::AnyExpr_WILDCARD_EXPR, fbWildcardExpr.Union());
@@ -34,7 +33,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeWildcardExpr(AstExpr 
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeBinaryExpr(AstExpr expr)
 {
     auto binaryExpr = RawStaticCast<const BinaryExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(binaryExpr);
     auto leftExpr = SerializeExpr(binaryExpr->leftExpr.get());
     auto rightExpr = SerializeExpr(binaryExpr->rightExpr.get());
@@ -47,7 +45,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeBinaryExpr(AstExpr ex
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeIsExpr(AstExpr expr)
 {
     auto isExpr = RawStaticCast<const IsExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(isExpr);
     auto leftExpr = SerializeExpr(isExpr->leftExpr.get());
     auto isType = SerializeType(isExpr->isType.get());
@@ -58,7 +55,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeIsExpr(AstExpr expr)
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeAsExpr(AstExpr expr)
 {
     auto asExpr = RawStaticCast<const AsExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(asExpr);
     auto leftExpr = SerializeExpr(asExpr->leftExpr.get());
     auto asType = SerializeType(asExpr->asType.get());
@@ -70,7 +66,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeAsExpr(AstExpr expr)
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeLitConstExpr(AstExpr expr)
 {
     auto litConstExpr = RawStaticCast<const LitConstExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(litConstExpr);
     auto value = builder.CreateString(litConstExpr->rawString);
     auto fbLitConstExpr = NodeFormat::CreateLitConstExpr(builder, fbNodeBase, value,
@@ -82,7 +77,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeLitConstExpr(AstExpr 
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeUnaryExpr(AstExpr expr)
 {
     auto unaryExpr = RawStaticCast<const UnaryExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(unaryExpr);
     auto onlyExpr = SerializeExpr(unaryExpr->expr.get());
     uint16_t op = static_cast<uint16_t>(unaryExpr->op);
@@ -94,7 +88,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeUnaryExpr(AstExpr exp
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeParenExpr(AstExpr expr)
 {
     auto parenExpr = RawStaticCast<const ParenExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(parenExpr);
     auto onlyExpr = SerializeExpr(parenExpr->expr.get());
     auto leftParenPos = FlatPosCreateHelper(parenExpr->leftParenPos);
@@ -124,7 +117,6 @@ flatbuffers::Offset<NodeFormat::CallExpr> NodeWriter::SerializeCallExpr(const Ca
     }
     auto fbNodeBase = SerializeNodeBase(callExpr);
     auto baseFunc = callExpr->baseFunc.get();
-
     auto fbBaseFunc = SerializeExpr(baseFunc);
     auto leftParenPos = FlatPosCreateHelper(callExpr->leftParenPos);
     auto rightParenPos = FlatPosCreateHelper(callExpr->rightParenPos);
@@ -176,7 +168,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeBlockExpr(AstExpr exp
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeReturnExpr(AstExpr expr)
 {
     auto returnExpr = RawStaticCast<const ReturnExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(returnExpr);
     auto returnPos = FlatPosCreateHelper(returnExpr->returnPos);
     auto fbExpr = SerializeExpr(returnExpr->expr.get());
@@ -190,7 +181,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeReturnExpr(AstExpr ex
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeDoWhileExpr(AstExpr expr)
 {
     auto doWhileExpr = RawStaticCast<const DoWhileExpr*>(expr);
-
     auto base = SerializeNodeBase(doWhileExpr);
     auto doPos = FlatPosCreateHelper(doWhileExpr->doPos);
     auto body = SerializeBlock(doWhileExpr->body.get());
@@ -206,7 +196,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeDoWhileExpr(AstExpr e
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeAssignExpr(AstExpr expr)
 {
     auto assignExpr = RawStaticCast<const AssignExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(assignExpr);
     auto fbLeftValue = SerializeExpr(assignExpr->leftValue.get());
     auto assignOp = static_cast<uint16_t>(assignExpr->op);
@@ -220,7 +209,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeAssignExpr(AstExpr ex
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeMemberAccess(AstExpr expr)
 {
     auto memberAccess = RawStaticCast<const MemberAccess*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(memberAccess);
     auto fbBaseExpr = SerializeExpr(memberAccess->baseExpr.get());
     auto dotPos = FlatPosCreateHelper(memberAccess->dotPos);
@@ -238,7 +226,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeMemberAccess(AstExpr 
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeLetPatternDestructor(AstExpr expr)
 {
     auto letExpr = RawStaticCast<const LetPatternDestructor*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(letExpr);
     auto fbPatterns = FlatVectorCreateHelper<NodeFormat::Pattern, Pattern, AstPattern>(
         letExpr->patterns, &NodeWriter::SerializePattern);
@@ -253,7 +240,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeLetPatternDestructor(
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeIfExpr(AstExpr expr)
 {
     auto ifExpr = RawStaticCast<const IfExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(ifExpr);
     auto ifPos = FlatPosCreateHelper(ifExpr->ifPos);
     auto leftParenPos = FlatPosCreateHelper(ifExpr->leftParenPos);
@@ -277,7 +263,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeIfExpr(AstExpr expr)
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeMatchExpr(AstExpr expr)
 {
     auto matchExpr = RawStaticCast<const MatchExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(matchExpr);
     auto leftParenPos = FlatPosCreateHelper(matchExpr->leftParenPos);
     auto fbSelector = SerializeExpr(matchExpr->selector.get());
@@ -296,7 +281,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeMatchExpr(AstExpr exp
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeWhileExpr(AstExpr expr)
 {
     auto whileExpr = RawStaticCast<const WhileExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(whileExpr);
     auto whilePos = FlatPosCreateHelper(whileExpr->whilePos);
     auto leftParenPos = FlatPosCreateHelper(whileExpr->leftParenPos);
@@ -311,7 +295,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeWhileExpr(AstExpr exp
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeArrayLit(AstExpr expr)
 {
     auto arrayLit = RawStaticCast<const ArrayLit*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(arrayLit);
     auto leftCurlPos = FlatPosCreateHelper(arrayLit->leftSquarePos);
     auto fbExs =
@@ -326,7 +309,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeArrayLit(AstExpr expr
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeTupleLit(AstExpr expr)
 {
     auto tupleLit = RawStaticCast<const TupleLit*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(tupleLit);
     auto leftParenPos = FlatPosCreateHelper(tupleLit->leftParenPos);
     auto fbExs =
@@ -341,7 +323,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeTupleLit(AstExpr expr
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeSubscriptExpr(AstExpr expr)
 {
     auto subscriptExpr = RawStaticCast<const SubscriptExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(subscriptExpr);
     auto fbBaseExpr = SerializeExpr(subscriptExpr->baseExpr.get());
     auto leftSquarePos = FlatPosCreateHelper(subscriptExpr->leftParenPos);
@@ -357,7 +338,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeSubscriptExpr(AstExpr
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeRangeExpr(AstExpr expr)
 {
     auto rangeExpr = RawStaticCast<const RangeExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(rangeExpr);
     auto fbStartExpr = SerializeExpr(rangeExpr->startExpr.get());
     auto rangePos = FlatPosCreateHelper(rangeExpr->rangePos);
@@ -392,7 +372,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeLambdaExpr(const Expr
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeSpawnExpr(AstExpr expr)
 {
     auto spawnExpr = RawStaticCast<const SpawnExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(spawnExpr);
     auto spawnPos = FlatPosCreateHelper(spawnExpr->spawnPos);
     auto taskExpr = SerializeExpr(spawnExpr->task.get());
@@ -408,7 +387,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeSpawnExpr(AstExpr exp
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeSynchronizedExpr(AstExpr expr)
 {
     auto synchronizedExpr = RawStaticCast<const SynchronizedExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(synchronizedExpr);
     auto syncPos = FlatPosCreateHelper(synchronizedExpr->syncPos);
     auto leftParenPos = FlatPosCreateHelper(synchronizedExpr->leftParenPos);
@@ -425,7 +403,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeTrailingClosureExpr(A
 {
     auto type = NodeFormat::AnyExpr_TRAILING_CLOSURE_EXPR;
     auto trailingClosureExpr = RawStaticCast<const TrailingClosureExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(trailingClosureExpr);
     auto leftLambdaPos = FlatPosCreateHelper(trailingClosureExpr->leftLambda);
     auto fbExpr = SerializeExpr(trailingClosureExpr->expr.get());
@@ -440,7 +417,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeTypeConvExpr(AstExpr 
 {
     auto type = NodeFormat::AnyExpr_TYPE_CONV_EXPR;
     auto typeConvExpr = RawStaticCast<const TypeConvExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(typeConvExpr);
     auto fbPrimitiveType = SerializeType(typeConvExpr->type.get());
     auto leftParenPos = FlatPosCreateHelper(typeConvExpr->leftParenPos);
@@ -454,7 +430,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeTypeConvExpr(AstExpr 
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeTryExpr(AstExpr expr)
 {
     auto tryExpr = RawStaticCast<const TryExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(tryExpr);
     auto fbLParenPos = FlatPosCreateHelper(tryExpr->lParen);
     auto fbResource = FlatVectorCreateHelper<NodeFormat::VarDecl, VarDecl, const VarDecl*>(
@@ -491,7 +466,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeTryExpr(AstExpr expr)
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeThrowExpr(AstExpr expr)
 {
     auto throwExpr = RawStaticCast<const ThrowExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(throwExpr);
     auto fbExpr = SerializeExpr(throwExpr->expr.get());
     auto fbThrowExpr = NodeFormat::CreateThrowExpr(builder, fbNodeBase, fbExpr);
@@ -532,7 +506,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializePrimitiveTypeExpr(Ast
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeForInExpr(AstExpr expr)
 {
     auto forinExpr = RawStaticCast<const ForInExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(forinExpr);
     auto leftParenPos = FlatPosCreateHelper(forinExpr->leftParenPos);
     auto fbPattern = SerializePattern(forinExpr->pattern.get());
@@ -563,7 +536,6 @@ flatbuffers::Offset<NodeFormat::NodeBase> NodeWriter::SerializeNodeBase(AstNode 
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeJumpExpr(AstExpr expr)
 {
     auto jumpExpr = RawStaticCast<const JumpExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(jumpExpr);
     auto isBreak = jumpExpr->isBreak;
     auto fbJumpExpr = NodeFormat::CreateJumpExpr(builder, fbNodeBase, isBreak);
@@ -573,7 +545,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeJumpExpr(AstExpr expr
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeIncOrDecExpr(AstExpr expr)
 {
     auto incOrDecExpr = RawStaticCast<const IncOrDecExpr*>(expr);
-
     auto base = SerializeNodeBase(incOrDecExpr);
     uint16_t op = static_cast<uint16_t>(incOrDecExpr->op);
     auto operatorPos = FlatPosCreateHelper(incOrDecExpr->operatorPos);
@@ -585,7 +556,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeIncOrDecExpr(AstExpr 
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeOptionalExpr(AstExpr expr)
 {
     auto optionalExpr = RawStaticCast<const OptionalExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(optionalExpr);
     auto baseExpr = SerializeExpr(optionalExpr->baseExpr.get());
     auto questPos = FlatPosCreateHelper(optionalExpr->questPos);
@@ -596,7 +566,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeOptionalExpr(AstExpr 
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeOptionalChainExpr(AstExpr expr)
 {
     auto optionalChainExpr = RawStaticCast<const OptionalChainExpr*>(expr);
-
     auto fbNodeBase = SerializeNodeBase(optionalChainExpr);
     auto optexpr = SerializeExpr(optionalChainExpr->expr.get());
     auto fbOptionalChainExpr = NodeFormat::CreateOptionalChainExpr(builder, fbNodeBase, optexpr);
@@ -607,7 +576,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeOptionalChainExpr(Ast
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeTokenPart(AstExpr expr)
 {
     auto tokenPart = RawStaticCast<const TokenPart*>(expr);
-
     auto vecToken = TokensVectorCreateHelper(tokenPart->tokens);
     auto fbTokens = builder.CreateVector(vecToken);
     auto fbTokenPart = NodeFormat::CreateTokenPart(builder, fbTokens);
@@ -618,7 +586,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeTokenPart(AstExpr exp
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeQuoteExpr(AstExpr expr)
 {
     auto quoteExpr = RawStaticCast<const QuoteExpr*>(expr);
-
     auto base = SerializeNodeBase(quoteExpr);
     auto leftParenPos = FlatPosCreateHelper(quoteExpr->leftParenPos);
     auto rightParenPos = FlatPosCreateHelper(quoteExpr->rightParenPos);
@@ -634,7 +601,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeQuoteExpr(AstExpr exp
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeMacroExpandExpr(AstExpr expr)
 {
     auto macroExpandExpr = RawStaticCast<const MacroExpandExpr*>(expr);
-
     auto base = SerializeNodeBase(macroExpandExpr);
     auto invocation = MacroInvocationCreateHelper(macroExpandExpr->invocation);
     auto identifier = builder.CreateString(macroExpandExpr->identifier.Val());
@@ -656,7 +622,6 @@ flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeMacroExpandExpr(AstEx
 flatbuffers::Offset<NodeFormat::Expr> NodeWriter::SerializeArrayExpr(AstExpr expr)
 {
     auto arrayExpr = RawStaticCast<const ArrayExpr*>(expr);
-
     auto base = SerializeNodeBase(arrayExpr);
     auto type = SerializeType(arrayExpr->type.get());
     auto leftParenPos = FlatPosCreateHelper(arrayExpr->leftParenPos);

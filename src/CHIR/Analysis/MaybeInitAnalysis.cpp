@@ -102,7 +102,6 @@ void MaybeInitAnalysis::HandleAllocateExpr(MaybeInitDomain& state, const Allocat
     if (auto it = allocateIdxMap.find(res); it != allocateIdxMap.end()) {
         auto allcoateIdx = it->second;
         state.Kill(allcoateIdx);
-
     }
 }
 
@@ -112,7 +111,6 @@ void MaybeInitAnalysis::HandleStoreExpr(MaybeInitDomain& state, const Store* sto
     if (auto it = allocateIdxMap.find(location); it != allocateIdxMap.end()) {
         auto allocateIdx = it->second;
         state.Gen(allocateIdx);
-
     }
 }
 
@@ -131,7 +129,6 @@ void MaybeInitAnalysis::HandleStoreElemRefExpr(MaybeInitDomain& state, const Sto
         return;
     }
     state.Gen(memberIdx - ctorInitInfo->superMemberNums);
-
 }
 
 void MaybeInitAnalysis::HandleApplyExpr(MaybeInitDomain& state, const Apply* apply) const
@@ -142,7 +139,6 @@ void MaybeInitAnalysis::HandleApplyExpr(MaybeInitDomain& state, const Apply* app
     // Check if it is a call to super init function of this class
     if (apply->IsSuperCall()) {
         state.Gen(domainSize - 1);
-
         return;
     }
     // Check if it is a call to another init function of this class/struct
@@ -156,7 +152,6 @@ void MaybeInitAnalysis::HandleApplyExpr(MaybeInitDomain& state, const Apply* app
             if (ctorInitInfo->superClassDef) {
                 state.Gen(domainSize - 1);
             }
-
         }
     }
 }

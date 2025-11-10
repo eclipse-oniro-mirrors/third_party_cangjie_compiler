@@ -59,7 +59,6 @@ private:
     Value* ConvertArrayToChir(
         VArrayType& ty, const IArray& val, std::function<void(Expression*)>& insertExpr, Block& parent);
 
-
     ClassType* FindClassType(const std::string& mangledName);
 
     CHIRBuilder& chirBuilder;

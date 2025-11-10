@@ -105,7 +105,6 @@ public:
             PushTypeAnno(type, std::move(res));
         }
 
-
         // collect custom annotations for members
         for (auto member : decl.GetMemberDeclPtrs()) {
             if (auto prop = DynamicCast<PropDecl>(member)) {
@@ -254,7 +253,6 @@ private:
         var->EnableAttr(Attribute::CONST);
         var->EnableAttr(Attribute::NO_REFLECT_INFO);
         var->Set<LinkTypeInfo>(Linkage::INTERNAL);
-
         return var;
     }
     
@@ -513,7 +511,6 @@ private:
                 (void)diag.diag.DiagnoseRefactor(DiagKindRefactor::chir_annotation_not_applicable, *annotation.src,
                     annotation.src->identifier, std::string{ANNOTATION_TARGET_2_STRING[targetid]});
                 res = false;
-
             }
         }
         return res;

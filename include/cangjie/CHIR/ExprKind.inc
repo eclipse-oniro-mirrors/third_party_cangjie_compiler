@@ -4,12 +4,12 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+// Tips:
+// 1. EXPRKIND(expression kind, exression name for human reading, Expression class)
+// 2. Remember to modify CHIRCasting.h and PackageFormat.fbs after adding a new expression
 
-// EXPRKIND(expression kind, exression kind value for human reading, Expression)
 #if defined(MAJORKIND) && defined(EXPRKIND)
 
-// NOTE: First and last kind will affect implementation of 'CHIRCasting'
 MAJORKIND(TERMINATOR,
 EXPRKIND(GOTO, "GoTo", GoTo)
 EXPRKIND(BRANCH, "Branch", Branch)

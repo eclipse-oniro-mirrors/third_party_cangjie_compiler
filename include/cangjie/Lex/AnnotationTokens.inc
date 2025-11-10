@@ -4,8 +4,6 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
-
 // ANNOTATION_TOKEN(token id, token value for human reading, token literal, token priority)
 #ifdef ANNOTATION_TOKEN
 ANNOTATION_TOKEN(EXCEPT, "except", "except", 0)

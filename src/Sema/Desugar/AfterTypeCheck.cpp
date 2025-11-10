@@ -425,7 +425,6 @@ void TypeChecker::TypeCheckerImpl::PerformDesugarAfterTypeCheck(ASTContext& ctx,
                 if (fie->inExpression) {
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
                     ReArrangeForInExpr(ctx, *fie);
-
 #endif
                 }
                 break;

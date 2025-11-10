@@ -63,7 +63,6 @@ DiagCategory Diagnostic::GetDiagnoseCategory(DiagKind diagKind)
             dc = DiagCategory::KIND;                                                                                   \
         }                                                                                                              \
     } while (0)
-
     GET_CATE(macro_expand, MACRO_EXPAND);
     GET_CATE(sema, SEMA);
 #undef GET_CATE

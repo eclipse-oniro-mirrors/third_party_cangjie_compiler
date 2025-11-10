@@ -229,6 +229,7 @@ template <bool ForConstEval> void CHIR2BCHIR::TranslateFunctions(const Package& 
         if (isIncremental && bchir.GetFunctions().find(fIdent) != bchir.GetFunctions().end()) {
             bchir.RemoveFunction(fIdent);
         }
+
         if constexpr (ForConstEval) {
             bool missingBody = f->TestAttr(Attribute::SKIP_ANALYSIS) && !f->GetBody();
             if (missingBody) {
@@ -316,7 +317,6 @@ Bchir::ByteCodeContent CHIR2BCHIR::GetTypeIdx(Cangjie::CHIR::Type& chirType)
             }
             break;
         }
-
         case CHIR::Type::TYPE_FUNC: {
             auto& fType = StaticCast<const FuncType&>(chirType);
             for (auto& it : fType.GetParamTypes()) {
@@ -508,7 +508,6 @@ Bchir::ByteCodeContent CHIR2BCHIR::LVarId(Context& ctx, const Value& value)
     ctx.val2lvarId.emplace_hint(it, &value, ctx.localVarId);
     return ctx.localVarId++; // increment ctx.localVarId
 }
-
 
 
 void CHIR2BCHIR::TranslateAllocate(Context& ctx, const Expression& expr)

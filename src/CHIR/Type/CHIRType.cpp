@@ -29,7 +29,6 @@ Type* CHIRType::TranslateTupleType(AST::TupleTy& tupleTy)
     for (auto argTy : tupleTy.typeArgs) {
         argTys.emplace_back(TranslateType(*argTy));
     }
-
     return builder.GetType<TupleType>(argTys);
 }
 
@@ -47,7 +46,6 @@ Type* CHIRType::TranslateFuncType(const AST::FuncTy& fnTy)
     auto funcTy = builder.GetType<FuncType>(paramTys, retTy, fnTy.hasVariableLenArg, fnTy.IsCFunc());
     return funcTy;
 }
-
 
 Type* CHIRType::TranslateStructType(AST::StructTy& structTy)
 {

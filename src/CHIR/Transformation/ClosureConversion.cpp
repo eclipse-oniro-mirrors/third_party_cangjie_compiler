@@ -1003,7 +1003,6 @@ void AddTypeCastForOperand(const std::pair<Expression*, std::vector<size_t>>& e,
         auto typecast = builder.CreateExpression<TypeCast>(expectedType, op, parentBlock);
         typecast->MoveBefore(expr);
         expr->ReplaceOperand(idx, typecast->GetResult());
-
     }
 }
 
@@ -1505,7 +1504,6 @@ Type* ClosureConversion::ConvertCompositionalType(const Type& type)
         case Type::TypeKind::TYPE_TUPLE:
             curConvertedTy = ConvertTupleType(StaticCast<const TupleType&>(type));
             break;
-
         case Type::TypeKind::TYPE_FUNC:
             curConvertedTy = ConvertFuncType(StaticCast<const FuncType&>(type));
             break;
@@ -1804,12 +1802,10 @@ void ClosureConversion::CreateGenericOverrideMethodInAutoEnvImplDef(ClassDef& au
     }
     auto applyRetType =
         ReplaceRawGenericArgType(*srcFunc.GetFuncType()->GetReturnType(), originalTypeToNewType, builder);
-
     std::vector<Type*> instTyArgs;
     for (auto ty : srcFunc.GetGenericTypeParams()) {
         instTyArgs.emplace_back(ReplaceRawGenericArgType(*ty, originalTypeToNewType, builder));
     }
-
     Type* thisTy = srcFunc.GetParentCustomTypeOrExtendedType();
     if (thisTy != nullptr) {
         thisTy = ReplaceRawGenericArgType(*thisTy, originalTypeToNewType, builder);
@@ -1873,12 +1869,10 @@ void ClosureConversion::CreateInstOverrideMethodInAutoEnvImplDef(ClassDef& autoE
     auto& params = newFunc->GetParams();
     long offset = srcFunc.GetFuncKind() == FuncKind::LAMBDA ? 0 : 1;
     std::vector<Value*> applyArgs(params.begin() + offset, params.end());
-
     std::vector<Type*> instTyArgs;
     for (auto ty : srcFunc.GetGenericTypeParams()) {
         instTyArgs.emplace_back(ReplaceRawGenericArgType(*ty, originalTypeToNewType, builder));
     }
-
     Type* thisTy = srcFunc.GetParentCustomTypeOrExtendedType();
     if (thisTy != nullptr) {
         thisTy = ReplaceRawGenericArgType(*thisTy, originalTypeToNewType, builder);
@@ -2392,6 +2386,7 @@ void ClosureConversion::ConvertApplyToInvoke(const std::vector<Apply*>& applyExp
             autoEnvBaseDef = instParentType->GetClassDef();
         }
         auto [methodName, originalFuncType] = GetFuncTypeFromAutoEnvBaseDef(*autoEnvBaseDef);
+
         auto invokeInfo = InvokeCallContext {
             .caller = callee,
             .funcCallCtx = FuncCallContext {
@@ -2427,6 +2422,7 @@ void ClosureConversion::ConvertApplyWithExceptionToInvokeWithException(
             autoEnvBaseDef = instParentType->GetClassDef();
         }
         auto [methodName, originalFuncType] = GetFuncTypeFromAutoEnvBaseDef(*autoEnvBaseDef);
+
         auto invokeInfo = InvokeCallContext {
             .caller = callee,
             .funcCallCtx = FuncCallContext {
@@ -2603,7 +2599,6 @@ Func* ClosureConversion::CreateGenericMethodInAutoEnvWrapper(ClassDef& autoEnvWr
     return func;
 }
 
-
 void ClosureConversion::CreateInstMethodInAutoEnvWrapper(ClassDef& autoEnvWrapperDef, Func& genericFunc)
 {
     // 1. create function type
@@ -2711,6 +2706,7 @@ void ClosureConversion::WrapApplyRetVal(Apply& apply)
     };
     PrivateTypeConverter converter(convertRetType, builder);
     converter.VisitValue(*applyRetVal);
+
     // 3. create $Auto_Env_wrapper object
     auto parentBlock = apply.GetParentBlock();
     auto autoEnvWrapperType = autoEnvWrapperDef->GetType();
@@ -2770,7 +2766,6 @@ void ClosureConversion::WrapApplyWithExceptionRetVal(ApplyWithException& apply)
     PrivateTypeConverter converter(convertRetType, builder);
     converter.VisitValue(*applyRetVal);
 
-
     auto autoEnvWrapperType = autoEnvWrapperDef->GetType();
     auto autoEnvWrapperRefType = builder.GetType<RefType>(autoEnvWrapperType);
     for (auto user : applyRetVal->GetUsers()) {
@@ -2824,6 +2819,7 @@ void ClosureConversion::WrapInvokeRetVal(Expression& e)
     };
     PrivateTypeConverter converter(convertRetType, builder);
     converter.VisitValue(*invokeRetVal);
+
     // 3. create $Auto_Env_wrapper object
     auto parentBlock = e.GetParentBlock();
     auto autoEnvWrapperType = autoEnvWrapperDef->GetType();
@@ -2882,7 +2878,6 @@ void ClosureConversion::WrapInvokeWithExceptionRetVal(Expression& e)
     };
     PrivateTypeConverter converter(convertRetType, builder);
     converter.VisitValue(*invokeRetVal);
-
 
     auto autoEnvWrapperType = autoEnvWrapperDef->GetType();
     auto autoEnvWrapperRefType = builder.GetType<RefType>(autoEnvWrapperType);

@@ -134,7 +134,6 @@ std::string ToBase62(uint64_t value)
 } // namespace
 
 namespace Cangjie::MangleUtils {
-
 std::string MangleFilePrivate(const AST::Decl& decl)
 {
     const size_t cjExtLen = 3;
@@ -461,7 +460,6 @@ std::string BaseMangler::MangleVarWithPatternDecl(
     return mangleStr;
 }
 
-
 std::optional<std::string> BaseMangler::MangleEntryFunction(const FuncDecl& funcDecl) const
 {
     // Change user main function to user.main, so that the function entry can be changed to RuntimeMain.
@@ -713,7 +711,6 @@ std::string BaseMangler::ManglePrefix(const Node& node, const std::vector<Ptr<No
                 auto mangleCtx = manglerCtxTable.at(pkgName);
                 CJC_NULLPTR_CHECK(mangleCtx.get());
                 std::optional<size_t> index = mangleCtx->GetIndexOfLambda(outerNode, &lambda);
-
                 mangled += MANGLE_LAMBDA_PREFIX + MangleUtils::DecimalToManglingNumber(std::to_string(index.value()));
                 break;
             }
@@ -894,7 +891,6 @@ std::string BaseMangler::MangleLambda(const LambdaExpr& lambda, const::std::vect
     auto mangleCtx = manglerCtxTable.at(pkgName);
     CJC_NULLPTR_CHECK(mangleCtx.get());
     std::optional<size_t> index = mangleCtx->GetIndexOfLambda(outerNode, &lambda);
-
     std::string mangleStr = MANGLE_CANGJIE_PREFIX + MANGLE_NESTED_PREFIX;
     std::vector<std::string> genericsTypeStack;
     mangleStr += ManglePrefix(lambda, prefix, genericsTypeStack, true);

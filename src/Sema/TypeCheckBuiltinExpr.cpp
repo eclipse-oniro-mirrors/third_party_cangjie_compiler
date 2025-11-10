@@ -520,7 +520,6 @@ bool TypeChecker::TypeCheckerImpl::ChkPointerExpr(ASTContext& ctx, Ty& target, P
     }
     return ret;
 }
-
 #endif
 
 Ptr<Ty> TypeChecker::TypeCheckerImpl::SynPointerExpr(ASTContext& ctx, PointerExpr& cptrExpr)
@@ -670,7 +669,6 @@ bool TypeChecker::TypeCheckerImpl::ChkCStringCall(ASTContext& ctx, Ty& target, C
             ce.ty = TypeManager::GetInvalidTy();
             return false;
         }
-
 #endif
         ce.ty = TypeManager::GetCStringTy();
         return true;

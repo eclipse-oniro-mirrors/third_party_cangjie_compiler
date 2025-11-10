@@ -6,9 +6,18 @@
 
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-add_executable(ParserTests ParserTest.cpp)
+add_executable(ParserTest ParserTest.cpp)
 target_link_libraries(
-    ParserTests
+    ParserTest
+    cangjie-lsp
+    ${CMAKE_DL_LIBS}
+    GTest::gtest
+    GTest::gtest_main)
+add_test(NAME ParserTest COMMAND ParserTest)
+
+add_executable(ParseTypeTest ParseTypeTest.cpp)
+target_link_libraries(
+    ParseTypeTest
     cangjie-lsp
     ${CMAKE_DL_LIBS}
     GTest::gtest

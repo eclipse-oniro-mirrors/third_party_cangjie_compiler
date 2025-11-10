@@ -35,7 +35,6 @@
 #include "cangjie/Basic/DiagnosticEngine.h"
 #include "cangjie/Basic/Print.h"
 #include "cangjie/Frontend/CompilerInstance.h"
-
 #include "cangjie/Utils/CheckUtils.h"
 #include "cangjie/Utils/Utils.h"
 #include "NativeFFI/Java/BeforeTypeCheck/GenerateJavaMirror.h"

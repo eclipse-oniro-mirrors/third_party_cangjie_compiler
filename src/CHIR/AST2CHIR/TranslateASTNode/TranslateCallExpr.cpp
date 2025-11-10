@@ -813,7 +813,6 @@ Value* Translator::TranslateStructOrClassCtorCall(const AST::CallExpr& expr)
         }
         auto load = CreateAndAppendExpression<Load>(loc, thisTy, thisArg, currentBlock);
         // this load should be removed if it is a super/this call, but it will trigger IRChecker error in:
-
         if (IsSuperOrThisCall(expr)) {
             load->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
             // should be: return nullptr;

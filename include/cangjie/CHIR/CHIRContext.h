@@ -278,7 +278,6 @@ public:
     void DeleteAllocatedTys();
 
 private:
-
     /*
      * @brief Cached Pointer of allocated instance in CHIR.
      */
@@ -286,7 +285,6 @@ private:
 
     /* The file name string pool for debug location: fileID map to source path */
     std::unordered_map<unsigned int, std::string>* fileNameMap;
-
     /*
      * @brief Cached Pointer of allocated instance in CHIR.
      */

@@ -31,7 +31,6 @@ const std::string INTERNAL_CFUNC_ATTR = "internal";
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
 const std::string FAST_NATIVE_ATTR = "gc-leaf-function";
 #endif
-
 const std::string VTABLE_LOOKUP = "VTABLE_LOOKUP"; // Indicates that it is the instruction of VTable lookup.
 const std::string GC_TYPE_META_NAME = "RelatedType";
 const std::string GC_GLOBAL_VAR_TYPE = "GlobalVarType";

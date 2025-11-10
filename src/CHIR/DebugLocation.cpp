@@ -13,6 +13,7 @@
  */
 
 #include "cangjie/CHIR/DebugLocation.h"
+
 #include <iostream>
 #include <sstream>
 
@@ -110,6 +111,7 @@ std::string DebugLocation::ToString() const
     }
     return ss.str();
 }
+
 void DebugLocation::Dump() const
 {
     std::cout << ToString() << std::endl;

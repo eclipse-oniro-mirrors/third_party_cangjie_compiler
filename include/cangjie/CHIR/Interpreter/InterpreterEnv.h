@@ -72,7 +72,6 @@ struct Env {
         bp = local.size();
     }
 
-
     /** @brief set base pointer to newBP and clean environment stack after bp. */
     void RestoreStackFrameTo(size_t newBP)
     {
@@ -85,7 +84,6 @@ struct Env {
     {
         return bp;
     }
-
 
 private:
     size_t numberOfGlobals;

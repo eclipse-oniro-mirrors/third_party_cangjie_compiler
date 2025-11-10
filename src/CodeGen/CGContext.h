@@ -322,7 +322,6 @@ public:
 
     void AddNullableReference(llvm::Value* value);
 
-
     void SetBasePtr(const llvm::Value* val, llvm::Value* basePtr);
     llvm::Value* GetBasePtrOf(llvm::Value* val) const;
 

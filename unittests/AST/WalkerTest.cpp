@@ -6,8 +6,8 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "gtest/gtest.h"
 #include <vector>
+#include "gtest/gtest.h"
 
 #define private public
 #include "cangjie/AST/Match.h"

@@ -330,7 +330,6 @@ void WrapVirtualFunc::CreateVirtualWrapperFunc(Func& func, FuncType& wrapperTy,
     for (size_t i = 0; i < paramInstTy.size(); ++i) {
         args[i] = TypeCastOrBoxIfNeeded(*args[i], *paramInstTy[i], builder, *entry, INVALID_LOCATION);
     }
-
     std::vector<Type*> instArgTypes;
     instArgTypes.reserve(genericTable.funcGenericTypeParams.size());
     for (auto& funcGenericParam : genericTable.funcGenericTypeParams) {

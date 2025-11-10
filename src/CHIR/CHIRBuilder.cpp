@@ -262,6 +262,7 @@ std::unordered_set<GenericType*> CHIRBuilder::GetAllGenericTypes() const
     }
     return result;
 }
+
 void CHIRBuilder::EnableIRCheckerAfterPlugin()
 {
     enableIRCheckerAfterPlugin = true;

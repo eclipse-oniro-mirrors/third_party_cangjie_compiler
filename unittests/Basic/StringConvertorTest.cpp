@@ -6,10 +6,10 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "cangjie/Basic/StringConvertor.h"
 #include <string>
 #include <utility>
 #include <vector>
+#include "cangjie/Basic/StringConvertor.h"
 
 #include "gtest/gtest.h"
 using namespace Cangjie;

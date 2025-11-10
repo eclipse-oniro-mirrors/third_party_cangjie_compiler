@@ -6,10 +6,10 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+#include "gtest/gtest.h"
 #include "cangjie/Option/Option.h"
 #include "cangjie/Driver/Driver.h"
 #include "cangjie/Utils/FileUtil.h"
-#include "gtest/gtest.h"
 
 #include <memory>
 

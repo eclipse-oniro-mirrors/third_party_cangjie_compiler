@@ -112,14 +112,12 @@ void TypeChecker::TypeCheckerImpl::PerformDesugarAfterInstantiation([[maybe_unus
         PerformToAnyInsertion(pkg);
     }
 #endif
-
     PerformRecursiveTypesElimination();
     UpdateDeclAttributes(pkg, ci->invocation.globalOptions.exportForTest);
     if (ci->invocation.globalOptions.enableCoverage) {
         ClearLineInfoAfterSema(pkg);
     }
 }
-
 
 bool AutoBoxing::NeedBoxOption(Ty& child, Ty& target)
 {

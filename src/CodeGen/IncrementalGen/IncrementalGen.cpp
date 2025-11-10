@@ -448,7 +448,6 @@ void IncrementalGen::EraseUselessFunctions()
         auto f = injectedModule->begin();
         while (f != injectedModule->end()) {
             auto cur = f++;
-
             bool isFromCFFI = (cur->hasFnAttribute(C2CJ_ATTR) || cur->hasFnAttribute(CJSTUB_ATTR));
             if (!cur->hasFnAttribute(FUNC_USED_BY_CLOSURE)) {
                 continue;

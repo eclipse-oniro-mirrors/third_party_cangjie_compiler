@@ -4,8 +4,6 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
-
 ERROR(chir_diag_begin, "")
 ERROR(chir_var_might_circular_dependency, "%s might have circular dependency")
 ERROR(chir_file_might_circular_dependency, "%s might have file circular dependency")

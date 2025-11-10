@@ -55,7 +55,6 @@ const std::vector<const Func*>& RangePropagation::GetFuncsNeedRemoveBlocks() con
 void RangePropagation::RunOnPackage(const Ptr<const Package>& package, bool isDebug)
 {
     for (auto func : package->GetGlobalFuncs()) {
-
         RunOnFunc(func, isDebug);
     }
 }
@@ -130,7 +129,6 @@ Ptr<LiteralValue> RangePropagation::GenerateConstExpr(const Ptr<Type>& type, con
                 return builder.CreateLiteralValue<IntLiteral>(type, intValue.value().UVal());
             }
             break;
-
     }
     return nullptr;
 }

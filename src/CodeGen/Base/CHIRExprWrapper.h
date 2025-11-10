@@ -335,7 +335,6 @@ public:
         }
     }
 
-
     bool IsCalleeMethod() const override
     {
         return true;
@@ -453,7 +452,6 @@ public:
         }
     }
 
-
     std::vector<CHIR::Type*> GetInstantiatedTypeArgs() const override
     {
         if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
@@ -462,7 +460,6 @@ public:
             return StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetInstantiatedTypeArgs();
         }
     }
-
 
     bool IsCalleeMethod() const override
     {

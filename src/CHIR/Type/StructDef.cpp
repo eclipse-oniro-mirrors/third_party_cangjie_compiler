@@ -8,6 +8,7 @@
 
 #include "cangjie/CHIR/Type/StructDef.h"
 
+#include <sstream>
 #include "cangjie/CHIR/CHIRCasting.h"
 #include "cangjie/CHIR/ToStringUtils.h"
 

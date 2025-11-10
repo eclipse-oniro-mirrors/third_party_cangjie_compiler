@@ -54,7 +54,6 @@ void Ohos_CJNATIVE::GenerateLinkingTool(const std::vector<TempFileInfo>& objFile
     tool->AppendArg("-o", outputFile);
     if (driverOptions.IsLTOEnabled()) {
         GenerateLinkOptionsForLTO(*tool.get());
-
     } else if (driverOptions.EnableHwAsan()) {
         // Same args as lto except GenerateLinkOptionsForLTO
         tool->AppendArg("-z", "notext");

@@ -4,6 +4,9 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 /**
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
  * @file
  *
  * This file declares the MPTypeCheckerImpl related classes, which provides typecheck capabilities for CJMP.

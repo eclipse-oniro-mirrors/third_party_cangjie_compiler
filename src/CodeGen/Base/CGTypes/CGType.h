@@ -245,7 +245,6 @@ public:
         return cgGenericKind == CGGenericKind::DYNAMIC_GI;
     }
 
-
     void GenTypeInfo();
 
     void SetCGExtensionDef(CGExtensionDef* ed)
@@ -278,7 +277,6 @@ public:
     /// To get a RefType of chir
     static CHIR::RefType* GetRefTypeOf(CHIR::CHIRBuilder& chirBuilder, const CHIR::Type& typeOfCHIR);
     static CHIR::RefType* GetRefTypeOfCHIRInt8(CHIR::CHIRBuilder& chirBuilder);
-
 
     static CGType* GetCGTI(CGModule& cgModule);
 

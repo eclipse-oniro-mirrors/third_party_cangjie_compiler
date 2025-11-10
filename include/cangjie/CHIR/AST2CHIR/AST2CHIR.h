@@ -65,7 +65,6 @@ public:
         AST2CHIR Build()
         {
             CJC_NULLPTR_CHECK(opts);
-
             CJC_NULLPTR_CHECK(import);
             CJC_NULLPTR_CHECK(types);
             CJC_NULLPTR_CHECK(diag);
@@ -291,7 +290,6 @@ private:
     void CreateCustomTypeDef(const AST::Decl& decl, bool isImported);
     void TranslateAllCustomTypeTy();
     void TranslateNominalDecls(const AST::Package& pkg);
-
     void SetFuncAttributeAndLinkageType(const AST::FuncDecl& astFunc, FuncBase& chirFunc);
 
     void FlatternPattern(const AST::Pattern& pattern, bool isLocalConst);

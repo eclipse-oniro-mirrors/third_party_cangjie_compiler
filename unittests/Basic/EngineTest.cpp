@@ -7,13 +7,12 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "cangjie/AST/PrintNode.h"
-#include "cangjie/Basic/DiagnosticEngine.h"
 #include "cangjie/Basic/DiagnosticEmitter.h"
+#include "cangjie/Basic/DiagnosticEngine.h"
 #include "cangjie/Basic/Match.h"
 #include "cangjie/Basic/Print.h"
 #include "cangjie/Parse/Parser.h"
 #include "cangjie/Utils/CheckUtils.h"
-
 
 #include "gtest/gtest.h"
 
@@ -239,7 +238,6 @@ TEST(EngineTest, apiTest4)
     DiagnosticEngine diag;
     auto code = R"(
 main(){
-
 })";
     auto file = std::string{"test.cj"};
     SourceManager sm;

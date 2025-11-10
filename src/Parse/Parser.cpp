@@ -132,7 +132,6 @@ OwnedPtr<File> ParserImpl::ParseTopLevel()
     if (!scanDepPkg) {
         ParseTopLevelDecls(*ret, annos);
     }
-
     ret->end = lookahead.End();
     if (ret->end.IsZero()) {
         ret->end = ret->begin;

@@ -32,7 +32,6 @@ public:
     void Clear();
 
 private:
-
     std::vector<CGType*> cgTypePool;
     std::unordered_map<CGType::TypeExtraInfo, std::unordered_map<const CHIR::Type*, CGType*>,
         CGType::TypeExtraInfoHasher> chirType2CGTypeMap;

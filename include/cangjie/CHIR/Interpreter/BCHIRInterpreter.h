@@ -23,7 +23,6 @@
 #undef AARCH64
 #endif
 #include "cangjie/Basic/DiagnosticEngine.h"
-
 #include "cangjie/CHIR/Interpreter/BCHIR.h"
 #include "cangjie/CHIR/Interpreter/BCHIRPrinter.h"
 #include "cangjie/CHIR/Interpreter/BCHIRResult.h"
@@ -76,7 +75,6 @@ public:
     {
     }
 
-
     /** @brief runt the interpreter */
     IResult Run(size_t baseIdx, bool expectsReturn = true);
 
@@ -85,7 +83,6 @@ public:
 
     /** @brief Moves a value to the arena, and returns the pointer */
     IPointer ToArena(IVal&& value);
-
 
     /** @brief get the value of a global variable */
     const IVal& PeekValueOfGlobal(Bchir::VarIdx id) const;
@@ -109,7 +106,6 @@ public:
     std::string DebugGetPosition(Bchir::ByteCodeIndex index);
     /** @brief Debug utility. Return a string with the mangled for a bytecode operation index. */
     std::string DebugGetMangledName(Bchir::ByteCodeIndex index) const;
-
 
     /** @brief Check if writing debug data to a file is enabled. If so, create output file for PrintDebugInfo. */
     void PrepareRuntimeDebug(const GlobalOptions& options);
@@ -199,6 +195,7 @@ private:
     void InterpretGetRef();
     void InterpretFieldTpl();
     void InterpretReturn();
+
     IVal* AllocateValue(IVal&& value);
 
     // Invoke support

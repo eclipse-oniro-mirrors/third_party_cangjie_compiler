@@ -48,7 +48,6 @@ static const std::string PrintArgTys(const std::vector<Type*>& argTys)
     return ss.str();
 }
 
-
 Type::Type(TypeKind kind) : kind(kind)
 {
     for (auto ty : argTys) {
@@ -1001,7 +1000,6 @@ std::string TupleType::ToString() const
     return ss.str();
 }
 
-
 std::string RawArrayType::ToString() const
 {
     CJC_ASSERT(!argTys.empty());
@@ -1160,7 +1158,6 @@ std::string GenericType::ToString() const
 }
 
 namespace Cangjie::CHIR {
-
 Type* GetFieldOfType(Type& baseTy, uint64_t index, CHIRBuilder& builder)
 {
     Type* type = nullptr;

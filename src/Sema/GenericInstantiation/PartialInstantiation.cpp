@@ -588,7 +588,6 @@ OwnedPtr<QuoteExpr> PartialInstantiation::InstantiateQuoteExpr(const QuoteExpr& 
     expr->quotePos = qe.quotePos;
     expr->leftParenPos = qe.leftParenPos;
     expr->rightParenPos = qe.rightParenPos;
-
     return expr;
 }
 

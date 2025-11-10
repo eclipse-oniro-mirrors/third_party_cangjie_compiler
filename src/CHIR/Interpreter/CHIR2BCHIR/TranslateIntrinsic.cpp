@@ -60,7 +60,6 @@ template <typename T> void CHIR2BCHIR::TranslateIntrinsicExpression(Context& ctx
             }
             break;
         }
-
         case CHIR::IntrinsicKind::ARRAY_GET:
         case CHIR::IntrinsicKind::ARRAY_GET_UNCHECKED:
         case CHIR::IntrinsicKind::ARRAY_SET:

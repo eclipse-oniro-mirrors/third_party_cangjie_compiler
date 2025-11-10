@@ -212,7 +212,6 @@ void FunctionGeneratorImpl::EmitIR()
     }
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-
     const auto& options = cgMod.GetCGContext().GetCompileOptions();
     if ((options.enableTimer || options.enableMemoryCollect) && (chirFunc.GetGenericDecl() != nullptr)) {
         if (chirFunc.GetGenericDecl()->TestAttr(CHIR::Attribute::IMPORTED)) {
@@ -270,7 +269,6 @@ void EmitImportedCFuncIR(CGModule& cgMod, const std::vector<CHIR::ImportedFunc*>
             IsNonPublicCFunc(*chirFuncTy, *importedCFunc) && importedCFunc->TestAttr(CHIR::Attribute::NON_RECOMPILE)) {
             cgFunc->GetRawFunction()->addFnAttr(CodeGen::INCREMENTAL_CFUNC_ATTR);
             cgFunc->GetRawFunction()->addFnAttr(CodeGen::INTERNAL_CFUNC_ATTR);
-
         }
 
         SetSRetAttrForStructReturnType(*chirFuncTy, *cgFunc->GetRawFunction());

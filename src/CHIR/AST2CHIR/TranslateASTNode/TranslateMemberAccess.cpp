@@ -495,7 +495,6 @@ Translator::LeftValueInfo Translator::TranslateMemberAccessAsLeftValue(const AST
         return LeftValueInfo(targetVal, {});
     }
 
-
     // Case 2.4: target is non-static member variable
     if (target->outerDecl && !target->TestAttr(AST::Attribute::STATIC)) {
         // following code is used in serveral places, should wrap into an API

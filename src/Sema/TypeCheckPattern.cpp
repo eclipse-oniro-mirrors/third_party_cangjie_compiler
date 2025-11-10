@@ -69,6 +69,7 @@ OwnedPtr<EnumPattern> VarOrEnumPatternToEnumPattern(ASTContext& ctx, const VarOr
     ep->constructor->end = vep.end;
     // Set symbol for LSP.
     ep->constructor->DisableAttr(Attribute::COMPILER_ADD);
+    ep->isInMacroCall = vep.isInMacroCall;
     if (vep.symbol) {
         auto nodeInfo = NodeInfo(*ep->constructor, vep.identifier, vep.symbol->scopeLevel, vep.symbol->scopeName);
         Collector::AddSymbol(ctx, nodeInfo, buildTrie);
@@ -625,6 +626,7 @@ bool TypeChecker::TypeCheckerImpl::ChkExceptTypePattern(
     }
     return Check(ctx, etp.ty, etp.pattern.get());
 }
+
 bool TypeChecker::TypeCheckerImpl::ChkHandlePatterns(ASTContext& ctx, Handler& h,
     std::vector<Ptr<Ty>>& included)
 {

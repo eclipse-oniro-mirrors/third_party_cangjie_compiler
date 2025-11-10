@@ -70,7 +70,6 @@ struct AnnoInfo {
         return mangledName != "none";
     }
 };
-
 } // namespace Cangjie::CHIR
 
 #endif

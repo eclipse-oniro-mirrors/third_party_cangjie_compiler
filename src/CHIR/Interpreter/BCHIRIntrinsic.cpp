@@ -24,7 +24,6 @@ using namespace Cangjie;
 using namespace CHIR;
 using namespace Interpreter;
 
-
 bool BCHIRInterpreter::InterpretIntrinsic0()
 {
     CJC_ASSERT(static_cast<OpCode>(bchir.Get(pc)) == OpCode::INTRINSIC0 ||
@@ -33,7 +32,6 @@ bool BCHIRInterpreter::InterpretIntrinsic0()
     auto opIdx = pc++;
     auto intrinsicKind = static_cast<IntrinsicKind>(bchir.Get(pc++));
     switch (intrinsicKind) {
-
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
         case RAW_ARRAY_REFEQ:
             [[fallthrough]];
@@ -41,7 +39,6 @@ bool BCHIRInterpreter::InterpretIntrinsic0()
         case OBJECT_REFEQ:
             InterpretRefEq();
             return false;
-
         default: {
             auto intrinsic = static_cast<size_t>(intrinsicKind);
             std::string concurrencyKeyword =
@@ -93,7 +90,6 @@ bool BCHIRInterpreter::InterpretIntrinsic1()
     }
 }
 
-
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
 void BCHIRInterpreter::InterpretCJCodeCanUseSIMD()
 {
@@ -119,7 +115,6 @@ void BCHIRInterpreter::InterpretCJCodeCanUseSIMD()
 }
 #endif
 
-
 bool BCHIRInterpreter::InterpretArrayGetIntrinsic(Bchir::ByteCodeIndex idx, bool indexCheck)
 {
     auto popIndex = interpStack.ArgsPop<IInt64>();
@@ -140,7 +135,6 @@ bool BCHIRInterpreter::InterpretArrayGet(
     return false;
 }
 
-
 void BCHIRInterpreter::InterpretRefEq()
 {
     auto v1 = interpStack.ArgsPopIVal();
@@ -155,4 +149,3 @@ void BCHIRInterpreter::InterpretRefEq()
     }
     interpStack.ArgsPush(IValUtils::PrimitiveValue<IBool>(temp));
 }
-

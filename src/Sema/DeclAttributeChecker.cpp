@@ -424,7 +424,6 @@ void DeclAttributeChecker::CheckGenericFuncDeclAttributes(const FuncDecl& fd) co
         diag.Diagnose(fd, DiagKind::sema_generic_in_operator_overload);
     }
 }
-
 #endif
 
 void DeclAttributeChecker::Check() const

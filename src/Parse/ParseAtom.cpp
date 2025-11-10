@@ -866,7 +866,6 @@ OwnedPtr<QuoteExpr> ParserImpl::ParseQuoteExpr()
     }
     skipNL = true;
     ret->end = lastToken.End();
-
     return ret;
 }
 

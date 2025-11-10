@@ -33,7 +33,6 @@ Ptr<Value> Translator::Visit(const AST::LambdaExpr& lambdaExpr)
     auto lambda = CreateAndAppendExpression<Lambda>(loc, funcTy, funcTy, currentBlock, true, mangledName, "$lambda");
     lambda->InitBody(*body);
 
-
     std::vector<DebugLocation> paramLoc;
     for (auto& astParam : lambdaExpr.funcBody->paramLists[0]->params) {
         paramLoc.emplace_back(TranslateLocationWithoutScope(builder.GetChirContext(), astParam->begin, astParam->end));

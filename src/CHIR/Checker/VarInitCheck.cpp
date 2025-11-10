@@ -52,7 +52,6 @@ void VarInitCheck::RunOnFunc(const Func* func)
     std::vector<MemberVarInfo> members;
     auto ctorInitInfo = std::make_unique<ConstructorInitInfo>();
     if (func->IsConstructor()) {
-
         auto customTypeDef = func->GetOuterDeclaredOrExtendedDef();
         CJC_NULLPTR_CHECK(customTypeDef);
         members = customTypeDef->GetAllInstanceVars();
@@ -62,7 +61,6 @@ void VarInitCheck::RunOnFunc(const Func* func)
             ctorInitInfo->localMemberNums = classDef->GetDirectInstanceVarNum();
             // We do a check here as class-Object does not have a super class.
             if (auto superClassDef = classDef->GetSuperClassDef(); superClassDef) {
-
                 ctorInitInfo->superClassDef = superClassDef;
                 ctorInitInfo->superMemberNums = members.size() - ctorInitInfo->localMemberNums;
             }

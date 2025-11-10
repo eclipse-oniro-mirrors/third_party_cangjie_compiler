@@ -6,8 +6,8 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "cangjie/Driver/Backend/Backend.h"
 #include "gtest/gtest.h"
+#include "cangjie/Driver/Backend/Backend.h"
 
 using namespace Cangjie;
 

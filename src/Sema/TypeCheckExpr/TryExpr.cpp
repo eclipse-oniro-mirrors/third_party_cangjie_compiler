@@ -62,6 +62,7 @@ Ptr<Ty> TypeChecker::TypeCheckerImpl::SynTryExpr(ASTContext& ctx, TryExpr& te)
     if (!te.resourceSpec.empty()) {
         return SynTryWithResourcesExpr(ctx, te);
     }
+
     bool isWellTyped;
     if (!te.handlers.empty() && te.tryLambda) {
         // For a try-handle expression, the try block has been replaced by a lambda,
@@ -119,6 +120,7 @@ std::optional<Ptr<Ty>> TypeChecker::TypeCheckerImpl::SynTryExprCatchesAndHandles
             jTy = tmpJTy;
         }
     }
+
     for (auto& handler : te.handlers) {
         if (!SynHandler(ctx, handler, jTy, te)) {
             isWellTyped = false;
@@ -307,6 +309,7 @@ bool TypeChecker::TypeCheckerImpl::ChkTryExprCatchPatterns(ASTContext& ctx, TryE
     }
     return true;
 }
+
 bool TypeChecker::TypeCheckerImpl::ChkTryExprHandlePatterns(ASTContext& ctx, TryExpr& te)
 {
     std::vector<Ptr<Ty>> included{};

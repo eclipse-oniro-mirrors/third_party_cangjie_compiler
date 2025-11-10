@@ -9,6 +9,7 @@
 #include "TypeCheckerImpl.h"
 
 #include "Desugar/AfterTypeCheck.h"
+#include "JoinAndMeet.h"
 #include "TypeCheckUtil.h"
 
 #include "cangjie/AST/Create.h"

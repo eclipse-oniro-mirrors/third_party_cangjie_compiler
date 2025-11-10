@@ -43,7 +43,6 @@ std::unordered_map<Bchir::ByteCodeIndex, IVal> BCHIRLinker::Run(
         const auto& bchir = packages[i];
         if constexpr (ForConstEval) {
             LinkAndInitGlobalVars(bchir, gvarId2InitIVal, i == packages.size() - 1);
-
         }
         if (bchir.GetMainMangledName() != "") {
             // always get the main from the most recent package
@@ -68,7 +67,6 @@ std::unordered_map<Bchir::ByteCodeIndex, IVal> BCHIRLinker::Run(
         // When running const-evaluation we initialize some variables manually instead of relying on linked BCHIR
         // to do that.
         GenerateCallsToConstInitFunctions(packages.back().initFuncsForConsts);
-
     }
 
     // End of top-level initialization
@@ -454,7 +452,6 @@ void BCHIRLinker::TraverseAndLink(const Bchir& bchir, const Bchir::Definition& c
                 topDef.Push(falseIdx);
                 break;
             }
-
             case OpCode::INTRINSIC1: {
                 topDef.Push(currentDef.Get(curr + 1));                  // intrinsic kind
                 auto oldTyIdx = currentDef.Get(curr + Bchir::FLAG_TWO); // type
@@ -465,7 +462,6 @@ void BCHIRLinker::TraverseAndLink(const Bchir& bchir, const Bchir::Definition& c
                 topDef.Push(newTyIdx);
                 break;
             }
-
             case OpCode::SYSCALL: {
                 auto nameId = stringMap[currentDef.Get(curr + 1)];
                 topDef.Push(nameId);
@@ -524,7 +520,6 @@ void BCHIRLinker::TraverseAndLink(const Bchir& bchir, const Bchir::Definition& c
                 topDef.Push(currentDef.Get(curr + Bchir::FLAG_FOUR) + offset); // jump target for when exception
                 break;
             }
-
             case OpCode::CAPPLY: {
                 auto argsSize = currentDef.Get(curr + 1);
                 topDef.Push(argsSize); // num of Args
@@ -564,7 +559,6 @@ void BCHIRLinker::TraverseAndLink(const Bchir& bchir, const Bchir::Definition& c
     }
 }
 
-
 Bchir::ByteCodeContent BCHIRLinker::FreshGVarId()
 {
     return gvarId++;
@@ -601,4 +595,3 @@ int BCHIRLinker::GetGVARId(const std::string& name) const
     }
     return -1;
 }
-

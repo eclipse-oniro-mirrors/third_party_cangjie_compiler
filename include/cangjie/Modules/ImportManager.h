@@ -355,6 +355,7 @@ private:
      * fileHash -> {declName, declSet}
      */
     std::map<uint64_t, std::map<std::string, AST::OrderedDeclSet>> fileImportedDeclsMap;
+
     /*
      * Store all used macro decls for each file in source package.
      * indexOfPackage -> {packageName, declSet}

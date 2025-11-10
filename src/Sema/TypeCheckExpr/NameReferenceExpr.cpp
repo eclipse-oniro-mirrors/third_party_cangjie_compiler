@@ -696,7 +696,6 @@ void TypeChecker::TypeCheckerImpl::InferStaticAccess(const ASTContext& ctx, Memb
             return;
         }
         ReplaceTarget(&ma, target);
-
         if (target && target->astKind == ASTKind::FUNC_DECL) {
             targets = std::vector<Ptr<Decl>>(ma.targets.begin(), ma.targets.end());
         }

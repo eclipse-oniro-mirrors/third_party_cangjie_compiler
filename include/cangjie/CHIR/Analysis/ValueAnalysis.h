@@ -1025,7 +1025,6 @@ private:
         }
     }
 
-
     template <typename TElemRef> AbstractObject* FindTargetElement(State<ValueDomain>& state, const TElemRef* elemRef)
     {
         auto loc = elemRef->GetLocation();
@@ -1408,7 +1407,6 @@ private:
             for (auto ty : tupleTy->GetElementTypes()) {
                 childrenTypes.emplace_back(ty->IsRef());
             }
-
         } else if (rootTy->GetTypeKind() == Type::TypeKind::TYPE_ENUM) {
             // We only focus the state of index of an enum. And its type is not a ref type.
             childrenTypes.emplace_back(false);

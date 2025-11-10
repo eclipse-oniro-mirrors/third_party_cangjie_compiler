@@ -89,7 +89,6 @@ void CHIR2BCHIR::TranslateOthersExpression(Context& ctx, const Expression& expr)
             PushOpCodeWithAnnotations(ctx, OpCode::VARRAY, expr, vArraySize);
             break;
         }
-
         case ExprKind::BOX: {
             CJC_ASSERT(expr.GetNumOfOperands() == 1);
             auto boxExpr = StaticCast<const Box*>(&expr);
@@ -271,5 +270,4 @@ void CHIR2BCHIR::TranslateApplyExpression(Context& ctx, const Apply& apply)
     }
     PushOpCodeWithAnnotations<false, true>(ctx, OpCode::APPLY, apply, static_cast<unsigned>(apply.GetNumOfOperands()));
 }
-
 

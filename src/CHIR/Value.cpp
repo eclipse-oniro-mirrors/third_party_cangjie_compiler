@@ -219,7 +219,6 @@ void Value::SetAnnoInfo(AnnoInfo&& info)
     annoInfo = std::move(info);
 }
 
-
 void Value::ClearUsersOnly()
 {
     users.clear();
@@ -1226,7 +1225,6 @@ std::vector<GenericType*> FuncBase::GetOriginalGenericTypeParams() const
 {
     return funcKind == LAMBDA ? originalLambdaInfo.genericTypeParams : GetGenericTypeParams();
 }
-
 
 Func::Func(Type* ty, const std::string& identifier, const std::string& srcCodeIdentifier,
     const std::string& rawMangledName, const std::string& packageName,

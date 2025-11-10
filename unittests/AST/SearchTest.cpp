@@ -1128,7 +1128,6 @@ enum E2<ABC> {
     | A22(ABC) | B
     func E11<EFG>(a: ABC) {}
     func kk(a:ABC) {}
-
 }
     )";
 

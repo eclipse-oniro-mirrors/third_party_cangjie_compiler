@@ -8,8 +8,6 @@
 
 #include "EmitExpressionIR.h"
 
-#include <cinttypes>
-
 #include "Base/CHIRExprWrapper.h"
 #include "Base/ExprDispatcher/ExprDispatcher.h"
 #include "CGModule.h"
@@ -96,7 +94,6 @@ void ExpressionGeneratorImpl::EmitIR()
                 }
                 break;
             default: {
-
                 CJC_ASSERT(false && "Should not reach here.");
                 break;
             }

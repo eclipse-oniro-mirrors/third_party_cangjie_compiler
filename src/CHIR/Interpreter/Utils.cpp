@@ -13,6 +13,7 @@
  */
 
 #include "cangjie/CHIR/Interpreter/Utils.h"
+
 #include <securec.h>
 #include "cangjie/CHIR/Interpreter/InterpreterValueUtils.h"
 
@@ -139,7 +140,6 @@ OpCode Interpreter::BinExprKindWitException2OpCode(Cangjie::CHIR::ExprKind exprK
             return OpCode::BIN_RSHIFT_EXC;
         case ExprKind::NEG:
             return OpCode::UN_NEG_EXC;
-
         default: {
             CJC_ASSERT(false);
             return OpCode::INVALID;

@@ -39,7 +39,6 @@ const unsigned TWO_INDENT = 2u;
 const unsigned THREE_INDENT = 3u;
 #define UNKNOWN_TY (ANSI_COLOR_RED + "unknown" + ANSI_COLOR_RESET)
 
-
 void PrintModifiers(const Decl& decl, unsigned indent)
 {
     std::string str = "Modifiers:";

@@ -98,7 +98,6 @@ std::string GetBlockStr(const Block& block, size_t indent)
             ss << res->GetIdentifier() << ": " << res->GetType()->ToString() << " = ";
         }
         ss << expr->ToString(indent + 1);
-
         ss << "\n";
     }
     return ss.str();
@@ -194,7 +193,6 @@ std::string GetLambdaStr(const Lambda& lambda, size_t indent)
     ss << "=> {";
     ss << " // ";
     ss << " srcCodeIdentifier: " << lambda.GetSrcCodeIdentifier();
-
     ss << GetGenericTypeParamsConstraintsStr(lambda.GetGenericTypeParams());
     ss << "\n" << GetBlockGroupStr(*lambda.GetBody(), indent + 1);
     ss << "}";
@@ -446,6 +444,7 @@ std::string BoolToString(bool flag)
         return "false";
     }
 }
+
 StringWrapper ThisTypeToString(const Type* thisType)
 {
     StringWrapper res;

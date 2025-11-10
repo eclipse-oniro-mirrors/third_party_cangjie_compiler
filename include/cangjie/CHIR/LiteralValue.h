@@ -11,7 +11,6 @@
 
 #include "cangjie/CHIR/Value.h"
 
-
 namespace Cangjie::CHIR {
 enum ConstantValueKind : uint8_t {
     KIND_BOOL,

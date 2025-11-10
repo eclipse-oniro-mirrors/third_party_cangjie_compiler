@@ -100,7 +100,6 @@ class A {
 // c2 rule 1
 
 main() {
-
 }
     )";
     Parser parser(code, diag, sm, {0, 1, 1}, true);

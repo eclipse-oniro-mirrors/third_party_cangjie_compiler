@@ -165,7 +165,6 @@ void MacroEvaluation::RunMacroSrv()
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     RuntimeInit::GetInstance().InitRuntime(
         ci->invocation.GetRuntimeLibPath(), ci->invocation.globalOptions.environment.allVariables);
-
 #endif
     // close unused pipe
     close(MacroProcMsger::GetInstance().pipefdP2C[1]);

@@ -73,7 +73,6 @@ public:
     static bool IsExpOverflow(int64_t x, uint64_t y, OverflowStrategy strategy, int64_t* res);
 
     /**
-
      * @brief Checks for overflow when typecasting an integer to another type.
      *
      * @tparam T The source data type.

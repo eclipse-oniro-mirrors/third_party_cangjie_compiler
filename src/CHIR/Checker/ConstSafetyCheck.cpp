@@ -24,7 +24,6 @@ void ConstSafetyCheck::RunOnPackage(const Package& package, size_t threadNum) co
     } else {
         Utils::TaskQueue taskQueue(threadNum);
         for (auto func : package.GetGlobalFuncs()) {
-
             taskQueue.AddTask<void>([this, func]() { return RunOnFunc(func); });
         }
         taskQueue.RunAndWaitForAllTasksCompleted();

@@ -2,11 +2,10 @@
 // This source file is part of the Cangjie project, licensed under Apache-2.0
 // with Runtime Library Exception.
 //
-// See https://cangjie-lang.cn/pages/LICENSE for license information.
+// See https://cangjie-lang.cn/pages/LICENSE for license information.#include <cstdio>
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include <cstdio>
 #include <fstream>
 #include <string>
 
@@ -537,7 +536,6 @@ TEST(UtilsTest, Float32ToFloat16)
     EXPECT_EQ(0b0000000000000000, Float32ToFloat16(5.9604e-8f));
 }
 
-
 TEST(UtilsTest, GetSizeDecl)
 {
     InvalidTy ty = InvalidTy();
@@ -637,7 +635,6 @@ TEST(UtilsTest, GetPkgNameFromRelativePath)
 
 TEST(UtilsTest, IsAbsolutePathAboveLengthLimit)
 {
-
 #ifdef _WIN32
     // 27 characters in the path
     EXPECT_FALSE(IsAbsolutePathAboveLengthLimit("C:/Windows/System32/cmd.exe"));

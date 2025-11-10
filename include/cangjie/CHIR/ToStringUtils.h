@@ -335,6 +335,7 @@ std::string CustomTypeKindToString(const CustomTypeDef& def);
  * @return A string representing the boolean value.
  */
 std::string BoolToString(bool flag);
+
 StringWrapper ThisTypeToString(const Type* thisType);
 std::string InstTypeArgsToString(const std::vector<Type*>& instTypeArgs);
 std::string ExprOperandsToString(const std::vector<Value*>& args);

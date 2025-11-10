@@ -148,7 +148,6 @@ public:
     // ===--------------------------------------------------------------------===//
     const AnnoInfo& GetAnnoInfo() const;
     void SetAnnoInfo(AnnoInfo&& info);
-
     
 protected:
     explicit Value(Type* ty, std::string identifier, ValueKind kind);
@@ -171,7 +170,6 @@ protected:
     std::vector<Expression*> users; // variable users
     std::mutex userMutex;           // mutex for AddUserOnly and RemoveUserOnly
     AnnoInfo annoInfo;              // annoInfo, used in struct/class/enum member func
-
 
 private:
     ValueKind GetValueKind() const;
@@ -347,7 +345,6 @@ enum FuncKind : uint8_t {
     MAIN_ENTRY,
     ANNOFACTORY_FUNC,
     MACRO_FUNC,
-
     DEFAULT_PARAMETER_FUNC,
     INSTANCEVAR_INIT, /**< These functions are related to initialization of class/struct's instance variables */
     FUNCKIND_END
@@ -366,7 +363,6 @@ struct AbstractMethodParam {
     std::string paramName;
     Type* type = nullptr;
     AnnoInfo annoInfo;
-
 
     std::string ToString();
 };
@@ -568,7 +564,6 @@ public:
     void SetOwnerFunc(Func* func);
 
     Expression* GetOwnerExpression() const;
-
 
     BlockGroup* Clone(CHIRBuilder& builder, Func& newFunc) const;
     BlockGroup* Clone(CHIRBuilder& builder, Lambda& newLambda) const;

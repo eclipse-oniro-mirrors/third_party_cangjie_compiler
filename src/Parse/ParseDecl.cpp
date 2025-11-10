@@ -1575,7 +1575,6 @@ OwnedPtr<StructBody> ParserImpl::ParseStructBody(StructDecl& sd)
             ret->decls.emplace_back(MakeOwned<InvalidDecl>(decl->begin));
             continue;
         }
-
         ret->decls.emplace_back(std::move(decl));
     }
     ret->rightCurlPos = lastToken.Begin();

@@ -15,7 +15,6 @@ Ptr<LiteralValue> Translator::TranslateLitConstant(const AST::LitConstExpr& expr
 {
     auto chirTyToTrans = TranslateType(realTy);
     switch (realTy.kind) {
-
         case AST::TypeKind::TYPE_FLOAT16:
         case AST::TypeKind::TYPE_FLOAT64:
         case AST::TypeKind::TYPE_IDEAL_FLOAT: {

@@ -96,7 +96,6 @@ void Translator::TranslateClassLikeDecl(ClassDef& classDef, const AST::ClassLike
     classDef.SetVarInitializationFunc(trans.TranslateVarsInit(decl));
 }
 
-
 void Translator::AddMemberVarDecl(CustomTypeDef& def, const AST::VarDecl& decl)
 {
     if (decl.TestAttr(AST::Attribute::PLATFORM)) {

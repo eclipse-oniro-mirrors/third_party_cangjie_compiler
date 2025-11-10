@@ -599,7 +599,6 @@ Ptr<Value> Translator::HandleTypePattern(const AST::TypePattern& typePattern, Pt
         // When pattern is always matched, do not return condition value.
         return nullptr;
     }
-
     auto targetTy = TranslateType(*typePattern.type->ty);
     queue.push(std::make_pair(typePattern.pattern.get(), value));
     if (typePattern.needRuntimeTypeCheck) {
@@ -610,7 +609,6 @@ Ptr<Value> Translator::HandleTypePattern(const AST::TypePattern& typePattern, Pt
         return expr->GetResult();
     }
 }
-
 
 void Translator::TranslateConditionMatches(const AST::MatchExpr& matchExpr, Ptr<Value> retVal)
 {

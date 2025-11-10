@@ -15,7 +15,6 @@ void UserCodeInfo::RecordInfo(const std::string& item, int64_t value)
     codeInfo.emplace_back(item, value);
 }
 
-
 std::string UserCodeInfo::GetJson() const
 {
     std::string output;
@@ -29,5 +28,4 @@ std::string UserCodeInfo::GetJson() const
     output += "\n}\n";
     return output;
 }
-
 } // namespace Cangjie

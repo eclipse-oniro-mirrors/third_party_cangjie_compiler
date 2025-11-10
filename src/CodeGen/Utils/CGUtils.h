@@ -99,7 +99,6 @@ inline std::string GetMangledNameOfCompilerAddedClass(const std::string& classNa
     return MANGLE_NESTED_PREFIX + MangleName(className) + "E";
 }
 
-
 const std::unordered_map<CHIR::ExprKind, std::string> OPERATOR_KIND_TO_OP_MAP = {
     {CHIR::ExprKind::ADD, "add"},
     {CHIR::ExprKind::SUB, "sub"},
@@ -144,7 +143,6 @@ inline bool HasNoUse(const llvm::Value& value)
 {
     return !value.hasNUsesOrMore(1);
 }
-
 
 inline const CHIR::Type* DeRef(const CHIR::Type& chirTy)
 {

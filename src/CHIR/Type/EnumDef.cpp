@@ -8,6 +8,7 @@
 
 #include "cangjie/CHIR/Type/EnumDef.h"
 
+#include <sstream>
 #include "cangjie/CHIR/CHIRCasting.h"
 #include "cangjie/CHIR/Expression/Terminator.h"
 #include "cangjie/CHIR/ToStringUtils.h"
@@ -88,7 +89,6 @@ void EnumDef::AddCtor(EnumCtorInfo ctor)
 {
     ctors.emplace_back(ctor);
 }
-
 
 std::vector<EnumCtorInfo> EnumDef::GetCtors() const
 {

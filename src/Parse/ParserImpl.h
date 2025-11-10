@@ -145,7 +145,6 @@ private:
     // should be set true, and set false while leaving.
     bool enableThis{false};
     bool deadlocked{false};
-
     bool inForeignBlock{false};
     bool enableCustomAnno{false}; // parse macrocall as custom annotation.
 
@@ -614,7 +613,6 @@ private:
     OwnedPtr<AST::FuncParam> ParseParamInParamList(
         const ScopeKind& scopeKind, Ptr<AST::FuncParam>& meetNamedParameter, Ptr<AST::FuncParam>& meetMemberParams);
     void ParseInterfaceDeclOrClassDeclGeneric(AST::InheritableDecl& ret);
-
     void SetDefaultFunc(ScopeKind scopeKind, AST::Decl& decl) const;
     void ParseCaseBody(AST::EnumDecl& enumDecl);
     void ParseEnumBody(AST::EnumDecl& enumDecl);

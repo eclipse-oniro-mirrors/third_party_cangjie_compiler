@@ -421,7 +421,6 @@ Type* CreateNewTypeWithArgs(Type& oldType, const std::vector<Type*>& newArgs, CH
             CJC_ASSERT(newArgs.size() == 1);
             newType = builder.GetType<VArrayType>(newArgs[0], StaticCast<const VArrayType&>(oldType).GetSize());
             break;
-
         case Type::TypeKind::TYPE_BOXTYPE:
             CJC_ASSERT(newArgs.size() == 1);
             newType = builder.GetType<BoxType>(newArgs[0]);

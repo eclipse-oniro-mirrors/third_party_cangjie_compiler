@@ -623,7 +623,6 @@ llvm::Value* GenerateTypeCast(IRBuilder2& irBuilder, const CHIRTypeCastWrapper& 
     }
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-
     if (srcType->IsPointerType(1) && targetType->IsPointerType(1)) {
         return srcValue;
     }

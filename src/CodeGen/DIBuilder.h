@@ -79,7 +79,6 @@ private:
     Position curLocation = {0, 0};
     llvm::DIScope* curScope{nullptr};
     std::vector<const CHIR::Type*> recursiveChains;
-
     std::map<const std::vector<int>, llvm::DIScope*> lexicalBlocks;
     llvm::DenseMap<const CHIR::Type*, llvm::TrackingMDRef> typeCache;
     llvm::DenseMap<const CHIR::Type*, llvm::TrackingMDRef> enumCtorCache;
@@ -89,7 +88,6 @@ private:
     llvm::DIScope* GetOrCreateLexicalScope(
         const CHIR::DebugLocation& position, llvm::BasicBlock& currentBB, std::vector<int>& scopeInfo);
     llvm::DILocation* HandleDefaultParamLocation(const CHIRExprWrapper& chirNode, llvm::DIScope* scope);
-
     llvm::DIFile* GetOrCreateFile(const CHIR::DebugLocation& position);
     llvm::DIType* GetOrCreateType(const CHIR::Type& ty, bool isReadOnly = false);
     void CreateParameter(const CHIR::Debug& debugNode, llvm::BasicBlock& curBB, bool pointerWrapper);

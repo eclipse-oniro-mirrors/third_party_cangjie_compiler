@@ -147,7 +147,6 @@ std::pair<bool, std::vector<size_t>> TupleNeedBox(const Tuple& tuple)
         return retVal;
     }
     auto operands = tuple.GetOperands();
-
     auto indexExpr = StaticCast<Constant*>(StaticCast<LocalVar*>(operands[0])->GetExpr());
     size_t index = 0;
     if (indexExpr->IsBoolLit()) {

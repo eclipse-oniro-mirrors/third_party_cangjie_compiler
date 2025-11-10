@@ -414,7 +414,6 @@ public:
     /**
      * @brief Creates annotation information for a function parameter.
      *
-
      * @param astParam The AST function parameter.
      * @param chirParam The CHIR parameter.
      * @param parent The custom type definition.
@@ -456,7 +455,6 @@ public:
     Value* GetWrapperFuncFromMemberAccess(Type& thisType, const std::string funcName,
         FuncType& instFuncType, bool isStatic, std::vector<Type*>& funcInstTypeArgs);
     
-
     void SetCompileTimeValue(bool val)
     {
         isCompileTimeValue = val;
@@ -774,7 +772,6 @@ private:
     Ptr<Value> Visit(const AST::SpawnExpr& spawnExpr);
     Ptr<Value> Visit(const AST::StructDecl& decl);
     Ptr<Value> Visit(const AST::SubscriptExpr& subscriptExpr);
-
     Ptr<Value> Visit(const AST::ThrowExpr& throwExpr);
     Ptr<Value> Visit(const AST::TryExpr& tryExpr);
     Ptr<Value> Visit(const AST::TupleLit& tuple);
@@ -927,7 +924,6 @@ private:
     std::pair<Value*, Type*> TranslateStructOrClassCtorCallCommon(const AST::CallExpr& expr);
     Value* TranslateStructOrClassCtorCall(const AST::CallExpr& expr);
     // ==================== func args===============
-
     static bool IsOptimizableTy(Ptr<AST::Ty> ty);
     static bool IsOptimizableEnumTy(Ptr<AST::Ty> ty);
     static uint64_t GetJumpablePatternVal(const AST::Pattern& pattern);
@@ -995,7 +991,6 @@ private:
     Type* GetSelectorType(const AST::EnumTy& ty) const;
     Ptr<Value> HandleTypePattern(const AST::TypePattern& typePattern, Ptr<Value> value,
         std::queue<std::pair<Ptr<const AST::Pattern>, Ptr<Value>>>& queue);
-
     Ptr<Value> HandleConstPattern(
         const AST::ConstPattern& constPattern, Ptr<Value> value, const DebugLocation& originLoc);
     // ========= helper functions for translating match as table ==========
@@ -1072,7 +1067,6 @@ private:
 
     Ptr<LocalVar> CreateGetElementRefWithPath(const DebugLocation& loc, Ptr<Value> lhsBase,
         const std::vector<std::string>& path, Ptr<Block> block, const CustomType& customType);
-
 
     /// Create a typecast or some equivalent expressions that represent a typecast.
     TypeCast* CreateWrappedTypeCast(Type* ty, Value* operand, Block* parent)

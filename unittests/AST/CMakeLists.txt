@@ -9,9 +9,9 @@
 include_directories(${CMAKE_SOURCE_DIR}/src/Sema)
 include_directories(${CMAKE_SOURCE_DIR}/src/AST)
 
-add_executable(WalkerTests WalkerTest.cpp)
+add_executable(WalkerTest WalkerTest.cpp)
 target_link_libraries(
-    WalkerTests
+    WalkerTest
     ${CMAKE_DL_LIBS}
     cangjie-lsp
     GTest::gtest

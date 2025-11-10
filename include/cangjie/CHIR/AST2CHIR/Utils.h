@@ -118,7 +118,6 @@ bool IsSrcCodeImportedGlobalDecl(const AST::Decl& decl, const GlobalOptions& opt
 bool IsSymbolImportedDecl(const AST::Decl& decl, const GlobalOptions& opts);
 
 /**
-
  * @brief Checks if a function is local.
  *
  * @param func The function declaration.
@@ -166,7 +165,6 @@ bool IsOverflowOperator(const std::string& name);
  * @return True if the type can be an integer type, false otherwise.
  */
 bool CanBeIntegerType(const Type& type);
-
 /**
  * @brief Adjusts the type of a variable initialization.
  *

@@ -72,7 +72,6 @@ public:
         void Push(Bchir::ByteCodeContent value);
         /** @brief push a 8 bytes value */
         void Push8bytes(uint64_t value);
-
         /** @brief sets value at index in the bytecode. */
         void Set(ByteCodeIndex index, Bchir::ByteCodeContent value);
         /** @brief sets opcode at index in the bytecode. */
@@ -91,7 +90,6 @@ public:
             return bytecode[static_cast<size_t>(index)] +
                 (static_cast<uint64_t>(bytecode[static_cast<size_t>(index) + 1]) << byteCodeContentWidth);
         }
-
         /** @brief get size of bytecode */
         size_t Size() const;
         /** @brief next available index (same as Size, but returns ByteCodeIndex). */
@@ -106,7 +104,6 @@ public:
         ByteCodeContent GetNumLVars() const;
         /** @brief set number of arguments */
         void SetNumArgs(ByteCodeContent num);
-
 
         // Annotations
 
@@ -223,7 +220,6 @@ public:
     /** @brief get linkedByteCode */
     const Definition& GetLinkedByteCode() const;
 
-
     /** @brief get value at index from linkedByteCode */
     inline ByteCodeContent Get(ByteCodeIndex index) const
     {
@@ -251,7 +247,6 @@ public:
 
     /** @brief get types section */
     const std::vector<Cangjie::CHIR::Type*>& GetTypes() const;
-
 
     /** @brief Adds a new type to the types section and returns its index. */
     size_t AddType(Cangjie::CHIR::Type& ty);

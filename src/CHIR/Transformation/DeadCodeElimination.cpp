@@ -1024,7 +1024,6 @@ void DeadCodeElimination::PrintUnreachableBlockWarning(
     }
 }
 
-
 bool DeadCodeElimination::CheckUselessExpr(const Expression& expr, bool isReportWarning) const
 {
     if (expr.GetResult() && !expr.GetResult()->GetUsers().empty()) {

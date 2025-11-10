@@ -315,7 +315,6 @@ std::vector<OwnedPtr<MatchCase>> MockSupportManager::GenerateHandlerMatchCases(
     auto handlerRetTy = typeManager.GetAnyTy();
     auto optionFuncRetTy = typeManager.GetEnumTy(*mockUtils->optionDecl, { handlerRetTy });
 
-
     std::vector<OwnedPtr<MatchCase>> handlerResultCases;
     auto handlerResultPattern = MakeOwned<EnumPattern>();
     auto handlerResultPatternConstructor = LookupEnumMember(
@@ -750,7 +749,6 @@ OwnedPtr<FuncDecl> MockSupportManager::GenerateErasedFuncAccessor(FuncDecl& meth
 {
     auto outerClassDecl = As<ASTKind::CLASS_DECL>(methodDecl.outerDecl);
     CJC_ASSERT(outerClassDecl);
-
 
     OwnedPtr<FuncDecl> methodAccessor = ASTCloner::Clone(Ptr(&methodDecl));
     mockUtils->AddGenericIfNeeded(methodDecl, *methodAccessor);

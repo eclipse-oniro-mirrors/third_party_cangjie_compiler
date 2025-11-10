@@ -588,7 +588,6 @@ Ptr<Decl> GIM::GenericInstantiationManagerImpl::GetInstantiatedDeclWithGenericIn
     }
     // Collect extend decls by usage.
     RecordExtend(*instantiatedDecl);
-
     Walker(instantiatedDecl, instantiationWalkerID, instantiator, contextReset).Walk();
     return instantiatedDecl;
 }

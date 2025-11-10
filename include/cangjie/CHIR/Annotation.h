@@ -95,7 +95,6 @@ private:
     bool need = true;
 };
 
-
 struct DebugLocationInfoForWarning : public Annotation {
 public:
     explicit DebugLocationInfoForWarning() = default;
@@ -149,7 +148,6 @@ private:
     Cangjie::Linkage linkType;
 };
 
-
 struct WrappedRawMethod : public Annotation {
 public:
     explicit WrappedRawMethod() = default;
@@ -182,7 +180,6 @@ private:
 enum class SkipKind : uint8_t {
     NO_SKIP,
     SKIP_DCE_WARNING,
-
     SKIP_FORIN_EXIT,
     SKIP_VIC,
 };
@@ -284,7 +281,6 @@ public:
 private:
     bool flag{false};
 };
-
 
 struct EnumCaseIndex : public Annotation {
 public:
@@ -438,6 +434,5 @@ private:
     // DebugLocation is a specialised field for better performance, since most expression/value/decl/type has one.
     DebugLocation loc{};
 };
-
 } // namespace Cangjie::CHIR
 #endif

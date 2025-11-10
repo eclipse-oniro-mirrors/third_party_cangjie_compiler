@@ -259,7 +259,6 @@ Ptr<JsonObject> GetJsonObject(Ptr<JsonObject> root, const std::string& key, cons
     return nullptr;
 }
 
-
 void ClearAnnoInfoOfDepPkg(ImportManager& importManager)
 {
     auto clearAnno = [](Ptr<Node> node) {
@@ -281,6 +280,7 @@ void ClearAnnoInfoOfDepPkg(ImportManager& importManager)
         Walker(depPkg, clearAnno).Walk();
     }
 }
+
 void MarkTargetAsExternalWeak(Ptr<Node> node)
 {
     if (!node) {
@@ -378,7 +378,6 @@ void APILevelAnnoChecker::ParseJsonFile(const std::vector<uint8_t>& in) noexcept
         }
     }
     intersectionSet = lastSyscap.value();
-
 }
 
 void APILevelAnnoChecker::ParseOption() noexcept

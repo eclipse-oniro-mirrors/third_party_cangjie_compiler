@@ -3,8 +3,9 @@
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 #include "TypeCheckerImpl.h"
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "TypeCheckUtil.h"
 
@@ -99,7 +100,6 @@ OwnedPtr<Expr> TypeChecker::TypeCheckerImpl::ConstructOptionMatch(OwnedPtr<Expr>
     matchExpr->matchCases.emplace_back(std::move(wildMatchCase));
     return matchExpr;
 }
-
 
 /**
  * Desugar for Binary expression for ??(coalescing).

@@ -90,6 +90,7 @@ void UpdateInstanceAttr(VTableType& vtable)
         }
     }
 }
+
 void UpdateFuncInfo(VirtualFuncInfo& oldItem, const VirtualFuncInfo& newItem)
 {
     auto originalFuncType = oldItem.typeInfo.originalType;

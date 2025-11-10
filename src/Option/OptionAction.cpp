@@ -795,7 +795,6 @@ std::unordered_map<Options::ID, std::function<bool(GlobalOptions&, OptionArgInst
         if (arg.value == "hotreload") {
             opts.outputMode = GlobalOptions::OutputMode::SHARED_LIB;
             opts.enableHotReload = true;
-
             opts.linkStaticStd = false; // waiting for hotreload's bugfix
         } else {
             CJC_ASSERT(OUTPUT_MODE_MAP.count(arg.value) != 0);

@@ -109,7 +109,6 @@ private:
 
     // =============== Functions for Unreachable Block Elimination =============== //
     bool CheckUselessBlock(const Block& block) const;
-
     void BreakBranchConnection(const Block& block) const;
     void ClearUnreachableMarkBlockForFunc(const BlockGroup& body) const;
     void UnreachableBlockEliminationForFunc(const BlockGroup& body, bool isDebug) const;

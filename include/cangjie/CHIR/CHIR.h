@@ -153,7 +153,6 @@ private:
     bool RunVarInitChecking();
     bool RunConstantPropagationAndSafetyCheck();
     bool RunConstantPropagation();
-
     void RunRangePropagation();
     bool RunNativeFFIChecks();
     void RunArrayListConstStartOpt();
@@ -176,7 +175,6 @@ private:
     void RunConstantAnalysis();
     // run semantic checks that have to be performed on CHIR
     bool RunAnnotationChecks();
-
     void EraseDebugExpr();
     void CFFIFuncWrapper();
     void RemoveUnusedImports(bool removeSrcCodeImported);

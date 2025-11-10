@@ -298,7 +298,6 @@ void StructInheritanceChecker::Check()
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     auto sortedExtends = GetAllNeedCheckExtended();
     extendDecls.insert(extendDecls.end(), sortedExtends.cbegin(), sortedExtends.cend());
-
 #endif
 
     for (auto decl : structDecls) {
@@ -1056,7 +1055,6 @@ void StructInheritanceChecker::CheckInheritanceAttributes(const MemberSignature&
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
         if ((!parentDecl->TestAttr(Attribute::OPEN) && notInInterface) || TestManager::IsDeclOpenToMock(*parentDecl)) {
             DiagCannotOverride(diag, child, *parentDecl);
-
 #endif
         } else if (child.TestAttr(Attribute::ABSTRACT) && notInInterface) {
             diag.Diagnose(child, DiagKind::sema_invalid_override_member_in_class, type, child.identifier.Val(), type);
@@ -1100,7 +1098,6 @@ void StructInheritanceChecker::DiagnoseForOverriddenMember(const MemberSignature
     std::string type = DeclKindToString(*childDecl);
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     if (childDecl->TestAttr(Attribute::OVERRIDE)) {
-
 #endif
         diag.Diagnose(*childDecl, DiagKind::sema_missing_overridden_func, type, childDecl->identifier.Val(), type);
     } else if (childDecl->TestAttr(Attribute::REDEF) && childDecl->TestAttr(Attribute::STATIC)) {

@@ -84,5 +84,4 @@ TEST_F(MangleTypeTest, RefTypes)
     // construct a RefType of Int8
     auto refTy = builder.GetType<RefType>(int8Ty);
     EXPECT_EQ(MangleType(*refTy), "a");
-
 }

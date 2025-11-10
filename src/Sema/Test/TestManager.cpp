@@ -363,6 +363,7 @@ void TestManager::PrepareDecls(Package& pkg)
         if (!node->curFile) {
             return VisitAction::WALK_CHILDREN;
         }
+
         if (!ShouldPrepareDecl(*node, pkg)) {
             return VisitAction::SKIP_CHILDREN;
         }

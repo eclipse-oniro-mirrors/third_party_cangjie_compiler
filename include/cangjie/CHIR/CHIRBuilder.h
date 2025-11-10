@@ -219,7 +219,6 @@ public:
         static_assert(std::is_base_of_v<Terminator, TExpr>);
         TExpr* expr = new TExpr(std::forward<Args>(args)...);
         this->allocatedExprs.push_back(expr);
-
         return expr;
     }
 

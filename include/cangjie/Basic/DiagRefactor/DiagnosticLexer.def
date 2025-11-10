@@ -4,8 +4,6 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
-
 ERROR(lex_diag_begin, "lex_diag_begin")
 ERROR(lex_unknown_start_of_token, "unknown start of token: %s", "unknown start of token: %s")
 ERROR(lex_unexpected_digit, "unexpected digit '%s' in %s", "unexpected digit", {

@@ -686,7 +686,6 @@ AnnoInfo CustomTypeDef::GetAnnoInfo() const
     return annoInfo;
 }
 
-
 std::vector<ClassType*> CustomTypeDef::GetImplementedInterfaceTys() const
 {
     return implementedInterfaceTys;

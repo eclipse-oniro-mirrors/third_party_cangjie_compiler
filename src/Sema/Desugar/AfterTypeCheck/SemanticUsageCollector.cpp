@@ -394,7 +394,6 @@ SemanticInfo GetSemanticUsage(TypeManager& typeManager, const std::vector<Ptr<Pa
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     SemanticUsageCollector collector(typeManager, pkgs);
     return collector.CollectInfoUsages();
-
 #endif
 }
 } // namespace Cangjie::Sema::Desugar::AfterTypeCheck

@@ -15,7 +15,6 @@
 
 namespace Cangjie {
 
-
 std::string UserTimer::GetJson() const
 {
     auto [result, _] = GetDataAndOrder();
@@ -37,7 +36,6 @@ std::string UserTimer::GetJson() const
     output += "\n}\n";
     return output;
 }
-
 
 void UserTimer::Start(const std::string& title, const std::string& subtitle, const std::string& desc)
 {

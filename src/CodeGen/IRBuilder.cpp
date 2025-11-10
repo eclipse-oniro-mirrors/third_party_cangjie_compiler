@@ -508,7 +508,6 @@ llvm::Value* IRBuilder2::CallIntrinsicRef2Null(llvm::Value* value)
 {
     return value;
 }
-
 #endif
 
 llvm::Value* IRBuilder2::CallClassIntrinsicInstanceOf(

@@ -6,7 +6,7 @@
 
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-add_executable(TypeCheckerTest TypeCheckerTest.cpp)
+add_executable(TypeCheckerTest TypeCheckerTest.cpp ${CANGJIE_SRC_OBJECTS})
 target_link_libraries(
     TypeCheckerTest
     cangjie-lsp
@@ -27,6 +27,7 @@ target_link_libraries(
     GTest::gtest_main
     TestCompilerInstanceObject)
 add_test(NAME GenericTest COMMAND GenericTest)
+
 add_executable(CommentsTest CommentsTest.cpp)
 target_link_libraries(
     CommentsTest

@@ -79,7 +79,6 @@ static const std::string FIELD_NAME_TO_STORE_OBJ_TO_SPY = "objectToSpyOn";
 static const std::string PARAMETER_TO_MATCH_RETURN_ENTRY = "value";
 static const std::string PARAMETER_TO_MATCH_THROW_ENTRY = "e";
 
-
 // This map describes the correspondance between accessor kind in the compiler code
 // and accessor kind in the unittest library code
 static const std::map<AccessorKind, std::string> ACCESSOR_KINDS = {
@@ -1338,6 +1337,7 @@ OwnedPtr<Expr> MockManager::GetMockedObjectHandler(OwnedPtr<RefExpr> objRef, con
 
     auto handlerRetTy = typeManager.GetAnyTy();
     auto optionFuncRetTy = typeManager.GetEnumTy(*mockUtils->optionDecl, { handlerRetTy });
+
     auto noneRef = CreateRefExpr(
         *Sema::Desugar::AfterTypeCheck::LookupEnumMember(mockUtils->optionDecl, OPTION_NONE_CTOR));
     noneRef->ty = optionFuncRetTy;
@@ -1430,6 +1430,7 @@ OwnedPtr<LambdaExpr> MockManager::GenerateCallHandlerLambda(
     funcTypeParamRef->ref.target = funcTypeParam.get();
     funcTypeParamRef->ty = funcTypeParam->ty;
     funcTypeParamRef->curFile = injectTo.curFile;
+
     std::vector<OwnedPtr<FuncParam>> handlerCallParams {};
     if (isMethod) {
         handlerCallParams.emplace_back(std::move(funcParamObj));
@@ -1602,6 +1603,7 @@ void MockManager::HandleMockAnnotatedLambdaValue(Expr& expr)
 void MockManager::HandleMockAnnotatedLambdaWithCall(CallExpr& callExpr)
 {
     auto target = callExpr.resolvedFunction;
+
     bool isInInterfaceWithDefault =
         target->outerDecl && target->outerDecl->astKind == ASTKind::INTERFACE_DECL &&
         target->TestAttr(Attribute::DEFAULT);

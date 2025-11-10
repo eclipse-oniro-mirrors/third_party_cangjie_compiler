@@ -328,7 +328,6 @@ struct InterpreterStack {
         std::swap(argStack[(argStack.size() - offsetFromEnd) + i], argStack[(argStack.size() - offsetFromEnd) + j]);
     }
 
-
     const ControlState& CtrlTop() const
     {
         return controlStack.back();
@@ -355,7 +354,6 @@ struct InterpreterStack {
     {
         return controlStack.empty();
     }
-
 
     const std::vector<ControlState>& GetCtrlStack() const
     {

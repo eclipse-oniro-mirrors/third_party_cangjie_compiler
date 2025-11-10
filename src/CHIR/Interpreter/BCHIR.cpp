@@ -37,7 +37,6 @@ void Bchir::Definition::Push8bytes(uint64_t value)
 }
 
 
-
 void Bchir::Definition::Set(ByteCodeIndex index, Bchir::ByteCodeContent value)
 {
     CJC_ASSERT(index < bytecode.size());
@@ -60,7 +59,6 @@ void Bchir::Definition::Resize(size_t newSize)
     CJC_ASSERT(newSize > bytecode.size());
     bytecode.resize(newSize);
 }
-
 
 Bchir::ByteCodeIndex Bchir::Definition::NextIndex() const
 {
@@ -87,7 +85,6 @@ void Bchir::Definition::SetNumArgs(ByteCodeContent num)
 {
     this->numArgs = num;
 }
-
 
 const Bchir::Definition& Bchir::GetLinkedByteCode() const
 {
@@ -138,7 +135,6 @@ Bchir::Definition::GetCodePositionsAnnotations() const
     return codePositionsAnnotations;
 }
 
-
 const std::string& Bchir::GetString(size_t index) const
 {
     return strings[index];
@@ -171,7 +167,6 @@ const std::vector<Cangjie::CHIR::Type*>& Bchir::GetTypes() const
 {
     return types;
 }
-
 
 const Cangjie::CHIR::Type* Bchir::GetTypeAt(size_t idx) const
 {
@@ -259,7 +254,6 @@ const std::vector<std::string>& Bchir::GetFileNames() const
     return fileNames;
 }
 
-
 size_t Bchir::AddFileName(const std::string& name)
 {
     auto idx = fileNames.size();
@@ -291,7 +285,6 @@ const std::string& Bchir::GetGlobalInitFunc() const
 {
     return globalInitFunc;
 }
-
 
 void Bchir::AddSClass(const std::string& mangledName, SClassInfo&& classInfo)
 {
@@ -340,7 +333,6 @@ bool Bchir::ClassExists(ByteCodeContent id) const
     return classTable.find(id) != classTable.end();
 }
 
-
 Bchir::ByteCodeIndex Bchir::GetClassFinalizer(ByteCodeContent classId)
 {
     auto classIt = classTable.find(classId);
@@ -367,7 +359,6 @@ void Bchir::RemoveClass(const std::string& name)
 {
     sClassTable.erase(name);
 }
-
 
 void Bchir::Set(ByteCodeIndex index, Bchir::ByteCodeContent value)
 {

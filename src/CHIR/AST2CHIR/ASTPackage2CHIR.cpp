@@ -167,14 +167,12 @@ void AST2CHIR::CollectDeclsFromExtendDecl(AST::ExtendDecl& extendDecl)
 
 void AST2CHIR::CollectDeclsFromClassLikeDecl(AST::ClassLikeDecl& classLikeDecl)
 {
-
     auto& bodyDecls = classLikeDecl.GetMemberDecls();
     for (auto& member : bodyDecls) {
         // Skip the non-static member variable declaration
         if (member->astKind == AST::ASTKind::VAR_DECL && !member.get()->TestAttr(AST::Attribute::STATIC)) {
             continue;
         }
-
         CollectMemberDecl(*member);
     }
 }
@@ -1091,6 +1089,7 @@ void AST2CHIR::CacheCustomTypeDefToGlobalSymbolTable()
     for (auto decl : importedGenericInstantiatedNominalDecls) {
         CreateCustomTypeDef(*decl, false);
     }
+
     for (auto decl : annoOnlyDecls) {
         if (Is<AST::InheritableDecl>(decl)) {
             CreatePseudoDefForAnnoOnlyDecl(*decl);

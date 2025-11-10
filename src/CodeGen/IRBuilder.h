@@ -262,7 +262,6 @@ public:
     }
 
     llvm::Value* CallIntrinsicRef2Null(llvm::Value* value);
-
     llvm::Value* CreateStringLiteral(const std::string& str);
 
     void CallArrayInit(

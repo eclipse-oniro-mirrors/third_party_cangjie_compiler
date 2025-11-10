@@ -844,6 +844,7 @@ TPatternOffset ASTWriter::ASTWriterImpl::SaveExceptTypePattern(const ExceptTypeP
     dbuilder.add_patterns(patternsIdx);
     return dbuilder.Finish();
 }
+
 TPatternOffset ASTWriter::ASTWriterImpl::SaveCommandTypePattern(const CommandTypePattern& ctp)
 {
     auto pIdx = SavePattern(*ctp.pattern);

@@ -36,7 +36,6 @@ public:
 
     int GetGVARId(const std::string& name) const;
 
-
 private:
     Bchir& topBchir;
     Bchir::Definition& topDef;
@@ -57,7 +56,6 @@ private:
     Bchir::ByteCodeContent classId{0};
     std::unordered_map<std::string, Bchir::ByteCodeContent> mName2ClassId;
 
-
     Bchir::ByteCodeContent methodId{0};
     std::unordered_map<std::string, Bchir::ByteCodeContent> mName2MethodId;
 
@@ -66,7 +64,6 @@ private:
 
     void LinkClasses(const Bchir& bchir);
     void LinkClass(const Bchir& bchir, const std::string& mangledName);
-
     void LinkAndInitGlobalVars(
         const Bchir& bchir, std::unordered_map<Bchir::ByteCodeIndex, IVal>& gvarId2InitIVal, bool isLast);
     /** @brief Generates a dummy function that simply aborts interpretation. */

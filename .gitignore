@@ -72,5 +72,3 @@ libs/std/ast/decode.cj
 
 # vscode
 .VSCodeCounter/
-
-third_party/libxml2-2.14.0/

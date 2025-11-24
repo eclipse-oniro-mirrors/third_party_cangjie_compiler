@@ -1005,7 +1005,7 @@ llvm::DIType* DIBuilder::CreateGenericClassType(const CHIR::ClassType& classTy)
     auto inheritType = createInheritance(fwdDecl, superDiType, 0u, 0u, llvm::DINode::FlagZero);
     elements.push_back(inheritType);
     CreateInheritedInterface(elements, fwdDecl, classTy);
-    CreateCustomTypeMember(classDef->GetDirectInstanceVars(), elements, fwdDecl, diFile);
+    CreateCustomTypeMember(classDef->GetDirectInstanceVars(), elements, fwdDecl, diFile, std::vector<CHIR::Type*>());
     CreateMethodType(*classDef, elements, fwdDecl);
     CreateGetGenericFunc(classTy, fwdDecl, elements);
     replaceArrays(fwdDecl, getOrCreateArray(elements));
@@ -1030,20 +1030,21 @@ llvm::DIType* DIBuilder::CreateCapturedVars(const CHIR::ClassType& classTy)
     return fwdDecl;
 }
 
-void DIBuilder::CreateCustomTypeMember(std::vector<CHIR::MemberVarInfo> members, CodeGenDIVector16& elements,
-    llvm::DICompositeType* fwdDecl, llvm::DIFile* diFile)
+void DIBuilder::CreateCustomTypeMember(const std::vector<CHIR::MemberVarInfo> members, CodeGenDIVector16& elements,
+    llvm::DICompositeType* fwdDecl, llvm::DIFile* diFile, const std::vector<CHIR::Type*> instMemberTys)
 {
+    CJC_ASSERT(members.size() == instMemberTys.size() || instMemberTys.empty());
     auto memberType = CreateTypeInfoMember(fwdDecl, diFile);
     elements.push_back(memberType);
     uint64_t offset = 0;
-    for (auto& it : members) {
-        auto elementTy = it.type;
-        auto elemType = GetOrCreateType(*elementTy);
+    for (size_t idx = 0; idx < members.size(); idx++) {
+        auto elementTy = members[idx].type;
+        auto elemType = !instMemberTys.empty() ? GetOrCreateType(*instMemberTys[idx]) : GetOrCreateType(*elementTy);
         auto bitInSize = GetSizeInBits(elemType);
         offset += bitInSize;
         auto align = 0u;
-        memberType = createMemberType(fwdDecl, it.name, diFile, it.loc.GetBeginPos().line, bitInSize,
-            static_cast<uint32_t>(align), offset, llvm::DINode::FlagZero, elemType);
+        memberType = createMemberType(fwdDecl, members[idx].name, diFile, members[idx].loc.GetBeginPos().line,
+            bitInSize, static_cast<uint32_t>(align), offset, llvm::DINode::FlagZero, elemType);
         elements.push_back(memberType);
     }
 }
@@ -1080,7 +1081,8 @@ llvm::DIType* DIBuilder::CreateStructType(const CHIR::StructType& structTy, cons
         typeCache[&structTy] = llvm::TrackingMDRef(fwdDecl);
         CodeGenDIVector16 elements;
         CreateInheritedInterface(elements, fwdDecl, structTy);
-        CreateCustomTypeMember(structDef->GetAllInstanceVars(), elements, fwdDecl, diFile);
+        CreateCustomTypeMember(structDef->GetAllInstanceVars(), elements, fwdDecl, diFile,
+            const_cast<CHIR::StructType&>(structTy).GetInstantiatedMemberTys(cgMod.GetCGContext().GetCHIRBuilder()));
         CreateMethodType(*structDef, elements, fwdDecl);
         CreateGetGenericFunc(structTy, fwdDecl, elements);
         replaceArrays(fwdDecl, getOrCreateArray(elements));

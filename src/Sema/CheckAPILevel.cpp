@@ -433,6 +433,9 @@ APILevelAnnoInfo APILevelAnnoChecker::Parse(const Decl& decl)
         }
         for (size_t i = 0; i < anno->args.size(); ++i) {
             std::string argName = anno->args[i]->name.Val();
+            // To support old APILevel definition thart construct param are
+            // 'level: Int8, atomicservice!: Bool = false, ...'.
+            argName = argName.empty() ? LEVEL_IDENTGIFIER : argName;
             if (parseNameParam.count(argName) <= 0) {
                 continue;
             }

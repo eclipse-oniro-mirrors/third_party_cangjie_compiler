@@ -72,3 +72,4 @@ libs/std/ast/decode.cj
 
 # vscode
 .VSCodeCounter/
+third_party/tinytoml

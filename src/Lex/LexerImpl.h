@@ -302,8 +302,6 @@ private:
         // @! is added after TokenKind::IDENTIFIER
         auto atExclIndex = static_cast<unsigned char>(TokenKind::AT_EXCL);
         tokenMap[TOKENS[atExclIndex]] = static_cast<TokenKind>(atExclIndex);
-        auto dcIndex = static_cast<unsigned char>(TokenKind::DOUBLE_COLON);
-        tokenMap[TOKENS[dcIndex]] = static_cast<TokenKind>(dcIndex);
         tokenMap["true"] = TokenKind::BOOL_LITERAL;
         tokenMap["false"] = TokenKind::BOOL_LITERAL;
     }

@@ -120,7 +120,7 @@ private:
     void CreateStructMemberType(const CHIR::StructType& structTy, llvm::Type* cgType, CodeGenDIVector16& elements,
         llvm::DICompositeType* fwdDecl, const CHIR::Type* boxTy);
     void CreateCustomTypeMember(std::vector<CHIR::MemberVarInfo> members, CodeGenDIVector16& elements,
-        llvm::DICompositeType* fwdDecl, llvm::DIFile* diFile, const std::vector<CHIR::Type*> instMemberTys);
+        llvm::DICompositeType* fwdDecl, llvm::DIFile* diFile);
     void CreateGetGenericFunc(
         const CHIR::CustomType& customTy, llvm::DICompositeType* fwdDecl, CodeGenDIVector16& elements);
     llvm::DIType* CreateEnumType(const CHIR::EnumType& enumTy, const CHIR::Type* boxTy);

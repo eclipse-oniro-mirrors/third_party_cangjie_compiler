@@ -8,7 +8,7 @@
 
 cmake_minimum_required(VERSION 3.16.5)
 project(cangjie)
-set(CJ_SDK_VERSION "1.1.0-beta.4")
+set(CJ_SDK_VERSION "1.1.0-beta.1")
 # Add path for custom CMake modules and add cmake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
@@ -346,15 +346,6 @@ if(CANGJIE_CODEGEN_CJNATIVE_BACKEND)
                 runtime/lib/${TARGET_TRIPLE_DIRECTORY_PREFIX}_${CJNATIVE_BACKEND}${SANITIZER_SUBPATH} # LIBRARY includes shared libraries except DLLs.
     )
     install(TARGETS boundscheck-static DESTINATION lib/${TARGET_TRIPLE_DIRECTORY_PREFIX}_${CJNATIVE_BACKEND}${SANITIZER_SUBPATH})
-    set(LIB_FOLDER_NAME lib)
-    if(WIN32)
-        set(LIB_FOLDER_NAME bin)
-    endif()
-    install(
-        FILES ${CMAKE_BINARY_DIR}/${LIB_FOLDER_NAME}/libboundscheck${CMAKE_SHARED_LIBRARY_SUFFIX}
-        DESTINATION runtime/lib/${TARGET_TRIPLE_DIRECTORY_PREFIX}_${CJNATIVE_BACKEND}${SANITIZER_SUBPATH}
-        RENAME libsecurec${CMAKE_SHARED_LIBRARY_SUFFIX}
-    )
     if(WIN32 AND CANGJIE_BUILD_CJDB)
         install(TARGETS boundscheck RUNTIME DESTINATION third_party/llvm/bin)
     endif()

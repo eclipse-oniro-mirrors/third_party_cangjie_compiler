@@ -17,7 +17,7 @@
 #endif
 #include <functional>
 #include <cassert>
-
+#include <cstdint>
 
 namespace Cangjie {
 

@@ -48,6 +48,7 @@ enum class CGIntrinsicKind {
     SYNC,
     MATH,
     STACK_TRACE,
+    THREAD_INFO,
     IDENTITY_HASHCODE,
     FUTURE,
     NET,
@@ -146,6 +147,14 @@ inline bool IsStackTraceIntrinsic(const CHIR::IntrinsicKind intrinsicKind)
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     return intrinsicKind == CHIR::IntrinsicKind::FILL_IN_STACK_TRACE ||
         intrinsicKind == CHIR::IntrinsicKind::DECODE_STACK_TRACE;
+#endif
+}
+
+inline bool IsThreadInfoIntrinsic(const CHIR::IntrinsicKind intrinsicKind)
+{
+#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
+    return intrinsicKind == CHIR::IntrinsicKind::DUMP_CURRENT_THREAD_INFO ||
+        intrinsicKind == CHIR::IntrinsicKind::DUMP_ALL_THREADS_INFO;
 #endif
 }
 

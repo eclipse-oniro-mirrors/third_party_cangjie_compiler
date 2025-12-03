@@ -16,6 +16,7 @@
 #define CANGJIE_BASIC_POSITION_H
 
 #include <string>
+#include <cstdint>
 
 namespace Cangjie {
 enum class PositionStatus {

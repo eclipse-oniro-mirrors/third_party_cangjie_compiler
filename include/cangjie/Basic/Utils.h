@@ -17,6 +17,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 
 namespace Cangjie::Utils {
 

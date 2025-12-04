@@ -371,15 +371,15 @@ size_t GetPositionalParamSize(const FuncDecl& fd)
     return params.size() - namedSize;
 }
 
-size_t GetInitializedlParamSize(const FuncDecl& fd)
+size_t GetInitializedlNameParamSize(const FuncDecl& fd)
 {
     CJC_ASSERT(fd.funcBody && !fd.funcBody->paramLists.empty());
     auto& params = fd.funcBody->paramLists.front()->params;
     size_t result = 0;
     for (auto iter = params.crbegin(); iter < params.crend(); ++iter) {
         CJC_NULLPTR_CHECK(*iter);
-        if ((*iter)->isNamedParam && (*iter)->TestAttr(Attribute::HAS_INITIAL)) {
-            result++;
+        if ((*iter)->isNamedParam) {
+            result += (*iter)->TestAttr(Attribute::HAS_INITIAL);
         } else {
             break;
         }
@@ -1816,7 +1816,7 @@ void TypeChecker::TypeCheckerImpl::FilterIncompatibleCandidatesForCall(
         return;
     }
 
-    size_t initializedParamSize = GetInitializedlParamSize(*badFd);
+    size_t initializedParamSize = GetInitializedlNameParamSize(*badFd);
     size_t paramsSize = badFd->funcBody->paramLists.front()->params.size();
     if ((ce.args.size() >= paramsSize - initializedParamSize) && (ce.args.size() <= paramsSize)) {
         CheckArgsWithParamName(ce, *badFd);

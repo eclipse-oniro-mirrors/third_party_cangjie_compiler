@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 ERROR(parse_query_diag_begin, "")
 // Query parser diagnostic info.
 ERROR(parse_query_expected_position_compare_operator, "expected '= or < or <='")

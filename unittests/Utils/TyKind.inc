@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 DEFINE_TY(AST::ArrayTy, AST::TypeKind::TYPE_ARRAY);
 DEFINE_TY(AST::PointerTy, AST::TypeKind::TYPE_POINTER);
 DEFINE_TY(AST::CStringTy, AST::TypeKind::TYPE_CSTRING);

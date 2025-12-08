@@ -83,6 +83,11 @@ void TestManager::ReportDoesntSupportMocking(
         MOCK_ON_COMPILATION_OPTION);
 }
 
+void TestManager::ReportDoesntSupportFrozen(const Expr& reportOn)
+{
+    diag.DiagnoseRefactor(DiagKindRefactor::sema_mock_frozen_unsupported, reportOn);
+}
+
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
 void TestManager::ReportFrozenRequired(const FuncDecl& reportOn)
 {
@@ -107,6 +112,12 @@ void TestManager::ReportMockDisabled(const Expr& reportOn)
 
 void TestManager::ReportWrongStaticDecl(const Expr& reportOn)
 {
+    if (auto lambda = DynamicCast<LambdaExpr>(&reportOn)) {
+        // excluding @EnsurePreparedToMock itself from error position
+        diag.DiagnoseRefactor(
+            DiagKindRefactor::sema_mock_wrong_static_decl, MakeRange(lambda->funcBody->body->leftCurlPos, lambda->end));
+        return;
+    }
     diag.DiagnoseRefactor(
         DiagKindRefactor::sema_mock_wrong_static_decl, reportOn);
 }
@@ -249,6 +260,11 @@ VisitAction TestManager::HandleMockAnnotatedLambda(const LambdaExpr& lambda)
         (lastExprTarget->outerDecl && lastExprTarget->outerDecl->TestAttr(Attribute::PRIVATE))
     ) {
         ReportWrongStaticDecl(lambda);
+        return VisitAction::WALK_CHILDREN;
+    }
+
+    if (auto funcDecl = As<ASTKind::FUNC_DECL>(lastExprTarget); funcDecl && funcDecl->isFrozen) {
+        ReportDoesntSupportFrozen(lambda);
         return VisitAction::WALK_CHILDREN;
     }
 
@@ -503,10 +519,10 @@ void TestManager::ReplaceCallsWithAccessors(Package& pkg)
 
     bool isInConstructor = false;
     bool isInMockAnnotatedLambda = false;
-    Ptr<Decl> outerClassLike;
+    Ptr<Ty> outerTy;
 
     Walker(&pkg, Walker::GetNextWalkerID(),
-        [this, &isInConstructor, &isInMockAnnotatedLambda, &outerClassLike, &pkg](const Ptr<Node> node) {
+        [this, &isInConstructor, &isInMockAnnotatedLambda, &outerTy, &pkg](const Ptr<Node> node) {
         if (node->astKind == ASTKind::PRIMARY_CTOR_DECL) {
             // Primary init has been already desugared to regular init
             return VisitAction::SKIP_CHILDREN;
@@ -516,9 +532,12 @@ void TestManager::ReplaceCallsWithAccessors(Package& pkg)
             isInMockAnnotatedLambda = true;
         }
 
-        if (auto classLikeDecl = DynamicCast<ClassLikeDecl>(node)) {
-            CJC_ASSERT(!outerClassLike);
-            outerClassLike = classLikeDecl;
+        if (auto inheritableDecl = DynamicCast<InheritableDecl>(node)) {
+            CJC_ASSERT(!outerTy);
+            outerTy = inheritableDecl->ty;
+        } else if (auto extendDecl = DynamicCast<ExtendDecl>(node)) {
+            CJC_ASSERT(!outerTy);
+            outerTy = extendDecl->extendedType->ty;
         }
 
         if ((node->curFile && !node->IsSamePackage(pkg))) {
@@ -541,20 +560,23 @@ void TestManager::ReplaceCallsWithAccessors(Package& pkg)
 
         if (auto expr = As<ASTKind::EXPR>(node); expr) {
             mockSupportManager->ReplaceExprWithAccessor(*expr, isInConstructor);
-            mockSupportManager->ReplaceInterfaceDefaultFunc(*expr, outerClassLike, isInMockAnnotatedLambda);
+            mockSupportManager->ReplaceInterfaceDefaultFunc(*expr, outerTy, isInMockAnnotatedLambda);
         }
 
         return VisitAction::WALK_CHILDREN;
-    }, [&isInConstructor, &isInMockAnnotatedLambda, &outerClassLike](const Ptr<Node> node) {
+    }, [&isInConstructor, &isInMockAnnotatedLambda, &outerTy](const Ptr<Node> node) {
         if (node->TestAttr(Attribute::CONSTRUCTOR)) {
             isInConstructor = false;
         }
         if (IsMockAnnotedLambda(node)) {
             isInMockAnnotatedLambda = false;
         }
-        if (auto classLikeDecl = DynamicCast<ClassLikeDecl>(node)) {
-            CJC_ASSERT(outerClassLike == classLikeDecl);
-            outerClassLike = nullptr;
+        if (auto inheritableDecl = DynamicCast<InheritableDecl>(node)) {
+            CJC_ASSERT(outerTy == inheritableDecl->ty);
+            outerTy = nullptr;
+        } else if (auto extendDecl = DynamicCast<ExtendDecl>(node)) {
+            CJC_ASSERT(outerTy == extendDecl->extendedType->ty);
+            outerTy = nullptr;
         }
         return VisitAction::KEEP_DECISION;
     }).Walk();
@@ -667,6 +689,29 @@ void TestManager::HandleDeclsToExportForTest(std::vector<Ptr<Package>> pkgs) con
     }
 }
 
+void TestManager::CollectInternalDeclUsages(Package& pkg)
+{
+    Walker(&pkg, Walker::GetNextWalkerID(), [&pkg, this](auto node) {
+        Ptr<Decl> target;
+        if (auto ma = As<ASTKind::MEMBER_ACCESS>(node); ma) {
+            target = ma->target;
+        }
+        if (auto re = As<ASTKind::REF_EXPR>(node); re) {
+            target = re->ref.target;
+        }
+        if (!target) {
+            return VisitAction::WALK_CHILDREN;
+        }
+        if (target->fullPackageName != pkg.fullPackageName) {
+            return VisitAction::WALK_CHILDREN;
+        }
+        if (MockUtils::IsMockAccessorRequired(*target) && target->linkage == Linkage::INTERNAL) {
+            mockSupportManager->WriteUsedInternalDecl(*target);
+        }
+        return VisitAction::WALK_CHILDREN;
+    }).Walk();
+}
+
 bool TestManager::ShouldBeMarkedAsContainingMockCreationCall(
     const CallExpr& callExpr, const Ptr<FuncDecl> enclosingFunc) const
 {
@@ -691,16 +736,12 @@ bool TestManager::ShouldBeMarkedAsContainingMockCreationCall(
 
 void TestManager::MarkDeclsForTestIfNeeded(std::vector<Ptr<Package>> pkgs) const
 {
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     HandleDeclsToExportForTest(pkgs);
-#endif
     for (auto& pkg : pkgs) {
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
         MarkMockCreationContainingGenericFuncs(*pkg);
         if (mockMode != MockMode::ON && (!mockCompatibleIfNeeded || !IsThereMockUsage(*pkg))) {
             continue;
         }
-#endif
 
         Walker(pkg, Walker::GetNextWalkerID(), [](auto node) {
             MockSupportManager::MarkNodeMockSupportedIfNeeded(*node);
@@ -790,6 +831,7 @@ void TestManager::PreparePackageForTestIfNeeded(Package& pkg)
 
         mockUtils->SetGetTypeForTypeParamDecl(pkg);
         mockUtils->SetIsSubtypeTypes(pkg);
+        CollectInternalDeclUsages(pkg);
         GenerateAccessors(pkg);
         PrepareToSpy(pkg);
         PrepareDecls(pkg);

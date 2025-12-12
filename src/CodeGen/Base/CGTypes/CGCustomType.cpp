@@ -46,7 +46,7 @@ std::vector<llvm::Constant*> CGCustomType::GenTypeInfoConstantVectorForTypes(
 }
 
 llvm::Constant* CGCustomType::GenTypeInfoArray(
-    CGModule& cgMod, std::string name, std::vector<llvm::Constant*> constants)
+    CGModule& cgMod, std::string name, std::vector<llvm::Constant*> constants, const std::string_view& attr)
 {
     auto p0i8 = llvm::Type::getInt8PtrTy(cgMod.GetLLVMContext());
     if (constants.empty()) {
@@ -59,7 +59,7 @@ llvm::Constant* CGCustomType::GenTypeInfoArray(
         llvm::cast<llvm::GlobalVariable>(cgMod.GetLLVMModule()->getOrInsertGlobal(name, typeOfFieldsGV));
     typeInfoOfFields->setInitializer(llvm::ConstantArray::get(typeOfFieldsGV, constants));
     typeInfoOfFields->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
-    typeInfoOfFields->addAttribute(CJTI_FIELDS_ATTR);
+    typeInfoOfFields->addAttribute(attr);
     return llvm::ConstantExpr::getBitCast(typeInfoOfFields, p0i8);
 }
 
@@ -75,7 +75,7 @@ llvm::Constant* CGCustomType::GenFieldsOfTypeInfo()
         (void)fieldConstants.insert(fieldConstants.begin(), CGType::GetInt64CGType(cgMod)->GetOrCreateTypeInfo());
         (void)fieldConstants.insert(fieldConstants.begin(), CGType::GetInt64CGType(cgMod)->GetOrCreateTypeInfo());
     }
-    return GenTypeInfoArray(cgMod, CGType::GetNameOfTypeInfoGV(chirType) + ".fields", fieldConstants);
+    return GenTypeInfoArray(cgMod, CGType::GetNameOfTypeInfoGV(chirType) + ".fields", fieldConstants, CJTI_FIELDS_ATTR);
 }
 
 llvm::Constant* CGCustomType::GenOffsetsArray(CGModule& cgMod, std::string name, llvm::StructType* layoutType)
@@ -164,8 +164,15 @@ llvm::Constant* CGCustomType::GenNameOfTypeTemplate()
     auto& customType = static_cast<const CHIR::CustomType&>(chirType);
     auto customDefShortName = CHIR::GetCustomTypeIdentifier(customType);
     auto customDef = customType.GetCustomTypeDef();
-    return cgMod.GenerateTypeNameConstantString(
-        (chirType.IsAutoEnvBase() ? "" : (customDef->GetPackageName() + ":")) + customDefShortName, false);
+    // to ensure compatibility, when dealing with scenarios involving package name containing organization name,
+    // we need to generate names as follows:
+    // "orgName::pkgName:xxx.ti.name" = "orgName/pkgName:xxx.ti"
+    // oldPrefix is "orgName::pkgName" and newPrefix is "orgName/pkgName"
+    auto packageName = customDef->GetPackageName();
+    auto oldPrefix = (chirType.IsAutoEnvBase() ? "" : (packageName + ":"));
+    ReplaceDelimiterAfterOrgName(packageName);
+    auto newPrefix = (chirType.IsAutoEnvBase() ? "" : (packageName + ":"));
+    return cgMod.GenerateTypeNameConstantString(oldPrefix + customDefShortName, false, newPrefix + customDefShortName);
 }
 
 llvm::Constant* CGCustomType::GenFieldsNumOfTypeTemplate()

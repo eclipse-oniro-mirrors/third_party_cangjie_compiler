@@ -123,6 +123,119 @@ inline bool CanExecute(const std::string& path)
     }
     return false;
 }
+
+#ifdef _WIN32
+bool RemoveDirRecursivelyInternal(const std::wstring& dirPath)
+{
+    WIN32_FIND_DATAW findData;
+    std::wstring searchPath = dirPath;
+    if (!searchPath.empty() && searchPath.back() != L'\\' && searchPath.back() != L'/') {
+        searchPath += L'\\';
+    }
+    searchPath += L"*";
+    HANDLE handle = FindFirstFileW(searchPath.c_str(), &findData);
+    if (handle == INVALID_HANDLE_VALUE) {
+        return RemoveDirectoryW(dirPath.c_str()) != 0;
+    }
+    auto closeHandle = [&handle]() {
+        if (handle != INVALID_HANDLE_VALUE) {
+            FindClose(handle);
+            handle = INVALID_HANDLE_VALUE;
+        }
+    };
+    do {
+        std::wstring name(findData.cFileName);
+        if (name == L"." || name == L"..") {
+            continue;
+        }
+        std::wstring childPath = dirPath;
+        if (!childPath.empty() && childPath.back() != L'\\' && childPath.back() != L'/') {
+            childPath += L'\\';
+        }
+        childPath += name;
+        bool isDirectory = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+        bool isReparse = (findData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+
+        if (isReparse) {
+            bool removed = isDirectory ? (RemoveDirectoryW(childPath.c_str()) != 0)
+                                       : (DeleteFileW(childPath.c_str()) != 0);
+            if (!removed) {
+                closeHandle();
+                return false;
+            }
+            continue;
+        }
+
+        if (isDirectory) {
+            if (!RemoveDirRecursivelyInternal(childPath)) {
+                closeHandle();
+                return false;
+            }
+        } else {
+            if ((findData.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0) {
+                SetFileAttributesW(childPath.c_str(), findData.dwFileAttributes & ~FILE_ATTRIBUTE_READONLY);
+            }
+            if (!DeleteFileW(childPath.c_str())) {
+                closeHandle();
+                return false;
+            }
+        }
+    } while (FindNextFileW(handle, &findData));
+    closeHandle();
+    DWORD attr = GetFileAttributesW(dirPath.c_str());
+    if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY) != 0) {
+        SetFileAttributesW(dirPath.c_str(), attr & ~FILE_ATTRIBUTE_READONLY);
+    }
+    return RemoveDirectoryW(dirPath.c_str()) != 0;
+}
+
+bool RemoveDirRecursively(const std::string& dirPath)
+{
+    std::optional<std::wstring> widePath = StringConvertor::StringToWString(dirPath);
+    if (!widePath.has_value()) {
+        return false;
+    }
+    return RemoveDirRecursivelyInternal(widePath.value());
+}
+#else
+bool RemoveDirRecursively(const std::string& dirPath)
+{
+    DIR* dir = opendir(dirPath.c_str());
+    if (dir == nullptr) {
+        return rmdir(dirPath.c_str()) == 0;
+    }
+    struct dirent* entry = nullptr;
+    bool ok = true;
+    while ((entry = readdir(dir)) != nullptr) {
+        std::string name(entry->d_name);
+        if (name == "." || name == "..") {
+            continue;
+        }
+        std::string childPath = JoinPath(dirPath, name);
+        struct stat st {};
+        if (lstat(childPath.c_str(), &st) != 0) {
+            ok = false;
+            break;
+        }
+        if (S_ISDIR(st.st_mode)) {
+            if (!RemoveDirRecursively(childPath)) {
+                ok = false;
+                break;
+            }
+        } else {
+            if (unlink(childPath.c_str()) != 0) {
+                ok = false;
+                break;
+            }
+        }
+    }
+    closedir(dir);
+    if (!ok) {
+        return false;
+    }
+    return rmdir(dirPath.c_str()) == 0;
+}
+#endif
 } // namespace
 
 bool IsSlash(char c)
@@ -388,6 +501,49 @@ bool Remove(const std::string& itemPath)
         return false;
     }
     return remove(itemPath.c_str()) == 0;
+#endif
+}
+
+bool RemoveDirectoryRecursively(const std::string& dirPath)
+{
+    if (dirPath.empty()) {
+        return false;
+    }
+#ifdef _WIN32
+    DWORD attr = GetFileAttributesA(dirPath.c_str());
+    if (attr == INVALID_FILE_ATTRIBUTES) {
+        return false;
+    }
+    if ((attr & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+        std::optional<std::wstring> widePath = StringConvertor::StringToWString(dirPath);
+        if (!widePath.has_value()) {
+            return false;
+        }
+        if ((attr & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+            DWORD dirAttr = GetFileAttributesW(widePath.value().c_str());
+            if (dirAttr != INVALID_FILE_ATTRIBUTES && (dirAttr & FILE_ATTRIBUTE_READONLY) != 0) {
+                SetFileAttributesW(widePath.value().c_str(), dirAttr & ~FILE_ATTRIBUTE_READONLY);
+            }
+            return RemoveDirectoryW(widePath.value().c_str()) != 0;
+        }
+        return DeleteFileA(dirPath.c_str()) != 0;
+    }
+    if ((attr & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+        return false;
+    }
+    return RemoveDirRecursively(dirPath);
+#else
+    struct stat st {};
+    if (lstat(dirPath.c_str(), &st) != 0) {
+        return false;
+    }
+    if (S_ISLNK(st.st_mode)) {
+        return unlink(dirPath.c_str()) == 0;
+    }
+    if (!S_ISDIR(st.st_mode)) {
+        return false;
+    }
+    return RemoveDirRecursively(dirPath);
 #endif
 }
 
@@ -1127,11 +1283,12 @@ std::string FindSerializationFile(
     const std::string& fullPackageName, const std::string& suffix, const std::vector<std::string>& searchPaths)
 {
     auto names = Utils::SplitQualifiedName(fullPackageName);
-    auto fileName = ToCjoFileName(names.front()) + DIR_SEPARATOR + fullPackageName;
-    auto filePath = FileUtil::FindFileByName(fileName + suffix, searchPaths, true).value_or("");
+    auto packageName = ToCjoFileName(fullPackageName);
+    auto fileName = ToCjoFileName(names.front()) + DIR_SEPARATOR + packageName;
+    auto filePath = FindFileByName(fileName + suffix, searchPaths, true).value_or("");
     if (filePath.empty()) {
         // TEMPORARILY, find file in direct path.
-        return FileUtil::FindFileByName(fullPackageName + suffix, searchPaths, true).value_or("");
+        return FindFileByName(packageName + suffix, searchPaths, true).value_or("");
     }
     return filePath;
 }
@@ -1218,32 +1375,22 @@ void HideFile(const std::string& path)
 
 std::string ToCjoFileName(std::string_view fullPackageName)
 {
-    std::string ret{};
-    size_t i{0};
-    for (; i < fullPackageName.size(); ++i) {
-        // replace first :: with # as organization name separator
-        if (fullPackageName[i] == ':' && i + 1 < fullPackageName.size() && fullPackageName[i + 1] == ':') {
-            ret += ORG_NAME_SEPARATOR;
-            i += strlen(TOKENS[static_cast<int>(TokenKind::DOUBLE_COLON)]);
-            break;
-        }
-        if (fullPackageName[i] == '.') {
-            break;
-        }
-        ret.push_back(fullPackageName[i]);
+    auto dc = TOKENS[static_cast<int>(TokenKind::DOUBLE_COLON)];
+    constexpr std::string::difference_type dcSize = 2;
+    if (auto it = fullPackageName.find(dc); it != std::string::npos) {
+        // packageName@orgName
+        return std::string{fullPackageName.substr(it + dcSize)} + std::string{ORG_NAME_SEPARATOR}
+            + std::string{fullPackageName.substr(0, it)};
     }
-    if (i < fullPackageName.size()) {
-        ret.insert(ret.end(), fullPackageName.begin() + i, fullPackageName.end());
-    }
-    return ret;
+    return std::string{fullPackageName};
 }
 
 std::string ToPackageName(std::string_view cjoName)
 {
     auto it = cjoName.find(ORG_NAME_SEPARATOR);
     if (it != std::string::npos) {
-        return std::string{cjoName.substr(0, it)} + TOKENS[static_cast<int>(TokenKind::DOUBLE_COLON)] +
-            std::string{cjoName.substr(it + 1)};
+        return std::string{cjoName.substr(it + 1)} + TOKENS[static_cast<int>(TokenKind::DOUBLE_COLON)] +
+            std::string{cjoName.substr(0, it)};
     }
     return std::string{cjoName};
 }

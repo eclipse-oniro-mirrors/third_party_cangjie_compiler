@@ -287,7 +287,8 @@ std::vector<OwnedPtr<ImportSpec>> ASTLoader::ASTLoaderImpl::LoadImportSpecs(cons
 
         LoadImportContent(importSpec->content, *rawImportSpec);
         LoadNodePos(*rawImportSpec, *importSpec);
-
+        // By default, 'withImplicitExport()' will return true.
+        importSpec->withImplicitExport = rawImportSpec->withImplicitExport();
         importSpecsVec.emplace_back(std::move(importSpec));
     }
     return importSpecsVec;
@@ -434,6 +435,13 @@ OwnedPtr<AST::Package> ASTLoader::ASTLoaderImpl::PreLoadImportedPackageNode()
         std::string importItem = package->imports()->Get(i)->str();
         importedFullPackageNames.emplace_back(importItem);
     }
+    if (package->allDependentStdPkgs()) {
+        uoffset_t nDepStdPkgs = package->allDependentStdPkgs()->size();
+        for (uoffset_t i = 0; i < nDepStdPkgs; i++) {
+            std::string depStdPkg = package->allDependentStdPkgs()->Get(i)->str();
+            packageNode->AddDependentStdPkg(depStdPkg);
+        }
+    }
     return packageNode;
 }
 
@@ -525,7 +533,10 @@ void ASTLoader::ASTLoaderImpl::AddDeclToImportedPackage(Decl& decl)
  */
 Ptr<Decl> ASTLoader::ASTLoaderImpl::GetDeclFromIndex(const PackageFormat::FullId* fullId)
 {
-    CJC_NULLPTR_CHECK(fullId);
+    // New field of FullId type, it may be empty when read old version cjo.
+    if (!fullId) {
+        return nullptr;
+    }
     auto pkgIndex = fullId->pkgId();
     if (pkgIndex == INVALID_PACKAGE_INDEX) {
         return nullptr;

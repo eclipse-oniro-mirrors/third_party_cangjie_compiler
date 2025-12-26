@@ -88,7 +88,6 @@ const std::unordered_map<std::string, Environment> STRING_ENVIRONMENT_MAP = {
 const std::unordered_map<Environment, std::string> ENVIRONMENT_STRING_MAP = {
     {Environment::OHOS, "ohos"},
     {Environment::GNU, "gnu"},
-    {Environment::GNU, "mingw32"},
     {Environment::ANDROID, "android"},
     {Environment::SIMULATOR, "simulator"}, 
     {Environment::NOT_AVAILABLE, ""},
@@ -319,7 +318,7 @@ bool ParseAndCheckConditionVar(
     std::string& id, std::unordered_map<std::string, std::string>& res, DiagnosticEngine& diag)
 {
     if (id.size() > std::string("``").size() && id[0] == '`') {
-        id.substr(1, id.size() - std::string("``").size()); // parse raw id
+        id = id.substr(1, id.size() - std::string("``").size()); // parse raw id
     }
     Unicode::NFC(id);
     if (BUILTIN_CONDITION.find(id) != BUILTIN_CONDITION.end()) {
@@ -877,10 +876,11 @@ std::unordered_map<Options::ID, std::function<bool(GlobalOptions&, OptionArgInst
     }},
     { Options::ID::DEBUG_CODEGEN, OPTION_TRUE_ACTION(opts.codegenDebugMode = true) },
     { Options::ID::CHIR_OPT_DEBUG, OPTION_TRUE_ACTION(opts.chirDebugOptimizer = true) },
-    { Options::ID::DUMP_CHIR_DEBUG, [](GlobalOptions& opts, [[maybe_unused]] const OptionArgInstance& arg) {
-        opts.chirDumpDebugMode = true;
-        return true;
-    }},
+    { Options::ID::DUMP_AST, OPTION_TRUE_ACTION(opts.dumpAST = true)},
+    { Options::ID::DUMP_CHIR, OPTION_TRUE_ACTION(opts.dumpCHIR = true)},
+    { Options::ID::DUMP_IR, OPTION_TRUE_ACTION(opts.dumpIR = true)},
+    { Options::ID::DUMP_ALL, OPTION_TRUE_ACTION(opts.dumpAll = true)},
+    { Options::ID::DUMP_TO_SCREEN, OPTION_TRUE_ACTION(opts.dumpToScreen = true)},
     { Options::ID::EMIT_CHIR, [](GlobalOptions& opts, [[maybe_unused]] const OptionArgInstance& arg) {
         if (arg.value.empty()) {
             opts.emitCHIRPhase = GlobalOptions::CandidateEmitCHIRPhase::OPT;
@@ -1011,6 +1011,16 @@ std::string Triple::Info::EnvironmentToString() const
         if (env == Environment::ANDROID) {
             return search->second + apiLevel;
         }
+        return search->second;
+    } else {
+        return "";
+    }
+}
+
+// conditionalCompilation doesn't need android + api level
+std::string Triple::Info::EnvironmentToSimpleString() const
+{
+    if (auto search = ENVIRONMENT_STRING_MAP.find(env); search != ENVIRONMENT_STRING_MAP.end()) {
         return search->second;
     } else {
         return "";

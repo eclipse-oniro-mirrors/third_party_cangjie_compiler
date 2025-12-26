@@ -280,18 +280,6 @@ bool CjoManager::NeedCollectDependency(std::string curName, bool isCurMacro, std
         return false;
     }
 
-    auto pkgInfo = impl->GetPackageInfo(depName);
-    if (!pkgInfo) {
-        // This common dependency was not imported in current platform part, so it need to be add manually
-        auto cjoPath = GetPackageCjoPath(depName);
-        if (!cjoPath || !LoadPackageHeader(depName, *cjoPath)) {
-            DiagnosticBuilder builder = GetDiag().DiagnoseRefactor(DiagKindRefactor::package_search_error,
-                DEFAULT_POSITION, depName);
-            builder.AddHelp(DiagHelp(Modules::NO_CJO_HELP_INFO));
-            return false;
-        }
-    }
-
     // If current is macro package, only load decls for dependent macro package,
     // otherwise, load decls for all dependent package (macro package was filtered before).
     // NOTE: non-macro package's will never be used through macro package.
@@ -565,7 +553,8 @@ std::pair<std::string, std::string> CjoManager::GetPackageCjo(const AST::ImportS
             found != impl->GetCjoFileCacheMap().end()) {
             cjoPath = cjoName; // Set dummy path for cached cjo data.
         } else {
-            cjoPath = FileUtil::FindSerializationFile(cjoName, SERIALIZED_FILE_EXTENSION, GetSearchPath());
+            cjoPath = FileUtil::FindSerializationFile(FileUtil::ToPackageName(cjoName),
+                SERIALIZED_FILE_EXTENSION, GetSearchPath());
         }
         if (!cjoPath.empty()) {
             break;
@@ -590,20 +579,21 @@ std::vector<std::string> CjoManager::GetPossibleCjoNames(const ImportSpec& impor
     std::string name;
     std::string_view dot = TOKENS[static_cast<int>(TokenKind::DOT)];
     bool needDc{import.content.hasDoubleColon};
-    for (size_t i{0}; i < import.content.prefixPaths.size(); ++i) {
+    for (size_t i{needDc ? 1UL : 0UL}; i < import.content.prefixPaths.size(); ++i) {
         name += import.content.prefixPaths[i];
-        if (i == import.content.prefixPaths.size() - 1) {
-            break;
-        }
-        if (i == 0 && needDc) {
-            name += ORG_NAME_SEPARATOR;
-            needDc = false;
-        } else {
+        if (i != import.content.prefixPaths.size() - 1) {
             name += dot;
         }
+        needDc = false;
     }
+    auto appendOrg = [&import](const std::string& name) {
+        if (import.content.hasDoubleColon) {
+            return name + std::string{ORG_NAME_SEPARATOR} + import.content.prefixPaths[0];
+        }
+        return name;
+    };
     if (import.content.kind == ImportKind::IMPORT_ALL) {
-        return {std::move(name)};
+        return {appendOrg(name)};
     }
     if (auto it = GetPackageNameByImport(import); !it.empty()) {
         return {FileUtil::ToCjoFileName(it)};
@@ -611,10 +601,10 @@ std::vector<std::string> CjoManager::GetPossibleCjoNames(const ImportSpec& impor
     // if needDc, this import must be of from a::b
     // in this case, the only possible pacakge name is a::b
     if (needDc) {
-        return {name + std::string{ORG_NAME_SEPARATOR} + import.content.identifier};
+        return {appendOrg(import.content.identifier)};
     }
     auto maybePackageName = name + std::string{dot} + import.content.identifier.Val();
-    return {std::move(maybePackageName), std::move(name)};
+    return {appendOrg(maybePackageName), appendOrg(name)};
 }
 
 std::string CjoManager::GetPackageNameByImport(const AST::ImportSpec& importSpec) const

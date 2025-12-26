@@ -812,6 +812,6 @@ void ToCHIR::RemoveUnusedImports(bool removeSrcCodeImported)
         opts, implicitFuncs};
     unusedImportRemover.Remove(*GetPackage());
     CreateExtendDefForImportedCustomTypeDef(*GetPackage(), builder, kind == IncreKind::INCR);
-    DumpCHIRDebug("RemoveUnusedImports");
+    DumpCHIRToFile("RemoveUnusedImports");
 }
 }  // namespace Cangjie::CHIR

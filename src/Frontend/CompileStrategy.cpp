@@ -436,13 +436,13 @@ void CompileStrategy::ParseAndMergeCjds() const
         return;
     }
     Utils::ProfileRecorder::Start("ImportPackages", "ParseAndMergeCjds");
-    auto cjdPaths = ci->importManager.GetDepPkgCjdPaths();
+    auto cjdInfos = ci->importManager.GetDepPkgCjdPaths();
     std::vector<std::future<void>> futures;
-    futures.reserve(cjdPaths.size());
+    futures.reserve(cjdInfos.size());
     // Reuse current CompilerInstance, but the Parser in the macro expansion phase uses the DParser.
     option.compileCjd = true;
-    // cjdInfo is [fullPackageName, cjdPath].
-    for (auto& cjdInfo : cjdPaths) {
+    // cjdInfos is [fullPackageName, cjdPath].
+    for (auto& cjdInfo : cjdInfos) {
         if (option.jobs == 1) {
             ParseAndMergeCjd(ci, cjdInfo);
         } else {

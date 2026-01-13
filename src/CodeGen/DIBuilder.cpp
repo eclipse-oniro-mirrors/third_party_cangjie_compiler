@@ -443,7 +443,7 @@ llvm::DILocation* DIBuilder::HandleDefaultParamLocation(const CHIRExprWrapper& c
         static_cast<unsigned>(curLocation.column), scope);
 }
 
-llvm::DILocation* DIBuilder::CreateDILoc(const CHIRExprWrapper& chirNode)
+llvm::DILocation* DIBuilder::CreateDILoc(const CHIRExprWrapper& chirNode, const bool removable)
 {
     CJC_ASSERT(enabled || enableLineInfo);
     llvm::BasicBlock* currentBB = cgMod.GetMappedBB(chirNode.GetParentBlock());
@@ -453,14 +453,18 @@ llvm::DILocation* DIBuilder::CreateDILoc(const CHIRExprWrapper& chirNode)
     if (!currentBB->getParent()->getSubprogram()) {
         return nullptr;
     }
+    if (removable && position.IsInvalidPos()) {
+        return nullptr;
+    }
     needSubprogram = true;
     llvm::DIScope* scope = GetOrCreateScope(position, *currentBB);
     auto parentFunc = chirNode.GetTopLevelFunc();
     if (parentFunc && parentFunc->GetFuncKind() == CHIR::DEFAULT_PARAMETER_FUNC) {
         return HandleDefaultParamLocation(chirNode, scope);
     }
+    auto [line, column] = position.GetBeginPos();
     return llvm::DILocation::get(
-        cgMod.GetLLVMContext(), position.GetBeginPos().line, position.GetBeginPos().column, scope);
+        cgMod.GetLLVMContext(), line, column, scope, nullptr, !position.GetBeginPos().IsLegal());
 }
 
 llvm::DILocation* DIBuilder::CreateDILoc(llvm::DIScope* currentScope, const CHIR::Position& position)
@@ -468,7 +472,8 @@ llvm::DILocation* DIBuilder::CreateDILoc(llvm::DIScope* currentScope, const CHIR
     if (!enabled && !enableLineInfo) {
         return nullptr;
     }
-    return llvm::DILocation::get(cgMod.GetLLVMContext(), position.line, position.column, currentScope);
+    return llvm::DILocation::get(
+        cgMod.GetLLVMContext(), position.line, position.column, currentScope, nullptr, !position.IsLegal());
 }
 
 llvm::DIScope* DIBuilder::GetOrCreateScope(const CHIR::DebugLocation& position, llvm::BasicBlock& currentBB)

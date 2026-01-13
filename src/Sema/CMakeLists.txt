@@ -19,6 +19,7 @@ add_subdirectory(LegalityOfUsage)
 add_subdirectory(Test)
 add_subdirectory(TypeCheckExpr)
 add_subdirectory(CJMP)
+add_subdirectory(Plugin)
 
 add_library(CangjieSema OBJECT ${SEMA_SRC})
 target_compile_options(CangjieSema PRIVATE ${CJC_EXTRA_WARNINGS})

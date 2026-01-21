@@ -41,6 +41,7 @@ struct InteropContext {
 
     AST::Package& pkg;
     std::vector<Ptr<AST::ClassLikeDecl>> mirrors;
+    std::vector<Ptr<AST::FuncDecl>> mirrorTopLevelFuncs;
     std::vector<Ptr<AST::ClassDecl>> impls;
     std::vector<OwnedPtr<AST::Decl>> genDecls;
 

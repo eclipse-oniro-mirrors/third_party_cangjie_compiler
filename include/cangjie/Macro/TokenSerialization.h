@@ -18,6 +18,7 @@
 #include <fstream>
 #include <set>
 #include <vector>
+#include <cstdint>
 
 #include "cangjie/Lex/Token.h"
 

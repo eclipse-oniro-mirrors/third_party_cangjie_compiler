@@ -17,12 +17,13 @@
 
 #include <fstream>
 #include <string_view>
+
+#include "NativeFFI/ObjC/AfterTypeCheck/Interop/Context.h"
+#include "NativeFFI/ObjC/Utils/Handler.h"
 #include "cangjie/AST/Match.h"
 #include "cangjie/AST/Types.h"
-#include "NativeFFI/ObjC/AfterTypeCheck/Interop/Context.h"
 
 namespace Cangjie::Interop::ObjC {
-using namespace AST;
 
 enum class ObjCFunctionType { STATIC, INSTANCE };
 enum class GenerationTarget { HEADER, SOURCE, BOTH };
@@ -32,7 +33,7 @@ using ArgsList = std::vector<std::pair<std::string, std::string>>;
 
 class ObjCGenerator {
 public:
-    ObjCGenerator(InteropContext& ctx, Ptr<ClassDecl> decl, const std::string& outputFilePath,
+    ObjCGenerator(InteropContext& ctx, Ptr<AST::Decl> declArg, const std::string& outputFilePath,
         const std::string& cjLibOutputPath);
     void Generate();
 
@@ -42,7 +43,7 @@ private:
     const std::string& outputFilePath;
     const std::string& cjLibOutputPath;
     size_t currentBlockIndent = 0;
-    Ptr<AST::ClassDecl> classDecl;
+    Ptr<AST::Decl> decl;
     InteropContext& ctx;
 
     void OpenBlock();
@@ -56,7 +57,7 @@ private:
     std::string GenerateObjCCall(const std::string& lhs, const std::string& rhs) const;
     std::string GenerateCCall(
         const std::string& funcName, const std::vector<std::string> args = std::vector<std::string>()) const;
-    std::string GenerateDefaultFunctionImplementation(const std::string& name, const Ty& retTy,
+    std::string GenerateDefaultFunctionImplementation(const std::string& name, const AST::Ty& retTy,
         const ArgsList args = ArgsList(), const ObjCFunctionType = ObjCFunctionType::INSTANCE) const;
     std::string GenerateFunctionDeclaration(
         const ObjCFunctionType type, const std::string& returnType, const std::string& name) const;
@@ -68,6 +69,7 @@ private:
     std::string GenerateStaticReference(const std::string& name, const std::string& type,
         const std::string& defaultValue) const;
     std::string GenerateFuncParamLists(const std::vector<OwnedPtr<AST::FuncParamList>>& paramLists,
+        const std::vector<std::string>& selectorComponents,
         FunctionListFormat format = FunctionListFormat::DECLARATION,
         const ObjCFunctionType type = ObjCFunctionType::INSTANCE);
     std::string MapCJTypeToObjCType(const OwnedPtr<AST::Type>& type);
@@ -76,9 +78,11 @@ private:
     ArgsList ConvertParamsListToArgsList(
         const std::vector<OwnedPtr<AST::FuncParamList>>& paramLists, bool withRegistryId);
     std::vector<std::string> ConvertParamsListToCallableParamsString(
-        std::vector<OwnedPtr<FuncParamList>>& paramLists, bool withSelf) const;
+        std::vector<OwnedPtr<AST::FuncParamList>>& paramLists, bool withSelf) const;
     std::string GenerateSetterParamLists(const std::string& type) const;
+    std::string WrapperCallByInitForCJMappingReturn(const AST::Ty& retTy, const std::string& nativeCall) const;
 
+    void GenerateForwardDeclarations();
     void GenerateStaticFunctionsReferences();
     void GenerateFunctionSymbolsInitialization();
     void GenerateFunctionSymInit(const std::string& fName);
@@ -87,6 +91,8 @@ private:
     void AddConstructors();
     void AddMethods();
     void WriteToFile();
+
+    std::string GenerateArgumentCast(const AST::Ty& retTy, std::string value) const;
 };
 } // namespace Cangjie::Interop::ObjC
 

@@ -17,7 +17,7 @@
 
 #include <set>
 #include <string>
-#include <unordered_set>
+#include <set>
 
 #include "cangjie/AST/Node.h"
 #include "cangjie/AST/NodeX.h"
@@ -75,7 +75,7 @@ struct PluginCustomAnnoInfo {
     std::optional<bool> hasHideAnno{std::nullopt};
 };
 
-using SysCapSet = std::vector<std::string>;
+using SysCapSet = std::set<std::string>;
 
 class PluginCustomAnnoChecker {
 public:

@@ -47,9 +47,13 @@ public:
     void DesugarPackage(Package& pkg);
 
 private:
+    void CheckUsageOfJavaTypes(Decl& decl);
+
+private:
     void CheckNonJavaSuperType(ClassLikeDecl& decl) const;
     void CheckJavaMirrorSubtypeAttrClassLikeDecl(ClassLikeDecl& decl) const;
     void CheckExtendDecl(ExtendDecl& decl) const;
+    void CheckGenericsInstantiation(Decl& file);
 
     ImportManager& importManager;
     TypeManager& typeManager;

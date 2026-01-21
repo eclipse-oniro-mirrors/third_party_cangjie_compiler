@@ -85,11 +85,28 @@ public:
 };
 
 /**
+ * Creates and inserts finalizers (with special private field $hasInited) for each @ObjCMirror class:
+ * ```cangjie
+ * private var $hasInited: Bool = false
+ * ~init() {
+ *     unsafe { ObjCRuntime.release($obj) }
+ * }
+ * ```
+ */
+class InsertFinalizer : public Handler<InsertFinalizer, InteropContext> {
+public:
+    void HandleImpl(InteropContext& ctx);
+};
+
+/**
  * Generates top-level `CJImpl_ObjC_{ForeignName}_deleteCJObject($registryId: RegistryId): Unit`
  * method for each @ObjCImpl declaration.
  */
 class GenerateDeleteCJObjectMethod : public Handler<GenerateDeleteCJObjectMethod, InteropContext> {
 public:
+    explicit GenerateDeleteCJObjectMethod()
+    {
+    }
     void HandleImpl(InteropContext& ctx);
 };
 
@@ -138,6 +155,7 @@ public:
     void HandleImpl(InteropContext& ctx);
 
 private:
+    void DesugarTopLevelFunc(InteropContext& ctx, AST::FuncDecl& func);
     void DesugarMethod(InteropContext& ctx, AST::ClassLikeDecl& mirror, AST::FuncDecl& method);
     void DesugarCtor(InteropContext& ctx, AST::ClassLikeDecl& mirror, AST::FuncDecl& ctor);
     void DesugarProp(InteropContext& ctx, AST::ClassLikeDecl& mirror, AST::PropDecl& prop);
@@ -162,6 +180,9 @@ private:
  */
 class GenerateInitCJObjectMethods : public Handler<GenerateInitCJObjectMethods, InteropContext> {
 public:
+    explicit GenerateInitCJObjectMethods()
+    {
+    }
     void HandleImpl(InteropContext& ctx);
 };
 
@@ -199,6 +220,9 @@ private:
  */
 class GenerateWrappers : public Handler<GenerateWrappers, InteropContext> {
 public:
+    explicit GenerateWrappers()
+    {
+    }
     void HandleImpl(InteropContext& ctx);
 
 private:
@@ -218,6 +242,9 @@ private:
  */
 class GenerateGlueCode : public Handler<GenerateGlueCode, InteropContext> {
 public:
+    explicit GenerateGlueCode()
+    {
+    }
     void HandleImpl(InteropContext& ctx);
 };
 

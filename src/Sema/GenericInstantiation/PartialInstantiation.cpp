@@ -25,6 +25,7 @@ using namespace Cangjie::Meta;
 
 namespace {
 auto g_optLevel = GlobalOptions::OptimizationLevel::O0;
+auto g_outputMode = GlobalOptions::OutputMode::EXECUTABLE;
 
 inline bool IsCPointerFrozenMember(const Decl& decl)
 {
@@ -40,6 +41,7 @@ inline bool IsCPointerFrozenMember(const Decl& decl)
 void SetOptLevel(const Cangjie::GlobalOptions& opts)
 {
     g_optLevel = opts.optimizationLevel;
+    g_outputMode = opts.outputMode;
 }
 
 GlobalOptions::OptimizationLevel GetOptLevel()
@@ -81,6 +83,14 @@ bool IsInOpenContext(const std::vector<Ptr<AST::Decl>>& contextDecl)
 
 bool RequireInstantiation(const Decl& decl, bool isInOpenContext)
 {
+    // Skip instantiations in common code compilation because:
+    // 1. Common code may be incomplete at this stage
+    // 2. Platform source sets can modify the implementation
+    //
+    // Also skip common declarations with platform implementations
+    if (g_outputMode == GlobalOptions::OutputMode::CHIR || decl.IsCommonMatchedWithPlatform()) {
+        return false;
+    }
     if (IsCPointerFrozenMember(decl)) {
         return true;
     }
@@ -1376,7 +1386,8 @@ OwnedPtr<StructBody> PartialInstantiation::InstantiateStructBody(const StructBod
     ret->leftCurlPos = sb.leftCurlPos;
     for (auto& it : sb.decls) {
         if (it->astKind == ASTKind::PRIMARY_CTOR_DECL ||
-            (it->astKind != ASTKind::VAR_DECL && !RequireInstantiation(*it)) || IsStaticVar(*it)) {
+            (it->astKind != ASTKind::VAR_DECL && !RequireInstantiation(*it)) || IsStaticVar(*it) ||
+            IsStaticInitializer(*it)) {
             continue;
         }
         ret->decls.push_back(InstantiateDecl(it.get(), visitor));

@@ -60,6 +60,8 @@ llvm::Constant* CGCustomType::GenTypeInfoArray(
     typeInfoOfFields->setInitializer(llvm::ConstantArray::get(typeOfFieldsGV, constants));
     typeInfoOfFields->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
     typeInfoOfFields->addAttribute(attr);
+    typeInfoOfFields->setConstant(true);
+    typeInfoOfFields->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
     return llvm::ConstantExpr::getBitCast(typeInfoOfFields, p0i8);
 }
 
@@ -72,8 +74,8 @@ llvm::Constant* CGCustomType::GenFieldsOfTypeInfo()
     std::vector<llvm::Constant*> fieldConstants = GenTypeInfoConstantVectorForTypes(cgMod, instanceMemberTypes);
     if (chirType.IsAutoEnv()) {
         CJC_ASSERT(!chirType.IsAutoEnvInstBase());
-        (void)fieldConstants.insert(fieldConstants.begin(), CGType::GetInt64CGType(cgMod)->GetOrCreateTypeInfo());
-        (void)fieldConstants.insert(fieldConstants.begin(), CGType::GetInt64CGType(cgMod)->GetOrCreateTypeInfo());
+        (void)fieldConstants.insert(fieldConstants.begin(), CGType::GetIntNativeCGType(cgMod)->GetOrCreateTypeInfo());
+        (void)fieldConstants.insert(fieldConstants.begin(), CGType::GetIntNativeCGType(cgMod)->GetOrCreateTypeInfo());
     }
     return GenTypeInfoArray(cgMod, CGType::GetNameOfTypeInfoGV(chirType) + ".fields", fieldConstants, CJTI_FIELDS_ATTR);
 }
@@ -97,6 +99,8 @@ llvm::Constant* CGCustomType::GenOffsetsArray(CGModule& cgMod, std::string name,
     typeInfoOfFields->setInitializer(llvm::ConstantArray::get(i32ArrType, elements));
     typeInfoOfFields->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
     typeInfoOfFields->addAttribute(CJTI_OFFSETS_ATTR);
+    typeInfoOfFields->setConstant(true);
+    typeInfoOfFields->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
     return llvm::ConstantExpr::getBitCast(typeInfoOfFields, i32Ty->getPointerTo());
 }
 
@@ -156,6 +160,8 @@ llvm::Constant* CGCustomType::GenTypeArgsOfTypeInfo()
     typeInfoOfGenericArgs->setInitializer(llvm::ConstantArray::get(typeOfGenericArgsGV, constants));
     typeInfoOfGenericArgs->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
     typeInfoOfGenericArgs->addAttribute(CJTI_TYPE_ARGS_ATTR);
+    typeInfoOfGenericArgs->setConstant(true);
+    typeInfoOfGenericArgs->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
     return llvm::ConstantExpr::getBitCast(typeInfoOfGenericArgs, p0i8);
 }
 
@@ -203,9 +209,9 @@ llvm::Constant* CGCustomType::GenFieldsFnsOfTypeTemplate()
     auto fieldTypes = StaticCast<CHIR::CustomType*>(
         customTypeDef->GetType())->GetInstantiatedMemberTys(cgMod.GetCGContext().GetCHIRBuilder());
     if (chirType.IsAutoEnv()) {
-        auto chirInt64Type = const_cast<CHIR::Type*>(&CGType::GetInt64CGType(cgMod)->GetOriginal());
-        fieldTypes.insert(fieldTypes.begin(), chirInt64Type);
-        fieldTypes.insert(fieldTypes.begin(), chirInt64Type);
+        auto chirIntNativeType = const_cast<CHIR::Type*>(&CGType::GetIntNativeCGType(cgMod)->GetOriginal());
+        fieldTypes.insert(fieldTypes.begin(), chirIntNativeType);
+        fieldTypes.insert(fieldTypes.begin(), chirIntNativeType);
     }
 
     return CGTypeInfo::GenFieldsFnsOfTypeTemplate(

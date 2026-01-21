@@ -293,6 +293,18 @@ bool CjoManager::NeedCollectDependency(std::string curName, bool isCurMacro, std
     return false;
 }
 
+void CjoManager::LoadFilesOfCommonPart(Ptr<Package> pkg)
+{
+    if (!impl->GetGlobalOptions().IsCompilingCJMP()) {
+        return;
+    }
+    auto commonLoader = GetCommonPartCjo(pkg->fullPackageName);
+    if (!commonLoader) {
+        return;
+    }
+    commonLoader->PreloadCommonPartOfPackage(*pkg);
+}
+
 void CjoManager::LoadPackageDeclsOnDemand(const std::vector<Ptr<Package>>& packages, bool fromLsp) const
 {
     // Add all directly imported package's loader.
@@ -314,20 +326,14 @@ void CjoManager::LoadPackageDeclsOnDemand(const std::vector<Ptr<Package>>& packa
     std::vector<Ptr<ASTLoader>> loaders;
     // Load common part cjo
     for (auto pkg : packages) {
-        if (impl->GetGlobalOptions().inputChirFiles.size() > 0) {
+        if (impl->GetGlobalOptions().IsCompilingCJMP()) {
             std::string expectedPackageName = pkg->fullPackageName;
             auto commonLoader = GetCommonPartCjo(expectedPackageName);
             if (!commonLoader) {
                 continue;
             }
-            commonLoader->PreloadCommonPartOfPackage(*pkg);
             commonLoader->LoadPackageDecls();
             loaders.emplace_back(commonLoader);
-            for (auto commonDependencyName : commonLoader->GetDependentPackageNames()) {
-                if (NeedCollectDependency(expectedPackageName, pkg->isMacroPackage, commonDependencyName)) {
-                    q.push(impl->GetPackageInfo(commonDependencyName));
-                }
-            }
         }
     }
 
@@ -532,15 +538,18 @@ void CjoManager::AddPackageDeclMap(const std::string& fullPackageName, const std
     }
 }
 
-std::optional<std::string> CjoManager::GetPackageCjoPath(std::string fullPackageName) const
+std::string CjoManager::GetPackageCjoPath(const std::string& fullPackageName) const
 {
     if (auto found = impl->GetCjoFileCacheMap().find(fullPackageName); found != impl->GetCjoFileCacheMap().end()) {
         return fullPackageName; // Set dummy path for cached cjo data.
-    } else {
-        return FileUtil::FindSerializationFile(fullPackageName, SERIALIZED_FILE_EXTENSION, GetSearchPath());
     }
-
-    return std::nullopt;
+    std::string cjoPath = "";
+    if (impl->GetCjoPathFromFindCache(fullPackageName, cjoPath)) {
+        return cjoPath;
+    }
+    cjoPath = FileUtil::FindSerializationFile(fullPackageName, SERIALIZED_FILE_EXTENSION, GetSearchPath());
+    impl->CacheCjoPathForFind(fullPackageName, cjoPath);
+    return cjoPath;
 }
 
 std::pair<std::string, std::string> CjoManager::GetPackageCjo(const AST::ImportSpec& importSpec) const
@@ -553,8 +562,11 @@ std::pair<std::string, std::string> CjoManager::GetPackageCjo(const AST::ImportS
             found != impl->GetCjoFileCacheMap().end()) {
             cjoPath = cjoName; // Set dummy path for cached cjo data.
         } else {
-            cjoPath = FileUtil::FindSerializationFile(FileUtil::ToPackageName(cjoName),
-                SERIALIZED_FILE_EXTENSION, GetSearchPath());
+            if (!impl->GetCjoPathFromFindCache(cjoName, cjoPath)) {
+                cjoPath = FileUtil::FindSerializationFile(
+                    FileUtil::ToPackageName(cjoName), SERIALIZED_FILE_EXTENSION, GetSearchPath());
+                impl->CacheCjoPathForFind(cjoName, cjoPath);
+            }
         }
         if (!cjoPath.empty()) {
             break;
@@ -564,8 +576,9 @@ std::pair<std::string, std::string> CjoManager::GetPackageCjo(const AST::ImportS
     auto cjoPackageName = FileUtil::ToPackageName(cjoName);
     // Store importSpec with packageName.
     std::string possibleName = importSpec.content.GetImportedPackageName();
-    impl->AddImportedPackageName(&importSpec, std::make_pair(cjoPackageName,
-        cjoPackageName == possibleName && importSpec.content.kind != ImportKind::IMPORT_ALL));
+    impl->AddImportedPackageName(&importSpec,
+        std::make_pair(
+            cjoPackageName, cjoPackageName == possibleName && importSpec.content.kind != ImportKind::IMPORT_ALL));
     return {cjoPackageName, cjoPath};
 }
 

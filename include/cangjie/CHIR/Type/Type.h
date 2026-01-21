@@ -161,6 +161,11 @@ public:
         return kind >= TYPE_INT8 && kind <= TYPE_FLOAT64;
     }
 
+    bool IsSignedInteger() const
+    {
+        return kind >= TYPE_INT8 && kind <= TYPE_INT_NATIVE;
+    }
+
     bool IsUnsignedInteger() const
     {
         return kind >= TYPE_UINT8 && kind <= TYPE_UINT_NATIVE;
@@ -634,7 +639,7 @@ public:
      * @param builder The CHIR builder used for building the types.
      */
     void GetInstMap(std::unordered_map<const GenericType*, Type*>& instMap, CHIRBuilder& builder) const;
-    
+
     /**
      * @brief Retrieves the instantiated member type by a given path.
      *
@@ -646,7 +651,7 @@ public:
     {
         return GetInstMemberTypeByPathCheckingReadOnly(path, builder).first;
     }
-    
+
     /**
      * @brief Retrieves the instantiated method types.
      *
@@ -654,7 +659,7 @@ public:
      * @return A vector of instantiated method types.
      */
     std::vector<FuncType*> GetInstMethodTypes(CHIRBuilder& builder) const;
-    
+
     /**
      * @brief Retrieves the instantiated member type by a given path, checking for read-only.
      *
@@ -664,7 +669,7 @@ public:
      */
     std::pair<Type*, bool> GetInstMemberTypeByPathCheckingReadOnly(
         const std::vector<uint64_t>& path, CHIRBuilder& builder) const;
-    
+
     /**
      * @brief Retrieves all instance member types.
      *
@@ -672,7 +677,7 @@ public:
      * @return A vector of instance member types.
      */
     std::vector<Type*> GetInstantiatedMemberTys(CHIRBuilder& builder);
-    
+
     /**
      * @brief Retrieves the implemented interface types.
      *
@@ -681,7 +686,7 @@ public:
      */
     std::vector<ClassType*> GetImplementedInterfaceTys(CHIRBuilder* builder,
         std::set<std::pair<const Type*, const Type*>>* visited = nullptr);
-    
+
     /**
      * @brief Retrieves the implemented interface types without extension.
      *
@@ -689,7 +694,7 @@ public:
      * @return A vector of implemented interface types without extension.
      */
     std::vector<ClassType*> GetImplementedInterfaceTysWithoutExtend(CHIRBuilder& builder);
-    
+
     /**
      * @brief Retrieves the exact parent type for a given function.
      *
@@ -703,7 +708,7 @@ public:
      */
     Type* GetExactParentType(const std::string& funcName, FuncType& funcType, bool isStatic,
         std::vector<Type*>& funcInstTypeArgs, CHIR::CHIRBuilder& builder, bool checkAbstractMethod);
-    
+
     /**
      * @brief Retrieves the expected function for a given name and type.
      *
@@ -717,7 +722,7 @@ public:
      */
     std::pair<FuncBase*, bool> GetExpectedFunc(const std::string& funcName, FuncType& funcType, bool isStatic,
         std::vector<Type*>& funcInstTypeArgs, CHIR::CHIRBuilder& builder, bool checkAbstractMethod);
-    
+
     /**
      * @brief Retrieves the index of a function in the virtual table.
      *
@@ -728,7 +733,7 @@ public:
      */
     std::vector<VTableSearchRes> GetFuncIndexInVTable(
         const FuncCallType& funcCallType, bool isStatic, CHIR::CHIRBuilder& builder) const;
-    
+
     /**
      * @brief Retrieves the declared and extended methods.
      *
@@ -736,7 +741,7 @@ public:
      * @return A vector of declared and extended methods.
      */
     std::vector<FuncBase*> GetDeclareAndExtendMethods(CHIRBuilder& builder) const override;
-    
+
     virtual void ResetAllInstantiatedType()
     {
         implementedInterfaceTys.clear();
@@ -1087,7 +1092,7 @@ public:
     {
         return GetInstMemberTypeByPathCheckingReadOnly(path, builder).first;
     }
-    
+
     /**
      * @brief Retrieves the instantiated member type by a given path, checking for read-only.
      *
@@ -1097,7 +1102,7 @@ public:
      */
     std::pair<Type*, bool> GetInstMemberTypeByPathCheckingReadOnly(
         const std::vector<uint64_t>& path, CHIRBuilder& builder) const;
-    
+
     /**
      * @brief Retrieves the instance map for generic types.
      *

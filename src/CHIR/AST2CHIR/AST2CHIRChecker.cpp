@@ -295,6 +295,11 @@ bool CheckInheritDeclGlobalMember(
     }
     // member func
     if (decl.astKind == Cangjie::AST::ASTKind::FUNC_DECL) {
+        if (decl.TestAttr(Cangjie::AST::Attribute::PLATFORM) && chirNode.TestAttr(Attribute::DESERIALIZED)) {
+            // `platform` function type can be subtype of `common` function type.
+            // We keep origin type in CHIR, however AST type is updated. Thus it's not an error.
+            return true;
+        }
         if (!decl.TestAttr(Cangjie::AST::Attribute::STATIC) && !CheckMethodType(*decl.ty, *chirCache->GetType())) {
             Errorln(chirCache->GetIdentifier() + " is expected to be promoted " + Cangjie::AST::Ty::ToString(decl.ty) +
                 ".");
@@ -490,8 +495,17 @@ bool CheckFunc(const Cangjie::AST::FuncDecl& decl, const Value& chirNode)
     auto astTy = decl.ty;
     auto chirTy = chirNode.GetType();
     if (!CheckType(*astTy, *chirTy)) {
-        Errorln(chirNode.GetIdentifier() + " is expected to be " + Cangjie::AST::Ty::ToString(astTy) + ".");
-        return false;
+        bool report = true;
+        if (decl.TestAttr(AST::Attribute::PLATFORM) && chirNode.TestAttr(Attribute::DESERIALIZED)) {
+            // `platform` function type can be subtype of `common` function type.
+            // We keep origin type in CHIR, however AST type is updated. Thus it's not an error.
+            report = false;
+        }
+
+        if (report) {
+            Errorln(chirNode.GetIdentifier() + " is expected to be " + Cangjie::AST::Ty::ToString(astTy) + ".");
+            return false;
+        }
     }
     return true;
 }

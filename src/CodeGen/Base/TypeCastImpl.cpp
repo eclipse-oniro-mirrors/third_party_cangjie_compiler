@@ -44,7 +44,7 @@ std::string StringIntX(Triple::ArchType archType, const CHIR::IntType& intTy)
         }
         return intTy.ToString();
     }
-    CJC_ASSERT(false && "Unsupported ArchType.");
+    CJC_ASSERT_WITH_MSG(false, "Unsupported ArchType.");
     return intTy.ToString();
 }
 
@@ -501,8 +501,8 @@ llvm::Value* GenerateGenericTypeCast(IRBuilder2& irBuilder, const CGValue& cgSrc
             // 2. store srcValue to temp
             auto payloadPtr = irBuilder.GetPayloadFromObject(temp);
             auto addr = irBuilder.CreateBitCast(payloadPtr, srcCGType->GetLLVMType()->getPointerTo(1));
-            auto addrType =
-                CGType::GetOrCreate(cgMod, CGType::GetRefTypeOf(cgMod.GetCGContext().GetCHIRBuilder(), srcTy), 1U);
+            auto addrType = CGType::GetOrCreate(
+                cgMod, CGType::GetRefTypeOf(cgMod.GetCGContext().GetCHIRBuilder(), srcTy), CGType::TypeExtraInfo(1U));
             (void)irBuilder.CreateStore(cgSrcValue, CGValue(addr, addrType));
             return temp;
         }
@@ -542,7 +542,6 @@ llvm::Value* GenerateGenericTypeCast(IRBuilder2& irBuilder, const CGValue& cgSrc
     } else if (IsDynamicClassRef(srcTy) && IsStructRef(targetTy)) { // class<T1>& -> struct&
         return nullptr;
     } else if (srcTy.IsStructArray() && targetTy.IsStructArray()) {
-        auto targetCGType = CGType::GetOrCreate(cgMod, &targetTy);
         auto tmp = irBuilder.CreateEntryAlloca(*targetCGType);
         llvm::MaybeAlign align{};
         irBuilder.CreateMemCpy(tmp, align, srcValue, align, irBuilder.GetLayoutSize_32(targetTy));
@@ -556,7 +555,6 @@ llvm::Value* GenerateGenericTypeCast(IRBuilder2& irBuilder, const CGValue& cgSrc
         return temp;
     } else if (IsDynamicStruct(srcTy) &&
         IsStaticStruct(targetTy)) { // struct<T1> -> struct<Int64>
-        auto targetCGType = CGType::GetOrCreate(cgMod, &targetTy);
         auto tmp = irBuilder.CreateEntryAlloca(*targetCGType);
         auto dataPtr = irBuilder.GetPayloadFromObject(srcValue);
         if (IsTypeContainsRef(targetCGType->GetLLVMType())) {
@@ -595,8 +593,9 @@ llvm::Value* GenerateGenericTypeCast(IRBuilder2& irBuilder, const CGValue& cgSrc
         auto addr = irBuilder.CreateBitCast(payloadPtr,
             srcTy.IsRef() ? srcCGType->GetPointerElementType()->GetLLVMType()->getPointerTo(1U)
                           : srcCGType->GetLLVMType()->getPointerTo(1U));
-        auto addrType = CGType::GetOrCreate(
-            cgMod, srcTy.IsRef() ? &srcTy : CGType::GetRefTypeOf(cgMod.GetCGContext().GetCHIRBuilder(), srcTy), 1U);
+        auto addrType = CGType::GetOrCreate(cgMod,
+            srcTy.IsRef() ? &srcTy : CGType::GetRefTypeOf(cgMod.GetCGContext().GetCHIRBuilder(), srcTy),
+            CGType::TypeExtraInfo(1U));
         (void)irBuilder.CreateStore(cgSrcValue, CGValue(addr, addrType));
         return temp;
     } else {

@@ -22,13 +22,14 @@ namespace PluginCheck {
 
 std::string ParseJsonString(size_t& pos, const std::vector<uint8_t>& in)
 {
+    if (pos >= in.size() || in[pos] != '"') {
+        return "";
+    }
+    ++pos;
     std::stringstream str;
-    if (in[pos] == '"') {
+    while (pos < in.size() && in[pos] != '"') {
+        str << in[pos];
         ++pos;
-        while (pos < in.size() && in[pos] != '"') {
-            str << in[pos];
-            ++pos;
-        }
     }
 
     return str.str();
@@ -36,7 +37,7 @@ std::string ParseJsonString(size_t& pos, const std::vector<uint8_t>& in)
 
 uint64_t ParseJsonNumber(size_t& pos, const std::vector<uint8_t>& in)
 {
-    if (in[pos] < '0' || in[pos] > '9') {
+    if (pos >= in.size() || in[pos] < '0' || in[pos] > '9') {
         return 0;
     }
     std::stringstream num;
@@ -52,7 +53,7 @@ uint64_t ParseJsonNumber(size_t& pos, const std::vector<uint8_t>& in)
 
 void ParseJsonArray(size_t& pos, const std::vector<uint8_t>& in, Ptr<JsonPair> value)
 {
-    if (in[pos] != '[') {
+    if (pos >= in.size() || in[pos] != '[' || value == nullptr) {
         return;
     }
     ++pos;
@@ -77,7 +78,7 @@ void ParseJsonArray(size_t& pos, const std::vector<uint8_t>& in, Ptr<JsonPair> v
 OwnedPtr<JsonObject> ParseJsonObject(size_t& pos, const std::vector<uint8_t>& in)
 {
     if (pos >= in.size() || in[pos] != '{') {
-        return nullptr;
+        return MakeOwned<JsonObject>();
     }
     ++pos;
     auto ret = MakeOwned<JsonObject>();
@@ -92,6 +93,11 @@ OwnedPtr<JsonObject> ParseJsonObject(size_t& pos, const std::vector<uint8_t>& in
         }
         if (in[pos] == ':') {
             mod = StringMod::VALUE;
+            if (ret->pairs.empty()) {
+                auto newData = MakeOwned<JsonPair>();
+                newData->key = "";
+                ret->pairs.emplace_back(std::move(newData));
+            }
         }
         if (in[pos] == ',') {
             mod = StringMod::KEY;
@@ -105,14 +111,17 @@ OwnedPtr<JsonObject> ParseJsonObject(size_t& pos, const std::vector<uint8_t>& in
                 ret->pairs.back()->valueStr.emplace_back(ParseJsonString(pos, in));
             }
         }
-        if (in[pos] >= '0' && in[pos] <= '9') {
+        if (in[pos] >= '0' && in[pos] <= '9' && mod == StringMod::VALUE) {
+            CJC_ASSERT(!ret->pairs.empty());
             ret->pairs.back()->valueNum.emplace_back(ParseJsonNumber(pos, in));
         }
-        if (in[pos] == '{') {
+        if (in[pos] == '{' && mod == StringMod::VALUE) {
+            CJC_ASSERT(!ret->pairs.empty());
             // The pos will be updated to the pos of matched '}'.
             ret->pairs.back()->valueObj.emplace_back(ParseJsonObject(pos, in));
         }
-        if (in[pos] == '[') {
+        if (in[pos] == '[' && mod == StringMod::VALUE) {
+            CJC_ASSERT(!ret->pairs.empty());
             // The pos will be updated to the pos of matched ']'.
             ParseJsonArray(pos, in, ret->pairs.back().get());
         }
@@ -123,6 +132,9 @@ OwnedPtr<JsonObject> ParseJsonObject(size_t& pos, const std::vector<uint8_t>& in
 
 std::vector<std::string> GetJsonString(Ptr<JsonObject> root, const std::string& key)
 {
+    if (root == nullptr) {
+        return {};
+    }
     for (auto& v : root->pairs) {
         if (v->key == key) {
             return v->valueStr;
@@ -139,6 +151,9 @@ std::vector<std::string> GetJsonString(Ptr<JsonObject> root, const std::string& 
 
 Ptr<JsonObject> GetJsonObject(Ptr<JsonObject> root, const std::string& key, const size_t index)
 {
+    if (root == nullptr) {
+        return nullptr;
+    }
     for (auto& v : root->pairs) {
         if (v->key == key && v->valueObj.size() > index) {
             return v->valueObj[index].get();

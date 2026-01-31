@@ -20,7 +20,6 @@
 #include "cangjie/Option/Option.h"
 
 namespace Cangjie {
-class Tool;
 class Job;
 
 /**

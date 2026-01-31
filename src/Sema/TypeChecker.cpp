@@ -2139,6 +2139,12 @@ std::vector<Ptr<ASTContext>> TypeChecker::TypeCheckerImpl::PreTypeCheck(const st
             CollectDeclsWithMember(pkg, *ctx);
         }
     }
+
+    for (auto pkg : pkgs) {
+        mpImpl->MatchPlatformWithCommon(*pkg);
+        mpImpl->CheckNotAllowedAnnotations(*pkg);
+    }
+
     return contexts;
 }
 
@@ -2154,7 +2160,8 @@ void TypeChecker::TypeCheckerImpl::PostTypeCheck(std::vector<Ptr<ASTContext>>& c
         // Check legality of usage after sema type completed.
         CheckLegalityOfUsage(*ctx, *ctx->curPackage);
         // Check cjmp match rules.
-        mpImpl->MatchPlatformWithCommon(*ctx->curPackage);
+        mpImpl->CheckReturnAndVariableTypes(*ctx->curPackage);
+        mpImpl->ValidateMatchedAnnotationsAndModifiers(*ctx->curPackage);
         AddAttrForDefaultFuncParam(*ctx->curPackage);
         // Because of the cjlint checking policy, desugar of propDecl should be done in sema stage for now.
         DesugarForPropDecl(*ctx->curPackage);

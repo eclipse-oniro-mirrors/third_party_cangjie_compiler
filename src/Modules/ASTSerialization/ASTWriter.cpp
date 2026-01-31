@@ -161,6 +161,10 @@ inline bool IsExternalNorminalDecl(const Decl& decl)
 
 inline bool ShouldAlwaysExport(const Decl& decl, bool serializingCommon)
 {
+    if (decl.IsCommonMatchedWithPlatform()) {
+        return false;
+    }
+
     // When 'exportAddition' is enabled, we have following rules:
     // 1. For BCHIR(include const evaluation) type usage, type decl must be exported.
     // Otherwise, only export external decls.
@@ -419,159 +423,55 @@ template <typename T> TVectorOffset<FormattedIndex> ASTWriter::ASTWriterImpl::Ge
 {
     // Body.
     std::vector<FormattedIndex> body;
+    // Track platform implementations that have been added to avoid duplicates
+    std::unordered_set<Decl*> addedPlatformImpls;
     // Incr compilation need load ty by cached cjo, so not only cache visible signature
     bool onlyVisibleSig = !config.exportForIncr && !config.exportContent;
     // For LSP usage, when decl is not external, ignore all members, only keep the typeDecl it self.
     if (onlyVisibleSig && decl.TestAttr(AST::Attribute::PRIVATE)) {
         return builder.CreateVector<FormattedIndex>(body);
     }
-    for (auto& it : decl.GetMemberDeclPtrs()) {
-        CJC_NULLPTR_CHECK(it);
+
+    // Check if a decl should be exported
+    auto shouldExportDecl = [&decl, onlyVisibleSig, this](const Decl* d) -> bool {
         // Because member variables determine the memory layout of a type, all of its member variables should be
         // stored in cjo as long as the type is externally visible.
-        const bool isInstMemberVar = it->astKind == ASTKind::VAR_DECL && !it->TestAttr(Attribute::STATIC);
+        const bool isInstMemberVar = d->astKind == ASTKind::VAR_DECL && !d->TestAttr(Attribute::STATIC);
         // For LSP usage, the invalid vpd will exists, we can ignore it.
-        if (it->doNotExport || it->astKind == AST::ASTKind::VAR_WITH_PATTERN_DECL ||
+        if (d->doNotExport || d->astKind == AST::ASTKind::VAR_WITH_PATTERN_DECL ||
             // For LSP usage, we can ignore invisible members.
-            (onlyVisibleSig && !it->IsExportedDecl())) {
-            continue;
+            (onlyVisibleSig && !d->IsExportedDecl())) {
+            return false;
         }
         if (decl.astKind == AST::ASTKind::EXTEND_DECL && serializingCommon) {
-            body.push_back(GetDeclIndex(it));
-            continue;
+            return true;
         }
         // Incr compilation need load ty by cached cjo, so still cache internal or inst member var decls
         if (!config.exportForIncr && !decl.TestAttr(Attribute::COMMON) && !isInstMemberVar &&
-            it->linkage == Linkage::INTERNAL) {
-            continue;
+            d->linkage == Linkage::INTERNAL) {
+            return false;
         }
-        body.push_back(GetDeclIndex(it));
-    }
-    return builder.CreateVector<FormattedIndex>(body);
-}
-
-/**
- * Update AST attributes related to common/platform, e.g. set FROM_COMMON_PART.
- */
-void ASTWriter::ASTWriterImpl::SetAttributesIfSerializingCommonPartOfPackage(Package& package)
-{
-    for (auto& file : package.files) {
-        if (file->package && file->package->hasCommon) {
-            serializingCommon = true;
-            break;
-        }
-    }
-    if (!serializingCommon) {
-        return;
-    }
-    std::function<VisitAction(Ptr<Node>)> visitor = [&visitor](const Ptr<Node>& node) {
-        switch (node->astKind) {
-            case ASTKind::PACKAGE: {
-                return VisitAction::WALK_CHILDREN;
-            }
-            case ASTKind::FILE: {
-                auto file = StaticAs<ASTKind::FILE>(node);
-                for (auto& decl : file->decls) {
-                    decl->EnableAttr(Attribute::FROM_COMMON_PART);
-                    Walker(decl->generic.get(), visitor).Walk();
-                }
-                return VisitAction::WALK_CHILDREN;
-            }
-            case ASTKind::INTERFACE_DECL: {
-                auto id = StaticAs<ASTKind::INTERFACE_DECL>(node);
-                for (auto& member : id->body->decls) {
-                    member->EnableAttr(Attribute::FROM_COMMON_PART);
-                    Walker(member.get(), visitor).Walk();
-                }
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::CLASS_DECL: {
-                auto cd = StaticAs<ASTKind::CLASS_DECL>(node);
-                for (auto& member : cd->body->decls) {
-                    member->EnableAttr(Attribute::FROM_COMMON_PART);
-                    Walker(member.get(), visitor).Walk();
-                }
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::STRUCT_DECL: {
-                auto sd = StaticAs<ASTKind::STRUCT_DECL>(node);
-                for (auto& member : sd->body->decls) {
-                    member->EnableAttr(Attribute::FROM_COMMON_PART);
-                    Walker(member.get(), visitor).Walk();
-                }
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::ENUM_DECL: {
-                auto ed = StaticAs<ASTKind::ENUM_DECL>(node);
-                for (auto& member : ed->members) {
-                    member->EnableAttr(Attribute::FROM_COMMON_PART);
-                    Walker(member.get(), visitor).Walk();
-                }
-                for (auto& constructor : ed->constructors) {
-                    constructor->EnableAttr(Attribute::FROM_COMMON_PART);
-                }
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::EXTEND_DECL: {
-                auto ed = StaticAs<ASTKind::EXTEND_DECL>(node);
-                for (auto& member : ed->members) {
-                    member->EnableAttr(Attribute::FROM_COMMON_PART);
-                    Walker(member.get(), visitor).Walk();
-                }
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::FUNC_DECL: {
-                auto fd = StaticAs<ASTKind::FUNC_DECL>(node);
-                for (auto& param : fd->funcBody->paramLists[0]->params) {
-                    if (param->desugarDecl) {
-                        param->desugarDecl->EnableAttr(Attribute::FROM_COMMON_PART);
-                    }
-                }
-                Walker(fd->funcBody->generic.get(), visitor).Walk();
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::PROP_DECL: {
-                auto pd = StaticAs<ASTKind::PROP_DECL>(node);
-                for (auto& getter : pd->getters) {
-                    getter->EnableAttr(Attribute::FROM_COMMON_PART);
-                }
-                for (auto& setter : pd->setters) {
-                    setter->EnableAttr(Attribute::FROM_COMMON_PART);
-                }
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::GENERIC: {
-                auto generic = StaticAs<ASTKind::GENERIC>(node);
-                for (auto& it : generic->typeParameters) {
-                    it->EnableAttr(Attribute::FROM_COMMON_PART);
-                }
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::VAR_WITH_PATTERN_DECL: {
-                auto varDecl = StaticAs<ASTKind::VAR_WITH_PATTERN_DECL>(node);
-                varDecl->irrefutablePattern->EnableAttr(Attribute::FROM_COMMON_PART);
-                Walker(varDecl->irrefutablePattern, visitor).Walk();
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::TUPLE_PATTERN: {
-                auto tuplePattern = StaticAs<ASTKind::TUPLE_PATTERN>(node);
-                for (auto& pattern : tuplePattern->patterns) {
-                    Walker(pattern, visitor).Walk();
-                }
-                return VisitAction::SKIP_CHILDREN;
-            }
-            case ASTKind::VAR_PATTERN: {
-                auto varPattern = StaticAs<ASTKind::VAR_PATTERN>(node);
-                varPattern->varDecl->EnableAttr(Attribute::FROM_COMMON_PART);
-                return VisitAction::SKIP_CHILDREN;
-            }
-            default:
-                return VisitAction::SKIP_CHILDREN;
-        }
+        return true;
     };
 
-    Walker walker(&package, visitor);
-    walker.Walk();
+    for (auto& it : decl.GetMemberDeclPtrs()) {
+        CJC_NULLPTR_CHECK(it);
+        // Skip if this decl is already added as a platform implementation
+        if (it->TestAttr(AST::Attribute::PLATFORM) && addedPlatformImpls.count(it.get()) > 0) {
+            continue;
+        }
+        // Process platform implementation first, applying same filter logic
+        if (it->platformImplementation) {
+            addedPlatformImpls.insert(it->platformImplementation.get());
+            if (shouldExportDecl(it->platformImplementation.get())) {
+                body.push_back(GetDeclIndex(it->platformImplementation));
+            }
+        }
+        if (shouldExportDecl(it.get())) {
+            body.push_back(GetDeclIndex(it));
+        }
+    }
+    return builder.CreateVector<FormattedIndex>(body);
 }
 
 /**
@@ -580,8 +480,12 @@ void ASTWriter::ASTWriterImpl::SetAttributesIfSerializingCommonPartOfPackage(Pac
  */
 void ASTWriter::ASTWriterImpl::PreSaveFullExportDecls(Package& package)
 {
-    SetAttributesIfSerializingCommonPartOfPackage(package);
-
+    for (auto& file : package.files) {
+        if (file->package && file->package->hasCommon) {
+            serializingCommon = true;
+            break;
+        }
+    }
     for (auto& file : package.files) {
         CJC_NULLPTR_CHECK(file.get());
         SaveFileInfo(*file);
@@ -1630,6 +1534,10 @@ FormattedIndex ASTWriter::ASTWriterImpl::SaveDecl(const Decl& decl, bool isTopLe
     //       Since this kind of member function will never be referenced during 'Sema' step
     //       and will be replaced during instantiation step, we ignore the ty of this kind of decl.
     auto attrs = decl.GetAttrs();
+    if (serializingCommon) {
+        attrs.SetAttr(Attribute::FROM_COMMON_PART, true);
+    }
+
     if (decl.TestAttr(Attribute::GENERIC_INSTANTIATED, Attribute::GENERIC)) {
         attrs.SetAttr(Attribute::UNREACHABLE, true); // Set 'UNREACHABLE' for export.
     }

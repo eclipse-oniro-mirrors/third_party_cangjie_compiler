@@ -859,7 +859,7 @@ Ptr<Value> Translator::TranslateForInIter(const AST::ForInExpr& forInExpr)
         builder.GetType<RefType>(matchTy), matchTy, currentBlock)->GetResult();
     Ptr<Value> iterInit = MakeNone(*matchTy, condLoc);
     CreateWrappedStore(condLoc, iterInit, iterNextLocation, currentBlock);
-    SetSkipPrintWarning(iterInit);
+    SetSkipPrintWarning(*iterInit);
 
     // 3. Translate condition var
     auto recordBlock = currentBlock;
@@ -1010,7 +1010,7 @@ protected:
 
     Value* TranslateBegin()
     {
-        auto& rangeBegin = Is<CallExpr>(range) ? *DynamicCast<CallExpr>(range)->args[0]->expr : range->desugarExpr ?
+        auto& rangeBegin = Is<CallExpr>(range) ? *StaticCast<CallExpr>(range)->args[0]->expr : range->desugarExpr ?
             *StaticCast<CallExpr>(*range->desugarExpr).args[0]->expr : *StaticCast<RangeExpr>(range)->startExpr;
         auto value = Translator::TranslateASTNode(rangeBegin, tr);
         return tr.GetDerefedValue(value, value->GetDebugLocation());

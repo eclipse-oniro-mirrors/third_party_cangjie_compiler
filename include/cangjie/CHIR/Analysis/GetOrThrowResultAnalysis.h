@@ -24,9 +24,9 @@ public:
     GetOrThrowResultDomain() = delete;
     /**
      * @brief constructor for domain definition of get or throw optimization pass.
-     * @param ArgIdxMap index map, value of domain.
+     * @param argIdxMap index map, value of domain.
      */
-    GetOrThrowResultDomain(std::unordered_map<const Value*, size_t>* ArgIdxMap);
+    GetOrThrowResultDomain(std::unordered_map<const Value*, size_t>* argIdxMap);
     ~GetOrThrowResultDomain()
     {
     }
@@ -46,9 +46,9 @@ public:
 
 private:
     /// results of get or throw analysis
-    std::vector<FlatSet<const Apply*>> GetOrThrowResults;
+    std::vector<FlatSet<const Apply>> getOrThrowResults;
     /// from location to index
-    std::unordered_map<const Value*, size_t>* ArgIdxMap;
+    std::unordered_map<const Value*, size_t>* argIdxMap;
 };
 
 template <> const std::string Analysis<GetOrThrowResultDomain>::name;
@@ -93,7 +93,7 @@ public:
 
 private:
     /// from location to index
-    std::unordered_map<const Value*, size_t> ArgIdxMap;
+    std::unordered_map<const Value*, size_t> argIdxMap;
 };
 } // namespace Cangjie::CHIR
 

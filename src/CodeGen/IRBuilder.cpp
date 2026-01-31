@@ -114,8 +114,13 @@ llvm::Instruction* IRBuilder2::CreateEntryAlloca(const CGType& cgType, const llv
             : cgType.GetLLVMType();
         auto allocaInst = CreateEntryAlloca(allocatedType, nullptr, name);
         auto& options = cgMod.GetCGContext().GetCompileOptions();
-        if (allocatedType->isStructTy() && options.enableCompileDebug &&
-            options.optimizationLevel == GlobalOptions::OptimizationLevel::O0) {
+        auto isOptionLikeNonRef = cgType.IsCGEnum() && StaticCast<const CGEnumType*>(&cgType)->IsOptionLikeNonRef();
+        // Zero-initialize memory if:
+        // 1. It is a struct in O0 debug builds.
+        // 2. It is an OptionLikeNonRef type in CJDB mode.
+        if ((allocatedType->isStructTy() && options.enableCompileDebug &&
+        options.optimizationLevel == GlobalOptions::OptimizationLevel::O0) ||
+        (options.cjdbMode && isOptionLikeNonRef)) {
             (void)CreateMemsetStructWith0(allocaInst);
         }
         return allocaInst;
@@ -364,8 +369,9 @@ void IRBuilder2::CreateBoxedValueForValueType(const CHIR::Debug& debugNode, cons
     if (debugNode.GetValue()->IsParameter()) {
         auto payload = GetPayloadFromObject(thisDebug);
         auto castedPtr = CreateBitCast(payload, argType->getPointerTo(1));
-        auto addrType = CGType::GetOrCreate(
-            cgMod, CGType::GetRefTypeOf(cgMod.GetCGContext().GetCHIRBuilder(), *debugNode.GetValue()->GetType()), 1U);
+        auto addrType = CGType::GetOrCreate(cgMod,
+            CGType::GetRefTypeOf(cgMod.GetCGContext().GetCHIRBuilder(), *debugNode.GetValue()->GetType()),
+            CGType::TypeExtraInfo(1U));
         CreateStore(cgValue, CGValue(castedPtr, addrType));
         if (ty->IsStruct()) {
             auto curCHIRFunc = DynamicCast<const CHIR::Func*>(&GetInsertCGFunction()->GetOriginal());

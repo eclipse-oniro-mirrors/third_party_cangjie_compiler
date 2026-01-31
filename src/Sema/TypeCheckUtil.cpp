@@ -624,6 +624,16 @@ Ptr<const Modifier> FindModifier(const Decl& d, TokenKind kind)
     return mod;
 }
 
+Ptr<Annotation> FindFirstAnnotation(const Decl& decl, AnnotationKind kind)
+{
+    auto found = std::find_if(decl.annotations.begin(), decl.annotations.end(),
+        [&kind](const auto& anno) { return anno.get()->kind == kind; });
+    if (found != decl.annotations.end()) {
+        return (*found).get();
+    }
+    return nullptr;
+}
+
 void AddArrayLitConstructor(ArrayLit& al)
 {
     auto decl = Ty::GetDeclPtrOfTy(al.ty);
@@ -869,7 +879,9 @@ bool IsNeedRuntimeCheck(TypeManager& typeManager, Ty& srcTy, Ty& targetTy)
     if (isFinalType(srcTy) && isFinalType(targetTy)) {
         auto srcDecl = Ty::GetDeclPtrOfTy(&srcTy);
         auto targetDecl = Ty::GetDeclPtrOfTy(&targetTy);
-        return srcDecl == targetDecl;
+        if (srcDecl || targetDecl) {
+            return srcDecl == targetDecl;
+        }
     }
     return (srcTy.IsClassLike() && targetTy.IsClassLike()) || srcTy.IsGeneric() || targetTy.IsGeneric() ||
         srcTy.HasGeneric() || targetTy.HasGeneric() || typeManager.IsSubtype(&srcTy, &targetTy, true, false) ||

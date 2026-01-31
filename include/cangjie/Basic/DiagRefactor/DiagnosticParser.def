@@ -29,6 +29,9 @@ ERROR(parse_expected_module_name, "expected module name after keyword 'from', fo
 ERROR(parse_expected_right_delimiter, "unclosed delimiter: '%s'", "expected '%s' here", {
     "to match this opening '%s'",
 })
+ERROR(parse_not_allowed_raw_identifier, "escaped identifier with backticks '%s' is not allowed", {
+    "don't use backticks here",
+})
 ERROR(parse_invalid_return_type, "there should be no return type in a %s")
 
 ERROR(parse_unmatched_right_delimiter, "unmatched delimiter: '%s'", "unmatched delimiter")
@@ -260,6 +263,9 @@ ERROR(parse_duplicated_annotation, "duplicated annotation: '%s'", "duplicated an
 ERROR(parse_conflict_annotation, "'%s' and '%s' annotations conflict on %s", "unexpected annotation", {
     "because it is conflicted with this"
 })
+ERROR(parse_fail_expected_annotation, "expected annotation '%s'", {
+    "declare annotation before this",
+})
 
 // common/platform
 ERROR(parse_common_and_platform_in_the_same_file, "'common' and 'platform' declarations can not be in the same file")
@@ -274,6 +280,7 @@ ERROR(parse_common_in_non_common_file, "common declaration must be defined in co
 ERROR(parse_platform_in_non_platform_file, "platform declaration must be defined in platform package part")
 ERROR(parse_cjmp_generic_decl, "generic declaration can not be '%s'")
 ERROR(parse_cjmp_pattern_decl, "%s pattern can not be '%s'")
+ERROR(parse_cjmp_in_common_ctor_required, "at least one constructor is required in common %s '%s'")
 ERROR(parse_explicitly_abstract_only_for_cjmp_abstract_class, "only common/platform or Native FFI mirror abstract classes can have explicitly abstract %s")
 
 // Modifier related.

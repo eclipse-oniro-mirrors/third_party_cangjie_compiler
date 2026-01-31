@@ -17,9 +17,9 @@
 
 #include "cangjie/Driver/Backend/Backend.h"
 #include "cangjie/Driver/Driver.h"
+#include "cangjie/Driver/Toolchains/ToolChain.h"
 
 namespace Cangjie {
-class ToolChain;
 
 class Gnu : public ToolChain {
 public:

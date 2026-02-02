@@ -23,6 +23,7 @@ OwnedPtr<Decl> JavaDesugarManager::GenerateCJMappingNativeDeleteCjObjectFunc(Dec
     FuncParam* jniEnvPtrParam = nullptr;
     OwnedPtr<Expr> selfParamRef;
     GenerateFuncParamsForNativeDeleteCjObject(decl, params, jniEnvPtrParam, selfParamRef);
+    CJC_NULLPTR_CHECK(jniEnvPtrParam);
 
     auto removeFromRegistryCall = lib.CreateRemoveFromRegistryCall(std::move(selfParamRef));
     auto wrappedNodesLambda = WrapReturningLambdaExpr(typeManager, Nodes(std::move(removeFromRegistryCall)));
@@ -70,6 +71,7 @@ OwnedPtr<Decl> JavaDesugarManager::GenerateNativeInitCjObjectFuncForEnumCtorNoPa
     PushEnvParams(params, "env");
     auto curFile = ctor.curFile;
     CJC_NULLPTR_CHECK(curFile);
+    CJC_ASSERT_WITH_MSG(!params.empty(), "jniEnvPtrParam is absent");
     auto& jniEnvPtrParam = *(params[0]);
 
     std::vector<OwnedPtr<FuncParamList>> paramLists;
@@ -116,6 +118,7 @@ void JavaDesugarManager::GenerateForCJEnumMapping(AST::EnumDecl& enumDecl)
             generatedDecls.push_back(GenerateNativeMethod(*fd, enumDecl));
         } else if (member->astKind == ASTKind::PROP_DECL && !member->TestAttr(Attribute::COMPILER_ADD)) {
             const PropDecl& propDecl = *StaticAs<ASTKind::PROP_DECL>(member.get());
+            CJC_ASSERT_WITH_MSG(!propDecl.getters.empty(), "property must have a getter");
             const OwnedPtr<FuncDecl>& funcDecl = propDecl.getters[0];
             auto getSignature = GetJniMethodNameForProp(propDecl, false);
             auto nativeMethod = GenerateNativeMethod(*funcDecl.get(), enumDecl);

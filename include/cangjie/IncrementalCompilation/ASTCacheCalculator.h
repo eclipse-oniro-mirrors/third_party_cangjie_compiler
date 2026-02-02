@@ -36,7 +36,7 @@ public:
     FileMap fileMap;
 
 private:
-    class ASTCacheCalculatorImpl* impl;
+    OwnedPtr<class ASTCacheCalculatorImpl> impl;
 };
 } // namespace Cangjie::IncrementalCompilation
 

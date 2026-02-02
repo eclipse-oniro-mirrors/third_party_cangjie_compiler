@@ -328,6 +328,8 @@ void JavaDesugarManager::DesugarJavaMirrorConstructor(FuncDecl& ctor, FuncDecl& 
     OwnedPtr<CallExpr> newObjectCall;
 
     if (IsJArray(*ctor.outerDecl)) {
+        CJC_ASSERT_WITH_MSG(
+            !ctor.outerDecl->generic->typeParameters.empty(), "JArray ctor must be generic");
         auto genericParam = ctor.outerDecl->generic->typeParameters[0].get();
         newObjectCall = lib.CreateCFFINewJavaArrayCall(
             WithinFile(CreateRefExpr(*jniEnvVar), curFile), *ctor.funcBody->paramLists[0], genericParam);
@@ -364,6 +366,7 @@ void JavaDesugarManager::AddJavaMirrorMethodBody(const ClassLikeDecl& mirror, Fu
     }
 
     OwnedPtr<Expr> methodCall;
+    CJC_ASSERT_WITH_MSG(!fun.funcBody->paramLists.empty(), "paramLists cannot be empty");
     auto& paramList = *fun.funcBody->paramLists[0].get();
     if (fun.TestAttr(Attribute::STATIC)) {
         methodCall = lib.CreateCFFICallStaticMethodCall(
@@ -371,6 +374,8 @@ void JavaDesugarManager::AddJavaMirrorMethodBody(const ClassLikeDecl& mirror, Fu
             paramList, *curFile);
     } else {
         if (IsJArray(mirror)) {
+            CJC_ASSERT_WITH_MSG(
+                !mirror.generic->typeParameters.empty(), "JArray ctor must be generic");
             auto genericParam = mirror.generic->typeParameters[0].get();
             CJC_ASSERT(genericParam);
             methodCall = lib.CreateCFFICallArrayMethodCall(
@@ -474,6 +479,9 @@ void JavaDesugarManager::InsertJavaMirrorPropSetter(PropDecl& prop)
     auto curFile = prop.curFile;
     OwnedPtr<CallExpr> jniSetterCall;
 
+    CJC_ASSERT_WITH_MSG(!prop.setters.empty(), "expected at least one setter");
+    CJC_ASSERT_WITH_MSG(!prop.setters[0]->funcBody->paramLists.empty(), "setter paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(!prop.setters[0]->funcBody->paramLists[0]->params.empty(), "setter params cannot be empty");
     auto paramRef = WithinFile(CreateRefExpr(*prop.setters[0]->funcBody->paramLists[0]->params[0]), curFile);
 
     if (prop.TestAttr(Attribute::STATIC)) {
@@ -603,6 +611,7 @@ void JavaDesugarManager::ReplaceCallsWithArrayJavaEntityGet(File& file)
         }
 
         auto ma = As<ASTKind::MEMBER_ACCESS>(callExpr->baseFunc);
+        CJC_ASSERT_WITH_MSG(!ma->baseExpr->ty->typeArgs.empty(), "JArray type must be generic");
         auto arrayElementType = ma->baseExpr->ty->typeArgs[0];
 
         if (!arrayElementType->IsClass() && !arrayElementType->IsCoreOptionType()) {
@@ -645,6 +654,7 @@ void JavaDesugarManager::ReplaceCallsWithArrayJavaEntitySet(File& file)
         }
 
         auto ma = As<ASTKind::MEMBER_ACCESS>(callExpr->baseFunc);
+        CJC_ASSERT_WITH_MSG(!ma->baseExpr->ty->typeArgs.empty(), "JArray type must be generic");
         auto arrayElementType = ma->baseExpr->ty->typeArgs[0];
 
         if (!arrayElementType->IsClass() && !arrayElementType->IsCoreOptionType()) {

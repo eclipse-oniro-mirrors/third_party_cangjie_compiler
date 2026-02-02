@@ -85,13 +85,13 @@ public:
     // FrontendTool/SourceManager/Parse/Macro/stdlib/unittests.
     Token Next(); // read and return next token
 
-    void ReserveToken(size_t num, bool skipNewline);
+    void ReserveToken(size_t num, bool skipNewline, bool skipComments);
 
     // Parse/unittests.
     const std::list<Token>& LookAhead(size_t num);
     bool Seeing(const std::vector<TokenKind>::const_iterator& begin, const std::vector<TokenKind>::const_iterator& end,
-        bool skipNewline = false);
-    bool Seeing(const std::vector<TokenKind>& kinds, bool skipNewline = false);
+        bool skipNewline = false, bool skipComments = true);
+    bool Seeing(const std::vector<TokenKind>& kinds, bool skipNewline = false, bool skipComments = true);
 
     // Parse.
     std::list<Token> LookAheadSkipNL(size_t num);
@@ -333,8 +333,6 @@ private:
         tokenMap[TOKENS[commonIndex]] = static_cast<TokenKind>(commonIndex);
         auto platformIndex = static_cast<unsigned char>(TokenKind::PLATFORM);
         tokenMap[TOKENS[platformIndex]] = static_cast<TokenKind>(platformIndex);
-        auto dcIndex = static_cast<unsigned char>(TokenKind::DOUBLE_COLON);
-        tokenMap[TOKENS[dcIndex]] = static_cast<TokenKind>(dcIndex);
         tokenMap["true"] = TokenKind::BOOL_LITERAL;
         tokenMap["false"] = TokenKind::BOOL_LITERAL;
         auto ftrIndex = static_cast<unsigned char>(TokenKind::FEATURES);

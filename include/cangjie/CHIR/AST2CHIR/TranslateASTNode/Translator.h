@@ -25,6 +25,7 @@
 #include "cangjie/CHIR/Value.h"
 #include "cangjie/Option/Option.h"
 #include "cangjie/Sema/GenericInstantiationManager.h"
+#include "cangjie/Utils/CheckUtils.h"
 #include "cangjie/Utils/SafePointer.h"
 #include "cangjie/Utils/Utils.h"
 
@@ -653,6 +654,7 @@ private:
     /** @brief Wrapped expression creation to handle both normal context and try-catch context.*/
     template <typename TExpr, typename... Args> Expression* TryCreate(Block* parent, Args&&... args)
     {
+        CJC_NULLPTR_CHECK(parent);
         if (tryCatchContext.empty()) {
             auto expr = CreateAndAppendExpression<CHIRNodeNormalT<TExpr>>(std::forward<Args>(args)..., parent);
             return expr;
@@ -667,6 +669,7 @@ private:
     template <typename TExpr, typename... Args>
     Expression* TryCreateWithOV(Block* parent, bool mayThrowE, OverflowStrategy ofs, Args&&... args)
     {
+        CJC_NULLPTR_CHECK(parent);
         if (tryCatchContext.empty() || !mayThrowE) {
             return CreateAndAppendExpression<CHIRNodeNormalT<TExpr>>(std::forward<Args>(args)..., ofs, parent);
         }
@@ -676,6 +679,7 @@ private:
     template <typename... Args>
     Expression* TryCreateCastWithOV(Block* parent, bool mayThrowE, OverflowStrategy ofs, Args&&... args)
     {
+        CJC_NULLPTR_CHECK(parent);
         if (tryCatchContext.empty() || !mayThrowE) {
             return CreateAndAppendExpression<TypeCast>(std::forward<Args>(args)..., ofs, parent);
         }
@@ -685,6 +689,7 @@ private:
     template <typename TEx, typename... Args>
     TEx* TryCreateExceptionTerminator(Block& parent, Args&&... args)
     {
+        CJC_ASSERT(!tryCatchContext.empty());
         auto errBB = tryCatchContext.top();
         auto sucBB = CreateBlock();
         if (delayExitSignal && !blockGroupStack.empty() && blockGroupStack.back() != errBB->GetParentBlockGroup()) {

@@ -419,7 +419,7 @@ private:
      */
     bool ResolveImportedPackageForFile(AST::File& file, bool isRecursive = false);
 
-    void HandleSTDPackage(const std::string& fullPackageName, const std::string& cjoPath, bool isRecursive = false);
+    void HandleStdPackage(const std::string& fullPackageName, const std::string& cjoPath, bool isRecursive = false);
 
     void AddImportedDeclsForSourcePackage(const AST::Package& pkg);
 

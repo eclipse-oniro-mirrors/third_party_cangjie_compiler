@@ -426,6 +426,7 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateJavaEntityCall(Ptr<File> file)
 
     for (auto& decl : javaEntityDecl->body->decls) {
         if (auto ctor = As<ASTKind::FUNC_DECL>(decl.get())) {
+            CJC_ASSERT_WITH_MSG(!ctor->funcBody->paramLists.empty(), "at least one paramLists expected");
             if (ctor->funcBody->paramLists[0]->params.empty()) {
                 suitableCtor = ctor;
                 break;
@@ -460,6 +461,7 @@ OwnedPtr<Expr> InteropLibBridge::CreateJavaEntityFromOptionMirror(OwnedPtr<Expr>
 {
     auto curFile = option->curFile;
     CJC_NULLPTR_CHECK(curFile);
+    CJC_ASSERT_WITH_MSG(!option->ty->typeArgs.empty(), "Option type must be generic");
     auto mirrorTy = option->ty->typeArgs[0];
     // `case Some(argv) => argv.javaref`
     auto vp = CreateVarPattern(V_COMPILER, mirrorTy);
@@ -501,6 +503,7 @@ OwnedPtr<Expr> InteropLibBridge::CreateJavaEntityCall(OwnedPtr<Expr> arg)
             return CreateJavaRefCall(std::move(arg));
         }
     } else if (arg->ty->IsCoreOptionType()) {
+        CJC_ASSERT_WITH_MSG(!arg->ty->typeArgs.empty(), "Option type must be generic");
         if (auto classALTy = DynamicCast<ClassLikeTy*>(arg->ty->typeArgs[0])) {
             if (auto decl = classALTy->commonDecl;
                 decl && decl->TestAnyAttr(Attribute::JAVA_MIRROR, Attribute::JAVA_MIRROR_SUBTYPE)) {
@@ -513,6 +516,7 @@ OwnedPtr<Expr> InteropLibBridge::CreateJavaEntityCall(OwnedPtr<Expr> arg)
 
     for (auto& decl : javaEntityDecl->body->decls) {
         if (auto ctor = As<ASTKind::FUNC_DECL>(decl.get()); ctor && ctor->TestAttr(Attribute::CONSTRUCTOR)) {
+            CJC_ASSERT_WITH_MSG(!ctor->funcBody->paramLists.empty(), "paramLists cannot be empty");
             if (ctor->funcBody->paramLists[0]->params.size() != 1) {
                 continue;
             }
@@ -558,7 +562,13 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateNewJavaObjectCall(OwnedPtr<Expr> env,
         return nullptr;
     }
 
+    CJC_ASSERT_WITH_MSG(!jclassInitFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(jclassInitFuncDecl->funcBody->paramLists[0]->params.size() > 1,
+        "at least 2 parameters expected for classInit function");
     CJC_ASSERT(jclassInitFuncDecl->funcBody->paramLists[0] && jclassInitFuncDecl->funcBody->paramLists[0]->params[1]);
+    CJC_ASSERT_WITH_MSG(!callNestFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(!callNestFuncDecl->funcBody->paramLists[0]->params.empty(),
+        "at least 1 parameter expected for callNestInit function");
     CJC_ASSERT(callNestFuncDecl->funcBody->paramLists[0] && callNestFuncDecl->funcBody->paramLists[0]->params[0]);
     auto strTy = jclassInitFuncDecl->funcBody->paramLists[0]->params[1]->ty;
     auto intTy = callNestFuncDecl->funcBody->paramLists[0]->params[0]->ty;
@@ -682,6 +692,7 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateCFFINewJavaArrayCall(
     auto typeMatch = CreateMatchByTypeArgument(genericParam,
         GenerateTypeMappingWithSelector([this](TypeKind kind, Ptr<Ty> ty) { return SelectJSigByTypeKind(kind, ty); }),
         strTy, std::move(defaultTypeOption));
+    CJC_ASSERT_WITH_MSG(!params.params.empty(), "mandatory size param is absent");
     auto sizeParam = WithinFile(CreateRefExpr(*params.params[0]), curFile);
 
     return CreateCall(funcDecl, curFile, std::move(jniEnv), std::move(typeMatch), std::move(sizeParam));
@@ -776,7 +787,13 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateCallMethodCall(OwnedPtr<Expr> env, Ow
         return nullptr;
     }
 
+    CJC_ASSERT_WITH_MSG(!jclassInitFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(jclassInitFuncDecl->funcBody->paramLists[0]->params.size() > 1,
+        "at least 2 parameters expected for classInit function");
     CJC_ASSERT(jclassInitFuncDecl->funcBody->paramLists[0] && jclassInitFuncDecl->funcBody->paramLists[0]->params[1]);
+    CJC_ASSERT_WITH_MSG(!callNestFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(!callNestFuncDecl->funcBody->paramLists[0]->params.empty(),
+        "at least 1 parameter expected for callNestInit function");
     CJC_ASSERT(callNestFuncDecl->funcBody->paramLists[0] && callNestFuncDecl->funcBody->paramLists[0]->params[0]);
     auto strTy = jclassInitFuncDecl->funcBody->paramLists[0]->params[1]->ty;
     auto intTy = callNestFuncDecl->funcBody->paramLists[0]->params[0]->ty;
@@ -824,7 +841,13 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateCallStaticMethodCall(
         return nullptr;
     }
 
+    CJC_ASSERT_WITH_MSG(!jclassInitFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(jclassInitFuncDecl->funcBody->paramLists[0]->params.size() > 1,
+        "at least 2 parameters expected for classInit function");
     CJC_ASSERT(jclassInitFuncDecl->funcBody->paramLists[0] && jclassInitFuncDecl->funcBody->paramLists[0]->params[1]);
+    CJC_ASSERT_WITH_MSG(!callNestFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(!callNestFuncDecl->funcBody->paramLists[0]->params.empty(),
+        "at least 1 parameter expected for callNestInit function");
     CJC_ASSERT(callNestFuncDecl->funcBody->paramLists[0] && callNestFuncDecl->funcBody->paramLists[0]->params[0]);
     auto strTy = jclassInitFuncDecl->funcBody->paramLists[0]->params[1]->ty;
     auto intTy = callNestFuncDecl->funcBody->paramLists[0]->params[0]->ty;
@@ -898,6 +921,7 @@ OwnedPtr<Expr> InteropLibBridge::CreateCFFICallArrayMethodCall(OwnedPtr<Expr> jn
     FuncParamList& params, const Ptr<GenericParamDecl> genericParam, ArrayOperationKind kind)
 {
     CJC_ASSERT(kind == ArrayOperationKind::GET || kind == ArrayOperationKind::SET);
+    CJC_ASSERT_WITH_MSG(params.params.size() > 1, "expected at least two parameters");
 
     static auto javaEntityKindDecl = GetJavaEntityKindDecl();
     static auto jObject = utils.GetJObjectDecl();
@@ -1065,6 +1089,7 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateGetFromRegistryOptionCall(OwnedPtr<Ex
     callArgs.push_back(CreateFuncArg(std::move(self)));
 
     auto fdRef = WithinFile(CreateRefExpr(*funcDecl), curFile);
+    CJC_ASSERT_WITH_MSG(!ty->typeArgs.empty(), "Option type expected to be generic");
     fdRef->instTys.push_back(ty->typeArgs[0]);
     fdRef->ty = typeManager.GetInstantiatedTy(funcDecl->ty, GenerateTypeMapping(*funcDecl, fdRef->instTys));
     return CreateCallExpr(std::move(fdRef), std::move(callArgs), funcDecl, ty, CallKind::CALL_DECLARED_FUNCTION);
@@ -1082,6 +1107,9 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateGetFieldCall(OwnedPtr<Expr> env, Owne
         return nullptr;
     }
 
+    CJC_ASSERT_WITH_MSG(!jclassInitFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(jclassInitFuncDecl->funcBody->paramLists[0]->params.size() > 1,
+        "at least 2 parameters expected for classInit function");
     CJC_ASSERT(jclassInitFuncDecl->funcBody->paramLists[0] && jclassInitFuncDecl->funcBody->paramLists[0]->params[1]);
     auto strTy = jclassInitFuncDecl->funcBody->paramLists[0]->params[1]->ty;
 
@@ -1114,6 +1142,9 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateGetStaticFieldCall(
         return nullptr;
     }
 
+    CJC_ASSERT_WITH_MSG(!jclassInitFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(jclassInitFuncDecl->funcBody->paramLists[0]->params.size() > 1,
+        "at least 2 parameters expected for classInit function");
     CJC_ASSERT(jclassInitFuncDecl->funcBody->paramLists[0] && jclassInitFuncDecl->funcBody->paramLists[0]->params[1]);
     auto strTy = jclassInitFuncDecl->funcBody->paramLists[0]->params[1]->ty;
 
@@ -1141,6 +1172,9 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateSetFieldCall(
         return nullptr;
     }
 
+    CJC_ASSERT_WITH_MSG(!jclassInitFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(jclassInitFuncDecl->funcBody->paramLists[0]->params.size() > 1,
+        "at least 2 parameters expected for classInit function");
     CJC_ASSERT(jclassInitFuncDecl->funcBody->paramLists[0] && jclassInitFuncDecl->funcBody->paramLists[0]->params[1]);
     auto strTy = jclassInitFuncDecl->funcBody->paramLists[0]->params[1]->ty;
 
@@ -1172,6 +1206,9 @@ OwnedPtr<CallExpr> InteropLibBridge::CreateSetStaticFieldCall(OwnedPtr<Expr> env
         return nullptr;
     }
 
+    CJC_ASSERT_WITH_MSG(!jclassInitFuncDecl->funcBody->paramLists.empty(), "paramLists cannot be empty");
+    CJC_ASSERT_WITH_MSG(jclassInitFuncDecl->funcBody->paramLists[0]->params.size() > 1,
+        "at least 2 parameters expected for classInit function");
     CJC_ASSERT(jclassInitFuncDecl->funcBody->paramLists[0] && jclassInitFuncDecl->funcBody->paramLists[0]->params[1]);
     auto strTy = jclassInitFuncDecl->funcBody->paramLists[0]->params[1]->ty;
 
@@ -1226,6 +1263,7 @@ Ptr<PropDecl> GetJavaEntityIsNullCall(StructDecl& entityDecl)
     if (!isNullProp) {
         return nullptr;
     }
+    CJC_ASSERT_WITH_MSG(!isNullProp->getters.empty(), "getters cannot be empty");
     auto access = CreateMemberAccess(std::move(entity), *isNullProp->getters[0]);
     CopyBasicInfo(access->baseExpr.get(), access.get());
     auto call =
@@ -1242,7 +1280,7 @@ OwnedPtr<Expr> InteropLibBridge::UnwrapJavaMirrorOption(
     CJC_ASSERT(ty->IsCoreOptionType());
     auto curFile = entity->curFile;
     CJC_NULLPTR_CHECK(curFile);
-
+    CJC_ASSERT_WITH_MSG(!ty->typeArgs.empty(), "Option type must be generic");
     auto declTy = ty->typeArgs[0];
     auto decl = Ty::GetDeclOfTy(declTy);
     CJC_ASSERT(IsMirror(*decl) || declTy->IsString() || (toRaw && IsImpl(*decl)));
@@ -1262,6 +1300,7 @@ OwnedPtr<Expr> InteropLibBridge::UnwrapJavaMirrorOption(
 OwnedPtr<Expr> InteropLibBridge::UnwrapJavaImplOption(
     OwnedPtr<Expr> env, OwnedPtr<Expr> entityOption, Ptr<Ty> ty, const ClassLikeDecl& mirror, bool toRaw)
 {
+    CJC_ASSERT_WITH_MSG(!ty->typeArgs.empty(), "Option type must be generic");
     auto actualTy = ty->typeArgs[0];
     auto regCall = CreateGetFromRegistryByEntityCall(std::move(env), std::move(entityOption), actualTy, true);
     if (!toRaw) {
@@ -1298,6 +1337,7 @@ OwnedPtr<Expr> InteropLibBridge::UnwrapJavaArrayEntity(OwnedPtr<Expr> entity, Pt
     varPattern->curFile = curFile;
     varPattern->varDecl->curFile = curFile;
     auto varPatternRef = WithinFile(CreateRefExpr(*(varPattern->varDecl)), curFile);
+    CJC_ASSERT_WITH_MSG(!mirror.generic->typeParameters.empty(), "JArray type must be generic");
     auto genericParam = mirror.generic->typeParameters[0].get();
     auto entityPtr = entity.get();
 
@@ -1354,6 +1394,7 @@ OwnedPtr<Expr> InteropLibBridge::UnwrapJavaEntity(OwnedPtr<Expr> entity, Ptr<Ty>
     if (ty->IsCoreOptionType()) {
         auto classLikeDecl = DynamicCast<const ClassLikeDecl*>(&outerDecl);
         CJC_NULLPTR_CHECK(classLikeDecl);
+        CJC_ASSERT_WITH_MSG(!ty->typeArgs.empty(), "Option type must be generic");
         auto actualTy = ty->typeArgs[0];
         auto actualDecl = Ty::GetDeclOfTy(actualTy);
         if (IsMirror(*actualDecl) || actualTy->IsString()) {

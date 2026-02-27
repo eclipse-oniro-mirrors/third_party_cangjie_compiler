@@ -44,7 +44,7 @@ class CjoManager;
 class ASTWriter {
 public:
     ASTWriter(DiagnosticEngine& diag, const std::string& packageDepInfo, const ExportConfig& exportCfg,
-        const CjoManager& cjoManager);
+        const CjoManager& cjoManager, TypeManager& typeManager);
     ~ASTWriter();
 
     // Add for cjmp

@@ -22,7 +22,7 @@ class GlobalDeclAnalysis {
 public:
     GlobalDeclAnalysis(DiagAdapter& ciDiag, const GenericInstantiationManager* gim, IncreKind kind,
         const ElementList<Ptr<const AST::Decl>>& funcsAndVars, const ElementList<Ptr<const AST::Decl>>& localConstVars,
-        const StaticInitInfoMap& staticInitFuncInfoMap, bool outputChir = false, bool mergingPlatform = false)
+        const StaticInitInfoMap& staticInitFuncInfoMap, bool outputChir = false, bool mergingSpecific = false)
         : diag(&ciDiag),
           gim(gim),
           kind(kind),
@@ -30,7 +30,7 @@ public:
           localConstVars(localConstVars),
           staticInitFuncInfoMap(staticInitFuncInfoMap),
           outputChir(outputChir),
-          mergingPlatform(mergingPlatform)
+          mergingSpecific(mergingSpecific)
     {
     }
 
@@ -113,7 +113,7 @@ private:
     // to determine a final init order of all variables
     DeclDepMap globalVarsAndLocalConstVarsDepMap;
     bool outputChir = false;
-    bool mergingPlatform = false;
+    bool mergingSpecific = false;
 };
 
 template <class T> class DepsUnit {

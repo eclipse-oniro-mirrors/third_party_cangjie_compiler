@@ -65,7 +65,7 @@ public:
     bool isChirNow = false;
 
 private:
-friend ASTLoader;
+    friend ASTLoader;
     std::vector<uint8_t> data;
     TypeManager& typeManager;
     DiagnosticEngine& diag;
@@ -366,7 +366,7 @@ friend ASTLoader;
     void LoadMatchCaseRef(FormattedIndex index, AST::MatchCase& mc, AST::Expr& selector);
 
     OwnedPtr<AST::Annotation> LoadAnnotation(const PackageFormat::Anno& rawAnno);
-    OwnedPtr<AST::FuncArg> LoadAnnotationArg(const PackageFormat::AnnoArg& rawArg);
+    std::vector<OwnedPtr<AST::FuncArg>> LoadAnnotationArgs(const PackageFormat::Anno& rawAnno);
 };
 } // namespace Cangjie
 

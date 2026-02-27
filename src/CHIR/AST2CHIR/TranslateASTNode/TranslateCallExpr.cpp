@@ -886,7 +886,7 @@ public func runInCommon() {
 
 // NOTE: More precise check: there is common class parent that is child of those providing current implementation.
 */
-inline bool CanActualFuncBeMovedInPlatform(const Type& thisType, CHIRBuilder& builder)
+inline bool CanActualFuncBeMovedInSpecific(const Type& thisType, CHIRBuilder& builder)
 {
     if (!thisType.IsStruct() && !thisType.IsEnum()) {
         return false;
@@ -896,7 +896,7 @@ inline bool CanActualFuncBeMovedInPlatform(const Type& thisType, CHIRBuilder& bu
     auto inheritanceList = customType.GetCustomTypeDef()->GetSuperTypesRecusively(builder);
     for (auto parentType: inheritanceList) {
         auto parent = parentType->GetCustomTypeDef();
-        if (parent->TestAttr(Attribute::COMMON) || parent->TestAttr(Attribute::PLATFORM)) {
+        if (parent->TestAttr(Attribute::COMMON) || parent->TestAttr(Attribute::SPECIFIC)) {
             return true;
         }
     }
@@ -964,7 +964,7 @@ Value* Translator::TranslateNonStaticMemberFuncCall(const AST::CallExpr& expr)
     bool calledByInheritableTy = thisType->IsClass() || thisType->IsGeneric();
     bool isSuperCall = expr.callKind == AST::CallKind::CALL_SUPER_FUNCTION;
     Expression* funcCall = nullptr;
-    bool mayFuncBeMovedInPlatform = CanActualFuncBeMovedInPlatform(*thisType, builder);
+    bool mayFuncBeMovedInPlatform = CanActualFuncBeMovedInSpecific(*thisType, builder);
     // NOTE: Looks like current devirtualization assumptions is quite naive, it can be eager.
     if ((calledByInheritableTy || mayFuncBeMovedInPlatform) && !isSuperCall && IsVirtualMember(*resolvedFunction)) {
         CJC_ASSERT(args.size() >= 1);

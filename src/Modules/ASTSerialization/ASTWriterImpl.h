@@ -52,8 +52,12 @@ struct NodeInfo {
 class ASTWriter::ASTWriterImpl {
 public:
     ASTWriterImpl(DiagnosticEngine& diag, const std::string& packageDepInfo, const ExportConfig& exportCfg,
-        const CjoManager& cjoManager)
-        : diag(diag), config(exportCfg), packageDepInfo(packageDepInfo), cjoManager(cjoManager)
+        const CjoManager& cjoManager, TypeManager& typeManager)
+        : diag(diag),
+          config(exportCfg),
+          packageDepInfo(packageDepInfo),
+          cjoManager(cjoManager),
+          typeManager(typeManager)
     {
     }
     ~ASTWriterImpl()
@@ -84,6 +88,7 @@ private:
     flatbuffers::FlatBufferBuilder builder{INITIAL_FILE_SIZE};
     std::string packageDepInfo;
     const CjoManager& cjoManager;
+    TypeManager& typeManager;
     /** All serialized node index in order. */
     // Save all imported packages, the vector pos is package index.
     std::vector<TStringOffset> allPackages;
@@ -208,7 +213,7 @@ private:
         // SuperInterfaceTypes.
         std::vector<FormattedIndex> superInterfaceTypes;
         for (auto& it : decl.inheritedTypes) {
-            superInterfaceTypes.push_back(SaveType(it->ty));
+            superInterfaceTypes.push_back(SaveType(typeManager.ObtainsAliasType(it.get())));
         }
         return builder.CreateVector<FormattedIndex>(superInterfaceTypes);
     }

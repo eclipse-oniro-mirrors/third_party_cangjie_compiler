@@ -107,6 +107,7 @@ private:
     TempFileInfo CreateLinuxLLVMOptOutputBcFileInfo(const TempFileInfo& info, TempFileKind kind);
 #endif
     std::string GetDylibSuffix() const;
+    std::string GetObjSuffix() const;
 };
 
 } // namespace Cangjie

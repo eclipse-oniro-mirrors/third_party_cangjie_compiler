@@ -1,55 +1,55 @@
 diff --git a/.gitcode/ISSUE_TEMPLATE/bug-report.yml b/.gitcode/ISSUE_TEMPLATE/bug-report.yml
 new file mode 100644
-index 000000000..58e84ce22
+index 000000000..2672d0d19
 --- /dev/null
 +++ b/.gitcode/ISSUE_TEMPLATE/bug-report.yml
 @@ -0,0 +1,57 @@
-+name: 缺陷反馈|Bug
-+description: 当您发现了一个缺陷，需要向社区反馈时，请使用此模板。
++name: "缺陷反馈|Bug"
++description: "当您发现了一个缺陷，需要向社区反馈时，请使用此模板。 Please use this template when you find a bug and want to report it to the community."
 +title: "[Bug]: "
 +labels: ["bug"]
 +body:
 +  - type: markdown
 +    attributes:
 +      value: |
-+        感谢对仓颉社区的支持与关注，欢迎反馈缺陷。
++        感谢对仓颉社区的支持与关注，欢迎反馈缺陷。 | Thanks for your support and attention to the community. We welcome feedback on any issues.
 +  - type: textarea
 +    attributes:
-+      label: 发生了什么问题？
-+      description: 提供尽可能多的信息描述产生了什么问题：
++      label: "发生了什么问题？ | Describe the issue that occurred."
++      description: "提供尽可能多的信息描述产生了什么问题： | Provide as much information as possible describing what issue occurred."
 +      placeholder: ""
 +    validations:
 +      required: true
 +  - type: textarea
 +    attributes:
-+      label: 期望行为是什么？
-+      description: 描述期望行为或效果应如何：
++      label: "期望行为是什么？ | What is the expected behavior?"
++      description: "描述期望行为或效果应如何： | Describe what the expected behavior or effect should be."
 +      placeholder: ""
 +    validations:
 +      required: true
 +  - type: textarea
 +    attributes:
-+      label: 如何复现该缺陷
-+      description: 提供尽可能多的信息描述如何复现该缺陷：
++      label: "如何复现该缺陷？ | How to reproduce the bug?"
++      description: "提供尽可能多的信息描述如何复现该缺陷： | Provide as much information as possible on how to reproduce the bug."
 +    validations:
 +      required: true
 +  - type: textarea
 +    attributes:
-+      label: 其他补充信息
-+      description: 补充下其他您认为需要提供的信息：
++      label: "其他补充信息 | Additional information"
++      description: "补充下其他您认为需要提供的信息： | Add any other information you think is necessary to provide."
 +    validations:
 +      required: false
 +  - type: textarea
 +    attributes:
-+      label: cjc版本信息
-+      description: 请将cjc -v的输出结果以图片或者文字的形式填写在下方：
++      label: "cjc版本信息 | cjc version information"
++      description: "请将cjc -v的输出结果以图片或者文字的形式填写在下方： | Please provide the output of 'cjc -v' as text or an image below."
 +      placeholder: ""
 +    validations:
 +      required: true
 +  - type: checkboxes
 +    attributes:
-+      label: 分支版本信息
-+      description: 在哪些分支版本存在该缺陷？
++      label: "分支版本信息 | Branch version information"
++      description: "在哪些分支版本存在该缺陷？ | In which branch versions does this bug exist?"
 +      options:
 +        - label: dev
 +          required: false
@@ -72,36 +72,36 @@ index 000000000..ec4bb386b
 \ No newline at end of file
 diff --git a/.gitcode/ISSUE_TEMPLATE/feature-request.yml b/.gitcode/ISSUE_TEMPLATE/feature-request.yml
 new file mode 100644
-index 000000000..5c0abbfcc
+index 000000000..8b024d69e
 --- /dev/null
 +++ b/.gitcode/ISSUE_TEMPLATE/feature-request.yml
 @@ -0,0 +1,37 @@
-+name: 新需求|Feature
-+description: 您需要反馈或实现一个新需求时，使用此模板。
-+title: "[新需求]: "
++name: "新需求|Feature"
++description: "您需要反馈或实现一个新需求时，使用此模板。 Please use this template when you need to request or implement a new feature."
++title: "[Feature]: "
 +labels: ["enhancement"]
 +body:
 +  - type: markdown
 +    attributes:
 +      value: |
-+        感谢提出新需求。
++        感谢提出新需求。 | Thanks for proposing a new feature.
 +  - type: textarea
 +    attributes:
-+      label: 新需求提供了什么功能？
-+      description: 请描述下新需求的功能是什么，解决了什么问题：
++      label: "新需求提供了什么功能？ | What functionality does the new feature provide?"
++      description: "请描述下新需求的功能是什么，解决了什么问题： | Please describe the functionality of the new feature and what problem it solves."
 +    validations:
 +      required: true
 +  - type: textarea
 +    attributes:
-+      label: 该需求带来的价值、应用场景？
-+      description: 请描述下该需求的价值，应用场景等：
++      label: "该需求带来的价值、应用场景？ | Value and application scenarios of the feature?"
++      description: "请描述下该需求的价值，应用场景等： | Please describe the value, application scenarios, etc., of the feature."
 +    validations:
 +      required: false
 +  - type: checkboxes
 +    id: version
 +    attributes:
-+      label: 新需求涉及的分支版本
-+      description: 请选择涉及的分支版本：
++      label: "新需求涉及的分支版本 | Branch versions involved in the new feature"
++      description: "请选择涉及的分支版本： | Please select the involved branch versions."
 +      options:
 +        - label: dev
 +          required: false
@@ -116,30 +116,30 @@ index 000000000..5c0abbfcc
 \ No newline at end of file
 diff --git a/.gitcode/ISSUE_TEMPLATE/question.yml b/.gitcode/ISSUE_TEMPLATE/question.yml
 new file mode 100644
-index 000000000..126942a58
+index 000000000..eefece8f2
 --- /dev/null
 +++ b/.gitcode/ISSUE_TEMPLATE/question.yml
 @@ -0,0 +1,31 @@
-+name: 问题咨询|Question
-+description: 如果您对Cangjie社区有疑问，欢迎反馈咨询。
-+title: "[问题咨询]: "
++name: "问题咨询|Question"
++description: "如果您对Cangjie社区有疑问，欢迎反馈咨询。| If you have any questions about the community, feel free to ask."
++title: "[Question]: "
 +labels: ["question"]
 +body:
 +  - type: markdown
 +    attributes:
 +      value: |
-+        感谢提出问题，我们将安排人答复！
++        感谢提出问题，我们将安排人答复！ | Thanks for asking, we will arrange for someone to reply!
 +  - type: textarea
 +    attributes:
-+      label: 问题描述
-+      description: 请描述下您的问题
++      label: "问题描述 | Question description"
++      description: "请描述下您的问题： | Please describe your question."
 +    validations:
 +      required: true
 +  - type: checkboxes
 +    id: version
 +    attributes:
-+      label: 受影响的分支版本
-+      description: 请选择您的问题涉及的分支版本：
++      label: "受影响的分支版本 | Affected branch versions"
++      description: "请选择您的问题涉及的分支版本： | Please select the branch versions involved in your question."
 +      options:
 +        - label: dev
 +          required: false
@@ -151,6 +151,7 @@ index 000000000..126942a58
 +          required: false
 +    validations:
 +      required: true
+\ No newline at end of file
 diff --git a/.gitcode/PULL_REQUEST_TEMPLATE/PULL_REQUEST_TEMPLATE.md b/.gitcode/PULL_REQUEST_TEMPLATE/PULL_REQUEST_TEMPLATE.md
 new file mode 100644
 index 000000000..024f40f50
@@ -9514,7 +9515,7 @@ index 0c4d9f78c..81b0f2afc 100644
    if (preference == ePreferDemangledWithoutArguments) {
      if (Language *lang = Language::FindPlugin(GuessLanguage())) {
 diff --git a/lldb/source/Core/ValueObject.cpp b/lldb/source/Core/ValueObject.cpp
-index d80139ab1..629ac5aa5 100644
+index d80139ab1..2769268bf 100644
 --- a/lldb/source/Core/ValueObject.cpp
 +++ b/lldb/source/Core/ValueObject.cpp
 @@ -48,6 +48,8 @@
@@ -9693,7 +9694,7 @@ index d80139ab1..629ac5aa5 100644
        if (!bracket_expr.contains('-')) {
          // if no separator, this is of the form [N].  Note that this cannot be
          // an unbounded range of the form [], because that case was handled
-@@ -3137,3 +3208,109 @@ ValueObjectSP ValueObject::Persist() {
+@@ -3137,3 +3208,114 @@ ValueObjectSP ValueObject::Persist() {
  
    return persistent_var_sp->GetValueObject();
  }
@@ -9755,6 +9756,11 @@ index d80139ab1..629ac5aa5 100644
 +    dynamic_name.replace(pos, 1, "::");
 +    // "::" size is 2.
 +    pos = dynamic_name.find(":", pos + 2);
++  }
++  pos = dynamic_name.find("/");
++  while (pos != std::string::npos) {
++    dynamic_name.replace(pos, 1, "::");
++    pos = dynamic_name.find("/", pos + 2);  // size of "::" is 2
 +  }
 +  lldb_private::TypeList types;
 +  llvm::DenseSet<SymbolFile *> searched_symbol_files;
@@ -11333,10 +11339,10 @@ index 000000000..844d69389
 +#endif
 diff --git a/lldb/source/Plugins/ExpressionParser/Cangjie/CangjieCompilerInstance.cpp b/lldb/source/Plugins/ExpressionParser/Cangjie/CangjieCompilerInstance.cpp
 new file mode 100644
-index 000000000..d515e0503
+index 000000000..c1de6c155
 --- /dev/null
 +++ b/lldb/source/Plugins/ExpressionParser/Cangjie/CangjieCompilerInstance.cpp
-@@ -0,0 +1,1253 @@
+@@ -0,0 +1,1263 @@
 +//===-- CangjieCompilerInstance.cpp ---------------------------------------===//
 +//
 +// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
@@ -12199,6 +12205,9 @@ index 000000000..d515e0503
 +      continue;
 +    }
 +    auto impkg = Utils::JoinStrings(im->content.prefixPaths, ".");
++    if (im->content.hasDoubleColon) {
++      impkg.replace(impkg.find("."), 1, PACKAGE_SUFFIX);
++    }
 +    auto find = std::find_if(m_package_names.begin(), m_package_names.end(),
 +        [&impkg](auto& pkg) { return pkg == impkg; });
 +    if (find == m_package_names.end()) {
@@ -12211,6 +12220,7 @@ index 000000000..d515e0503
 +    import->content.prefixDotPoses.resize(prefixLen);
 +    import->content.identifier = "*";
 +    import->content.kind = ImportKind::IMPORT_ALL;
++    import->content.hasDoubleColon = im->content.hasDoubleColon;
 +    import->EnableAttr(Attribute::IMPLICIT_ADD, Attribute::COMPILER_ADD);
 +    import->curFile = file.get();
 +    file->imports.emplace_back(std::move(import));
@@ -12220,11 +12230,16 @@ index 000000000..d515e0503
 +void CangjieCompilerInstance::AddImportSpecToLLDBExprPackage() {
 +  auto tempPkg = this->GetSourcePackages()[0];
 +  for (auto& fPkg : this->m_fake_packages) {
++    auto hasDoubleColon = false;
 +    auto pkgName = fPkg->fullPackageName;
 +    auto pos = pkgName.find(PACKAGE_SUFFIX);
++    if (pos != std::string::npos) {
++      hasDoubleColon = true;
++      pkgName.replace(pos, PACKAGE_SUFFIX.size(), ".");
++    }
 +    auto pkgPath = Utils::SplitQualifiedName(pkgName);
 +    for (auto &file : tempPkg->files) {
-+      auto collectImport = [&file, &pkgPath](Ptr<const Node> curNode) -> VisitAction {
++      auto collectImport = [&file, &pkgPath, &hasDoubleColon](Ptr<const Node> curNode) -> VisitAction {
 +        // locals: vardecl or funcdecl
 +        if (pkgPath.back() == LOCAL_PACKAGE_NAME &&
 +          (curNode->astKind == ASTKind::VAR_DECL || curNode->astKind == ASTKind::FUNC_DECL)) {
@@ -12261,6 +12276,7 @@ index 000000000..d515e0503
 +          importPackage->content.prefixDotPoses.resize(pkgPath.size());
 +          importPackage->content.identifier = "*";
 +          importPackage->content.kind = ImportKind::IMPORT_ALL;
++          importPackage->content.hasDoubleColon = hasDoubleColon;
 +          importPackage->curFile = file.get();
 +          importPackage->EnableAttr(Attribute::IMPLICIT_ADD, Attribute::COMPILER_ADD);
 +          file->imports.emplace_back(std::move(importPackage));
@@ -12673,10 +12689,10 @@ index 000000000..6595dcf91
 +#endif // LLDB_SOURCE_PLUGINS_EXPRESSIONPARSER_CANGJIE_CANGJIECOMPILERINSTANCE_H
 diff --git a/lldb/source/Plugins/ExpressionParser/Cangjie/CangjieDeclMap.cpp b/lldb/source/Plugins/ExpressionParser/Cangjie/CangjieDeclMap.cpp
 new file mode 100644
-index 000000000..6a317a064
+index 000000000..b775b90b7
 --- /dev/null
 +++ b/lldb/source/Plugins/ExpressionParser/Cangjie/CangjieDeclMap.cpp
-@@ -0,0 +1,2265 @@
+@@ -0,0 +1,2285 @@
 +//===-- CangjieDeclMap.cpp ------------------------------------------------===//
 +//
 +// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
@@ -14090,8 +14106,18 @@ index 000000000..6a317a064
 +      continue;
 +    }
 +    auto import = MakeOwned<ImportSpec>();
-+    import->content.prefixPaths = Utils::SplitQualifiedName(fullpkg);
-+
++    auto pos = fullpkg.find(":");
++    if (pos != std::string::npos) {
++      // fullpkg: "org:a"
++      import->content.hasDoubleColon = true;
++      import->content.prefixPaths.emplace_back(fullpkg.substr(0, pos));
++      std::vector<std::string> paths = Utils::SplitQualifiedName(fullpkg.substr(pos + 1));
++      for (auto path : paths) {
++        import->content.prefixPaths.emplace_back(path);
++      }
++    } else {
++      import->content.prefixPaths = Utils::SplitQualifiedName(fullpkg);
++    }
 +    const size_t prefixLen = import->content.prefixPaths.size();
 +    import->content.prefixPoses.resize(prefixLen);
 +    import->content.prefixDotPoses.resize(prefixLen);
@@ -14123,6 +14149,16 @@ index 000000000..6a317a064
 +    pkgname = pkgname.substr(0, pos);
 +    if (pkgname.empty() || pkgname == "std") {
 +      return;
++    }
++    pos = pkgname.find(PACKAGE_SUFFIX);
++    if (pos != std::string::npos) {
++      // "org::a" -> "org:a"
++      pkgname.replace(pos, 1, "");
++    }
++    pos = pkgname.find("/");
++    if (pos != std::string::npos) {
++      // "org/a" -> "org:a"
++      pkgname.replace(pos, 1, ":");
 +    }
 +    m_fullpkgs.insert(pkgname);
 +    Log *log = GetLog(LLDBLog::Expressions);
@@ -15705,10 +15741,10 @@ index 000000000..4d9a88c12
 +#endif // LLDB_SOURCE_PLUGINS_EXPRESSIONPARSER_CANGJIE_CANGJIEEXPRESSIONSOUECECODE_H
 diff --git a/lldb/source/Plugins/ExpressionParser/Cangjie/CangjieIRForTarget.cpp b/lldb/source/Plugins/ExpressionParser/Cangjie/CangjieIRForTarget.cpp
 new file mode 100644
-index 000000000..41ec67c0e
+index 000000000..3fbe52394
 --- /dev/null
 +++ b/lldb/source/Plugins/ExpressionParser/Cangjie/CangjieIRForTarget.cpp
-@@ -0,0 +1,553 @@
+@@ -0,0 +1,558 @@
 +//===-- CangjieIRForTarget.cpp --------------------------------------------===//
 +//
 +// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
@@ -16190,6 +16226,11 @@ index 000000000..41ec67c0e
 +lldb_private::CompilerType CangjieIRForTarget::GetCompilerTypeByName(std::string &name) {
 +  std::string demangled_name = lldb_private::Mangled::GetDemangledTypeName(name);
 +  lldb_private::Log *log = GetLog(LLDBLog::Expressions);
++  auto pos = demangled_name.find(":");
++  if (pos != std::string::npos && pos != demangled_name.find("::")) {
++    // org:a::AA
++    demangled_name.replace(pos, 1, "::");
++  }
 +  auto type = m_decl_map->FindParsedTypesByName(demangled_name);
 +  if (type.GetTypeClass() == lldb::eTypeClassStruct &&
 +    type.GetTypeName().GetStringRef().contains(lldb_private::E0_PREFIX_NAME)) {
@@ -18904,7 +18945,7 @@ index 5ab494414..6521e8519 100644
    ItaniumABILanguageRuntime.cpp
  
 diff --git a/lldb/source/Plugins/LanguageRuntime/CPlusPlus/ItaniumABI/ItaniumABILanguageRuntime.cpp b/lldb/source/Plugins/LanguageRuntime/CPlusPlus/ItaniumABI/ItaniumABILanguageRuntime.cpp
-index 1595335cf..90392cdb9 100644
+index 1595335cf..36c2ad755 100644
 --- a/lldb/source/Plugins/LanguageRuntime/CPlusPlus/ItaniumABI/ItaniumABILanguageRuntime.cpp
 +++ b/lldb/source/Plugins/LanguageRuntime/CPlusPlus/ItaniumABI/ItaniumABILanguageRuntime.cpp
 @@ -4,37 +4,30 @@
@@ -18961,7 +19002,7 @@ index 1595335cf..90392cdb9 100644
  
  char ItaniumABILanguageRuntime::ID = 0;
  
-@@ -182,6 +176,1018 @@ TypeAndOrName ItaniumABILanguageRuntime::GetTypeInfoFromVTableAddress(
+@@ -182,6 +176,1026 @@ TypeAndOrName ItaniumABILanguageRuntime::GetTypeInfoFromVTableAddress(
    return TypeAndOrName();
  }
  
@@ -19076,10 +19117,18 @@ index 1595335cf..90392cdb9 100644
 +    // type_name: "default:A"  ==> "default::A"
 +    while (pos != std::string::npos) {
 +      // type_name: "default:$Captured_Int64"  ==> "default::$Captured_Int64"
-+      temp_name.replace(pos, 1, "::");
++      if (pos != temp_name.find("::")) {
++        // type_name: "org::default:C1", if type_name has org, no need to replace ":" with "::"
++        temp_name.replace(pos, 1, "::");
++      }
 +      pos = temp_name.find(":", pos + 2); // size of "::" is 2
 +    }
-+
++    // "org/pkg::CC"  ==>  "org::pkg::CC"
++    pos = temp_name.find("/");
++    while (pos != std::string::npos) {
++      temp_name.replace(pos, 1, "::");
++      pos = temp_name.find("/", pos + 2); // size of "::" is 2
++    }
 +    return ConstString(temp_name.c_str());
 +}
 +
@@ -19980,7 +20029,7 @@ index 1595335cf..90392cdb9 100644
  bool ItaniumABILanguageRuntime::GetDynamicTypeAndAddress(
      ValueObject &in_value, lldb::DynamicValueType use_dynamic,
      TypeAndOrName &class_type_or_name, Address &dynamic_address,
-@@ -193,7 +1199,16 @@ bool ItaniumABILanguageRuntime::GetDynamicTypeAndAddress(
+@@ -193,7 +1207,16 @@ bool ItaniumABILanguageRuntime::GetDynamicTypeAndAddress(
    // contain the full class name. The second pointer above the "address point"
    // is the "offset_to_top".  We'll use that to get the start of the value
    // object which holds the dynamic type.
@@ -24870,7 +24919,7 @@ index 19e00e111..324854824 100644
      if (llvm::Expected<APFloat::opStatus> op =
              f.convertFromString(value_str, APFloat::rmNearestTiesToEven)) {
 diff --git a/lldb/source/Version/Version.cpp b/lldb/source/Version/Version.cpp
-index b391fe1ea..5e179447d 100644
+index b391fe1ea..3f125b499 100644
 --- a/lldb/source/Version/Version.cpp
 +++ b/lldb/source/Version/Version.cpp
 @@ -4,6 +4,12 @@
@@ -24926,7 +24975,7 @@ index b391fe1ea..5e179447d 100644
        g_version_str += "\n  llvm revision ";
        g_version_str += llvm_rev;
      }
-+    g_version_str += "\n  cangjie 1.1.0-beta.20";
++    g_version_str += "\n  cangjie 1.1.0-beta.21";
    }
  
    return g_version_str.c_str();
@@ -50750,10 +50799,10 @@ index 8c77b6937..4e65ed2e2 100644
        F->addParamAttr(ArgNo, Attribute::NoAlias);
 diff --git a/llvm/lib/Transforms/IPO/CJPartialEscapeAnalysis.cpp b/llvm/lib/Transforms/IPO/CJPartialEscapeAnalysis.cpp
 new file mode 100644
-index 000000000..b0332af40
+index 000000000..6ac2fa303
 --- /dev/null
 +++ b/llvm/lib/Transforms/IPO/CJPartialEscapeAnalysis.cpp
-@@ -0,0 +1,3403 @@
+@@ -0,0 +1,3406 @@
 +//===- CJPartialEscapeAnalysis.cpp - escape analysis for Cangjie ----------===//
 +//
 +// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
@@ -53571,6 +53620,9 @@ index 000000000..b0332af40
 +        SrcMP = findSrcMP(BaseV, VPOffset, I->getParent());
 +        SrcMPCache.insert({CacheKey, SrcMP});
 +      }
++      // The definition of Base is itself, skip it.
++      if (SrcMP->P == Base && VPOffset == PVOffset)
++        continue;
 +      MemPtr *MP = MemPtr::create(Base, PVOffset, *this, LI);
 +      MP->insertDefine(I->getParent(), SrcMP);
 +      if (!Def[I->getParent()][Base][PVOffset].empty()) {
@@ -54349,7 +54401,7 @@ index 50710eaa1..b9065ec1a 100644
  
  /// Deduce returned attributes for the SCC.
 diff --git a/llvm/lib/Transforms/IPO/GlobalDCE.cpp b/llvm/lib/Transforms/IPO/GlobalDCE.cpp
-index f35827220..3b41e6e8d 100644
+index f35827220..7314c5751 100644
 --- a/llvm/lib/Transforms/IPO/GlobalDCE.cpp
 +++ b/llvm/lib/Transforms/IPO/GlobalDCE.cpp
 @@ -18,6 +18,7 @@
@@ -54492,7 +54544,7 @@ index f35827220..3b41e6e8d 100644
    // Make sure that all memory is released
    AliveGlobals.clear();
    ConstantDependenciesCache.clear();
-@@ -458,3 +503,356 @@ PreservedAnalyses GlobalDCEPass::run(Module &M, ModuleAnalysisManager &MAM) {
+@@ -458,3 +503,357 @@ PreservedAnalyses GlobalDCEPass::run(Module &M, ModuleAnalysisManager &MAM) {
      return PreservedAnalyses::none();
    return PreservedAnalyses::all();
  }
@@ -54702,23 +54754,24 @@ index f35827220..3b41e6e8d 100644
 +  // mtable needs to remain alive even though neither target type nor interface
 +  // is in use.
 +  if (GVU->isCJOuterTypeExtensions()) {
-+    auto IsInternalType = [](GlobalVariable *TI) {
-+      auto *TT = TI->getInitializer()
++    auto IsInternalType = [](GlobalVariable *Ty) {
++      if (Ty->isCJTypeTemplate())
++        return GlobalVariable::isInternalLinkage(Ty->getLinkage());
++      auto *TT = Ty->getInitializer()
 +                     ->getOperand(ClassInfoFieldType::CIT_GENERIC_FROM)
 +                     ->stripPointerCasts();
 +      if (isa<ConstantPointerNull>(TT))
-+        return GlobalVariable::isInternalLinkage(TI->getLinkage());
-+
++        return GlobalVariable::isInternalLinkage(Ty->getLinkage());
 +      return GlobalVariable::isInternalLinkage(
 +          cast<GlobalVariable>(TT)->getLinkage());
 +    };
 +    bool IsTypeInternal = false, IsIFInternal = false;
-+    auto *TI = cast<GlobalVariable>(
++    auto *Ty = cast<GlobalVariable>(
 +        GV->getInitializer()
 +            ->getOperand(ExtensionDefFieldType::ET_TARGET_TYPE)
 +            ->stripPointerCasts());
-+    if (TI->hasInitializer())
-+      IsTypeInternal = IsInternalType(TI);
++    if (Ty->hasInitializer())
++      IsTypeInternal = IsInternalType(Ty);
 +    auto *IFN = GV->getInitializer()
 +                    ->getOperand(ExtensionDefFieldType::ET_INTERFACE_FN)
 +                    ->stripPointerCasts();
@@ -55099,7 +55152,7 @@ index b850591b4..f5754d089 100644
        LLVM_DEBUG(dbgs() << "canCreateThunkFor: " << F->getName()
                          << " is too small to bother creating a thunk for\n");
 diff --git a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-index f1b6f2bb7..eb6a58c34 100644
+index f1b6f2bb7..99f9a0ffa 100644
 --- a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
 +++ b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
 @@ -17,6 +17,7 @@
@@ -55126,7 +55179,7 @@ index f1b6f2bb7..eb6a58c34 100644
 +    "enable-cj-generic-intrinsic-opt", cl::init(true), cl::Hidden,
 +    cl::desc("Enable cangjie generic intrinsics optimization"));
 +cl::opt<bool> EnableCJGCInstrTransform("enable-cj-gcinstr-transform",
-+                                       cl::Hidden, cl::init(true));
++                                       cl::Hidden, cl::init(false));
  static cl::opt<bool>
  UseGVNAfterVectorization("use-gvn-after-vectorization",
    cl::init(false), cl::Hidden,
@@ -66995,10 +67048,10 @@ index 000000000..14b0d3f87
 +                    "Cangjie Loop Float Optimize", false, false)
 diff --git a/llvm/lib/Transforms/Scalar/CJRSSCE.cpp b/llvm/lib/Transforms/Scalar/CJRSSCE.cpp
 new file mode 100644
-index 000000000..fb4aa8ebd
+index 000000000..cdc7e67f9
 --- /dev/null
 +++ b/llvm/lib/Transforms/Scalar/CJRSSCE.cpp
-@@ -0,0 +1,1338 @@
+@@ -0,0 +1,1345 @@
 +//===- CJRSSCE.cpp ----------------------------------------------*- C++ -*-===//
 +//
 +// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
@@ -67060,22 +67113,29 @@ index 000000000..fb4aa8ebd
 +using Interval = std::pair<uint64_t, uint64_t>;
 +
 +static std::pair<Value *, uint64_t>
-+getBasePtrAndOffset(const DataLayout &DL, Value *V, Instruction *I) {
++getBasePtrAndOffset(const DataLayout &DL, Value *V, Instruction *I,
++                    Instruction **LastClobberI = nullptr) {
 +  // For example:
 +  //   %16 = llvm.cj.gcread.ref(%cmp, %15)
 +  //   store i8 addrspace(1)* %16, %17
 +  // The Ptr now is %16, and we need to find cmp to check if cmp is same as
-+  // BasePtr.
++  // BasePtr. And if V is a load instruction, we need to ensure that the load
++  // pointer is not clobbered starting from here.
 +  V = V->stripPointerCasts();
 +  if (isa<StoreInst>(I)) {
++    Instruction *StartI = I->getFunction()->getEntryBlock().getFirstNonPHI();
 +    if (auto *II = dyn_cast<IntrinsicInst>(V)) {
 +      if (II->getIntrinsicID() == Intrinsic::cj_gcread_ref)
 +        V = II->getArgOperand(1)->stripPointerCasts();
 +      else if (II->getIntrinsicID() == Intrinsic::cj_gcread_static_ref)
 +        V = II->getArgOperand(0)->stripPointerCasts();
++      StartI = II;
 +    } else if (auto *LI = dyn_cast<LoadInst>(V)) {
 +      V = LI->getPointerOperand()->stripPointerCasts();
++      StartI = LI;
 +    }
++    if (LastClobberI)
++      *LastClobberI = StartI;
 +  }
 +  // V is not a memory object.
 +  if (!isa<PointerType>(V->getType()))
@@ -67507,7 +67567,7 @@ index 000000000..fb4aa8ebd
 +      }
 +      assert((isa<StoreInst>(I) || isa<MemCpyInst>(I)) &&
 +             "Only support to deal store or memcpy");
-+      auto [SrcBPtr, SrcOff] = getBasePtrAndOffset(DL, Src, I);
++      auto [SrcBPtr, SrcOff] = getBasePtrAndOffset(DL, Src, I, &LastClobberI);
 +      auto [DstBPtr, DstOff] = getBasePtrAndOffset(DL, Dst, I);
 +      if (!SrcBPtr || !DstBPtr)
 +        break;

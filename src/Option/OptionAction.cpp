@@ -44,6 +44,10 @@ const std::unordered_map<std::string, uint8_t> LTO_MODE_MAP = {
     {"thin", uint8_t(GlobalOptions::LTOMode::THIN_LTO)},
 };
 
+const std::unordered_map<std::string, GlobalOptions::InteropLanguage> INTEROP_LANGUAGE_MAP = {
+    {"Java", GlobalOptions::InteropLanguage::Java}, {"ObjC", GlobalOptions::InteropLanguage::ObjC},
+};
+
 const std::unordered_map<std::string, uint8_t> WARN_GROUP_MAP = {
 #define WARN_GROUP(DESCR, KIND) {DESCR, uint8_t(WarnGroup::KIND)},
 #include "cangjie/Basic/DiagRefactor/DiagnosticWarnGroupKind.def"
@@ -603,7 +607,15 @@ std::unordered_map<Options::ID, std::function<bool(GlobalOptions&, OptionArgInst
     }},
     { Options::ID::PACKAGE_COMPILE, OPTION_TRUE_ACTION(opts.compilePackage = true) },
     { Options::ID::NO_PRELUDE, OPTION_TRUE_ACTION(opts.implicitPrelude = false) },
-    { Options::ID::ENABLE_INTEROP_CJMAPPING, OPTION_TRUE_ACTION(opts.enableInteropCJMapping = true) },
+    { Options::ID::USE_INTEROP_CJ_PACKAGE_CONFIG_RPATH, [](GlobalOptions& opts, const OptionArgInstance& arg) {
+        // Not allowed to be empty.
+        if (arg.value.empty()) {
+            Errorf("'%s' requires a non-empty value.\n", arg.name.c_str());
+            return false;
+        }
+        opts.interopCJPackageConfigPath = arg.value;
+        return true;
+    }},
     { Options::ID::INT_OVERFLOW_MODE, [](GlobalOptions& opts, const OptionArgInstance& arg) {
         CJC_ASSERT(ValidOverflowStrategy(arg.value));
         if (!ValidOverflowStrategy(arg.value)) { return false; }
@@ -843,6 +855,17 @@ std::unordered_map<Options::ID, std::function<bool(GlobalOptions&, OptionArgInst
 #endif
         return true;
     }},
+     { Options::ID::ENABLE_INTEROP_CJMAPPING, [](GlobalOptions& opts, const OptionArgInstance& arg) {
+        if (arg.value.empty()) {
+            return false;
+        }
+        if (INTEROP_LANGUAGE_MAP.count(arg.value) == 0) {
+            return false;
+        }
+        opts.targetInteropLanguage = INTEROP_LANGUAGE_MAP.at(arg.value);
+        opts.enableInteropCJMapping = true;
+        return true;
+    }},
     // ---------- OUTPUT CONTROL OPTIONS ----------
     { Options::ID::OUTPUT_FILE, [](GlobalOptions& opts, const OptionArgInstance& arg) {
         // Not allowed to be empty.
@@ -1008,7 +1031,13 @@ std::unordered_map<Options::ID, std::function<bool(GlobalOptions&, OptionArgInst
     { Options::ID::NO_DATA_SECTIONS, OPTION_TRUE_ACTION(opts.enableDataSections = false) },
     { Options::ID::GC_SECTIONS, OPTION_TRUE_ACTION(opts.enableGcSections = true) },
     { Options::ID::NO_GC_SECTIONS, OPTION_TRUE_ACTION(opts.enableGcSections = false) },
-    { Options::ID::PGO_INSTR_GEN, OPTION_TRUE_ACTION(opts.enablePgoInstrGen = true) },
+    { Options::ID::PGO_INSTR_GEN, [](GlobalOptions& opts, const OptionArgInstance& arg) {
+        opts.enablePgoInstrGen = true;
+        if (arg.value != "") {
+            opts.pgoProfileFile = arg.value;
+        }
+        return true;
+    }},
     { Options::ID::PGO_INSTR_USE, [](GlobalOptions& opts, const OptionArgInstance& arg) {
         opts.enablePgoInstrUse = true;
         opts.pgoProfileFile = arg.value;

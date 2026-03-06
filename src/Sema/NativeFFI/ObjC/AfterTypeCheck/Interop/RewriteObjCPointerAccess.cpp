@@ -65,7 +65,7 @@ void HandleObjCPointerRead(InteropContext& ctx, CallExpr& callExpr)
     auto elementType = receiver->ty->typeArgs[0];
     auto rawCType = ctx.typeMapper.Cj2CType(elementType);
     Ptr<Ty> pointerType = ctx.typeManager.GetPointerTy(rawCType);
-    auto ptrFieldDecl = ctx.factory.GetObjCPointerPointerField();
+    auto ptrFieldDecl = ctx.bridge.GetObjCPointerPointerField();
     CJC_ASSERT(ptrFieldDecl);
     Ptr<Ty> int64Type = ctx.typeManager.GetPrimitiveTy(TypeKind::TYPE_INT64);
 
@@ -88,11 +88,10 @@ void HandleObjCPointerRead(InteropContext& ctx, CallExpr& callExpr)
         readPointerFunc,
         rawCType,
         CallKind::CALL_INTRINSIC_FUNCTION);
-    CopyBasicInfo(&callExpr, call);
-    auto wrapExpr = ctx.factory.WrapEntity(std::move(call), *elementType);
-    wrapExpr->sourceExpr = &callExpr;
-    callExpr.desugarExpr = std::move(wrapExpr);
-    callExpr.desugarArgs = std::nullopt;
+    ctx.factory.SetDesugarExpr(
+        &callExpr,
+        ctx.factory.WrapEntity(std::move(call), *elementType)
+    );
 }
 
 /**
@@ -124,7 +123,7 @@ void HandleObjCPointerWrite(InteropContext& ctx, CallExpr& callExpr)
     auto elementType = receiver->ty->typeArgs[0];
     auto rawCType = ctx.typeMapper.Cj2CType(elementType);
     Ptr<Ty> pointerType = ctx.typeManager.GetPointerTy(rawCType);
-    auto ptrFieldDecl = ctx.factory.GetObjCPointerPointerField();
+    auto ptrFieldDecl = ctx.bridge.GetObjCPointerPointerField();
     CJC_ASSERT(ptrFieldDecl);
     Ptr<Ty> int64Type = ctx.typeManager.GetPrimitiveTy(TypeKind::TYPE_INT64);
     Ptr<Ty> unitType = ctx.typeManager.GetPrimitiveTy(TypeKind::TYPE_UNIT);
@@ -150,10 +149,7 @@ void HandleObjCPointerWrite(InteropContext& ctx, CallExpr& callExpr)
         writePointerFunc,
         unitType,
         CallKind::CALL_INTRINSIC_FUNCTION);
-    CopyBasicInfo(&callExpr, call);
-    call->sourceExpr = &callExpr;
-    callExpr.desugarExpr = std::move(call);
-    callExpr.desugarArgs = std::nullopt;
+    ctx.factory.SetDesugarExpr(&callExpr, std::move(call));
 }
 }
 

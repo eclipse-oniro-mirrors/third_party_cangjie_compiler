@@ -9,19 +9,24 @@
 /**
  * @file
  *
- * This file implements check that Objective-C mirror declaration is not an interface, as it is not supported yet.
+ * This file implements searching for forward classes  previously generated.
  */
 
 #include "Handlers.h"
 #include "cangjie/AST/Match.h"
+#include "cangjie/AST/Node.h"
 
 using namespace Cangjie::AST;
 using namespace Cangjie::Interop::ObjC;
 
-void CheckInterface::HandleImpl(TypeCheckContext& ctx)
+void FindFwdClass::HandleImpl(InteropContext& ctx)
 {
-    if (auto id = As<ASTKind::INTERFACE_DECL>(&ctx.target); id) {
-        ctx.diag.DiagnoseRefactor(DiagKindRefactor::sema_objc_interop_not_supported, id->keywordPos, "interface");
-        id->EnableAttr(Attribute::IS_BROKEN);
+    for (auto& file : ctx.pkg.files) {
+        for (auto& decl : file->decls) {
+            if (auto classDecl = As<ASTKind::CLASS_DECL>(decl);
+                classDecl && ctx.typeMapper.IsObjCFwdClass(*classDecl)) {
+                ctx.fwdClasses.emplace_back(classDecl);
+            }
+        }
     }
 }

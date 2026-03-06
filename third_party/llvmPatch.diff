@@ -24919,7 +24919,7 @@ index 19e00e111..324854824 100644
      if (llvm::Expected<APFloat::opStatus> op =
              f.convertFromString(value_str, APFloat::rmNearestTiesToEven)) {
 diff --git a/lldb/source/Version/Version.cpp b/lldb/source/Version/Version.cpp
-index b391fe1ea..3f125b499 100644
+index b391fe1ea..116297d0e 100644
 --- a/lldb/source/Version/Version.cpp
 +++ b/lldb/source/Version/Version.cpp
 @@ -4,6 +4,12 @@
@@ -24975,7 +24975,7 @@ index b391fe1ea..3f125b499 100644
        g_version_str += "\n  llvm revision ";
        g_version_str += llvm_rev;
      }
-+    g_version_str += "\n  cangjie 1.1.0-beta.21";
++    g_version_str += "\n  cangjie 1.1.0-beta.22";
    }
  
    return g_version_str.c_str();
@@ -61166,10 +61166,10 @@ index 000000000..3409036f1
 +}
 diff --git a/llvm/lib/Transforms/Scalar/CJFillMetadata.cpp b/llvm/lib/Transforms/Scalar/CJFillMetadata.cpp
 new file mode 100644
-index 000000000..e02675f85
+index 000000000..c22ba410c
 --- /dev/null
 +++ b/llvm/lib/Transforms/Scalar/CJFillMetadata.cpp
-@@ -0,0 +1,1626 @@
+@@ -0,0 +1,1627 @@
 +//===- CJFillMetadata.cpp - Fill Cangjie Metadata ---------------*- C++ -*-===//
 +//
 +// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
@@ -62058,7 +62058,8 @@ index 000000000..e02675f85
 +      if (ReflectMD->getNumOperands() == ERT_MAX)
 +        return getEnumReflectInfo(ReflectMD);
 +      if (ReflectMD->getNumOperands() == ECRT_MAX)
-+        return getEnumCtorReflectInfo(ReflectMD);
++        // for compatibility: old runtime cannot parse this metadata field
++        return Int8PtrNull;
 +      report_fatal_error(GV->getName() +
 +                         ": enum reflect info's operand number error!");
 +    } else {

@@ -22,7 +22,7 @@ using namespace Cangjie::Interop::ObjC;
 void CheckMirrorSubtypeAttr::HandleImpl(TypeCheckContext& ctx)
 {
     auto& ty = *ctx.target.ty;
-    if (!ctx.typeMapper.IsObjCMirrorSubtype(ty)) {
+    if (!ctx.typeMapper.IsValidObjCMirrorSubtype(ty)) {
         return;
     }
 

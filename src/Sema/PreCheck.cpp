@@ -191,6 +191,14 @@ void CreateGenericConstraints(Generic& generic)
         }
     }
 }
+
+inline std::string GetNormalizedName(const Symbol& sym)
+{
+    // Deserialized `static init()` identifier is "static.init".
+    // But duplication conflict need to be reported with just parsed `static init()` with identifier "init".
+    bool isStaticConstructor = sym.node->TestAttr(Attribute::STATIC) && sym.node->TestAttr(Attribute::CONSTRUCTOR);
+    return isStaticConstructor && sym.name == "static.init" ? "init" : sym.name;
+}
 } // namespace
 
 void TypeChecker::TypeCheckerImpl::CheckRedefinition(ASTContext& ctx)
@@ -1159,12 +1167,29 @@ void TypeChecker::TypeCheckerImpl::AddSuperClassObjectForClassDecl(ASTContext& c
         if (HasSuperClass(*cd)) {
             continue;
         }
+
         if (cd->TestAnyAttr(Attribute::JAVA_MIRROR, Attribute::JAVA_MIRROR_SUBTYPE)) {
             if (!AddJObjectSuperClassJavaInterop(ctx, *cd)) {
                 AddObjectSuperClass(ctx, *cd);
             }
         } else {
             AddObjectSuperClass(ctx, *cd);
+        }
+    }
+}
+
+void TypeChecker::TypeCheckerImpl::AddSuperInterfaceForClassLikeDecl(ASTContext& ctx)
+{
+    // TODO: move it to Interop::ObjC
+    std::vector<Symbol*> syms = GetAllDecls(ctx);
+    for (auto& sym : syms) {
+        CJC_ASSERT(sym && sym->node);
+        if (!sym->node->TestAnyAttr(Attribute::OBJ_C_MIRROR, Attribute::OBJ_C_MIRROR_SUBTYPE)) {
+            continue;
+        }
+
+        if (auto classLikeDecl = As<ASTKind::CLASS_LIKE_DECL>(sym->node); classLikeDecl) {
+            AddObjCIdSuperInterfaceObjCInterop(ctx, *classLikeDecl);
         }
     }
 }
@@ -1544,7 +1569,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckFuncStaticConflict(const std::vector<
         for (const auto& func : staticFuncs) {
             DiagStaticAndNonStaticOverload(diag, *func, *firstNonStatic);
         }
-    }
+}
 }
 
 bool TypeChecker::TypeCheckerImpl::PreCheckFuncRedefinitionWithSameSignature(
@@ -1614,7 +1639,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckFuncRedefinition(const ASTContext& ct
             continue; // Do not collect invalid/macro expanded node.
         }
         std::string scopeName = ScopeManagerApi::GetScopeNameWithoutTail(sym->scopeName);
-        auto names = std::make_pair(sym->name, scopeName);
+        auto names = std::make_pair(GetNormalizedName(*sym), scopeName);
         auto fd = StaticAs<ASTKind::FUNC_DECL>(sym->node);
         if (fd->propDecl) {
             continue; // Do not check for property's getter/setter.
@@ -1797,6 +1822,8 @@ void TypeChecker::TypeCheckerImpl::PreCheckUsage(ASTContext& ctx, const Package&
     CheckAllDeclAttributes(ctx);
     // Add Object as super class for class declaration.
     AddSuperClassObjectForClassDecl(ctx);
+    // Add super interface for class declaration.
+    AddSuperInterfaceForClassLikeDecl(ctx);
     // Collector assumption collection of generic declaration.
     CollectAndCheckAssumption(ctx);
     // Check extend generic param & reset inheritance checking flag.

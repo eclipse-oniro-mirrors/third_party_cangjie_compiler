@@ -34,6 +34,7 @@
 #include "cangjie/AST/Types.h"
 #include "cangjie/Basic/Linkage.h"
 #include "cangjie/Basic/Position.h"
+#include "cangjie/Basic/InteropCJPackageConfigReader.h"
 #include "cangjie/Lex/Token.h"
 #include "cangjie/Utils/CheckUtils.h"
 #include "cangjie/Utils/ConstantsUtils.h"
@@ -286,6 +287,22 @@ struct Node {
     }
 
     /**
+     * Whether a declaration is InterfaceDecl.
+     */
+    bool IsInterfaceDecl() const noexcept
+    {
+        return astKind == ASTKind::INTERFACE_DECL;
+    }
+
+    /**
+     * Whether a declaration is abstract ClassDecl.
+     */
+    bool IsAbstractClass() const noexcept
+    {
+        return astKind == ASTKind::CLASS_DECL && this->TestAttr(Attribute::ABSTRACT);
+    }
+
+    /**
      * Whether a node is ClassBody or InterfaceBody.
      */
     bool IsClassLikeDeclBody() const noexcept
@@ -508,7 +525,11 @@ enum class AnnotationKind {
     JAVA_HAS_DEFAULT,
     OBJ_C_MIRROR,
     OBJ_C_IMPL,
+    OBJ_C_INIT, // Indicate a method as Objective-C init.
+    OBJ_C_OPTIONAL,
     FOREIGN_NAME,
+    FOREIGN_GETTER_NAME,
+    FOREIGN_SETTER_NAME,
     ATTRIBUTE,
     /**
      * NOTE: 'OVERFLOW' is a macro in early versions of glibc (VERSION < 2.27).
@@ -1705,7 +1726,7 @@ struct Expr : Node {
 
     /** Used to mark sugar kind which is desugared before typecheck.
      * Also used to mark desugared call expr like `Token(xxx)`
-     */
+    */
     enum class SugarKind {
         QUEST,
         IF_LET,      // if-let Expression
@@ -2940,6 +2961,19 @@ struct Package : Node {
     bool noSubPkg{false};
     bool needExported{true}; /**< Parent path of package path is "src", there is no need to export this package. */
 
+    // ===--------------------------------------------------------------------===//
+    // Interop CJ Package Level Symbol Config
+    // ===--------------------------------------------------------------------===//
+    InteropCJStrategy interopCJApiStrategy = InteropCJStrategy::NONE;
+    InteropCJGenericStrategyType interopCJGenericTypeStrategy = InteropCJGenericStrategyType::NONE;
+    std::vector<std::string> interopCJIncludedApis;
+    std::vector<std::string> interopCJExcludedApis;
+    std::unordered_map<std::string, std::unordered_map<std::string, GenericTypeArguments>>
+        allowedInteropCJGenericInstantiations;
+    std::vector<std::string> interopTuples; /**< Record interop tuple configuration. Writed in sema. */
+    bool isInteropCJPackageConfig{false};
+    std::vector<LambdaPattern> lambdaPatterns;
+
 private:
     std::vector<std::string> allDependentStdPkgs; /**< Record all dependent standard packages. */
 
@@ -2987,6 +3021,10 @@ public:
     const std::vector<std::string>& GetAllDependentStdPkgs() const
     {
         return allDependentStdPkgs;
+    }
+
+    const std::vector<LambdaPattern>& GetLambdaPatterns() const {
+        return lambdaPatterns;
     }
 };
 

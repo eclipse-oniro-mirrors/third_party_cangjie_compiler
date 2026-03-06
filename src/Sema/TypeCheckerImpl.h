@@ -31,6 +31,7 @@
 #include "cangjie/Sema/TypeManager.h"
 #include "cangjie/Utils/ProfileRecorder.h"
 #include "CJMP/MPTypeCheckerImpl.h"
+#include "InheritanceChecker/MemberSignature.h"
 
 namespace Cangjie {
 class Synthesizer;
@@ -122,8 +123,11 @@ public:
      */
     void PerformDesugarAfterInstantiation(ASTContext& ctx, AST::Package& pkg);
 
+    // Parse package config file and storage to corresponding pkg.
+    void ParsePackageConfigFile(Ptr<AST::Package>& pkg, InteropCJPackageConfigReader packagesFullConfig);
+
     // Desugar after sema.
-    void PerformDesugarAfterSema(const std::vector<Ptr<AST::Package>>& pkgs);
+    void PerformDesugarAfterSema(std::vector<Ptr<AST::Package>>& pkgs);
 
     /**
      * Synthesize the given @p expr in given @p scopeName and return the found candidate decls or types.
@@ -419,6 +423,10 @@ private:
      * Add Object to all ClassDecls' inheritedTypes if there is no one.
      */
     void AddSuperClassObjectForClassDecl(ASTContext& ctx);
+    /**
+     * Add super interface to all ClassDecls' inheritedTypes if there is no one.
+     */
+    void AddSuperInterfaceForClassLikeDecl(ASTContext& ctx);
     void CheckAndAddSubDecls(
         const AST::Type& type, AST::ClassDecl& cd, bool& hasSuperClass, int& superClassLikeNum) const;
     bool HasSuperClass(AST::ClassDecl& cd) const;
@@ -428,9 +436,13 @@ private:
      */
     void AddObjectSuperClass(ASTContext& ctx, AST::ClassDecl& cd);
     /**
-     * LLVM-java interop scenario.
+     * CJNative-java interop scenario.
      */
     bool AddJObjectSuperClassJavaInterop(ASTContext& ctx, AST::ClassDecl& cd);
+    /**
+     * CJNative-objc interop scenario.
+     */
+    void AddObjCIdSuperInterfaceObjCInterop(ASTContext& ctx, AST::ClassLikeDecl& classLikeDecl);
     void AddDefaultSuperCall(const AST::FuncBody& funcBody) const;
     /**
      * If there is no default constructor, insert one.
@@ -1230,6 +1242,7 @@ private:
     bool CheckRefTypeCheckAccessLegality(const ASTContext& ctx, AST::RefType& rt, const AST::Decl& target);
     void CheckRefTypeWithRealTarget(AST::RefType& rt);
     void HandleAliasForRefType(AST::RefType& rt, Ptr<AST::Decl>& target);
+    bool CheckTypeParametersForAliasRef(AST::RefType& rt, const AST::TypeAliasDecl& aliasDecl);
 
     void GetRevTypeMapping(
         std::vector<Ptr<AST::Ty>>& params, std::vector<Ptr<AST::Ty>>& args, MultiTypeSubst& revTyMap);
@@ -1515,6 +1528,11 @@ private:
         }
         typeMapping = GenerateTypeMappingForTypeAliasDecl(tad);
         SubstituteTypeForTypeAliasTypeMapping(tad, typeArgs, typeMapping);
+        // Also generate direct mapping from type alias decl's type parameters to the provided type arguments
+        auto directMapping = TypeCheckUtil::GenerateTypeMapping(tad, typeArgs);
+        for (auto& [key, value] : directMapping) {
+            typeMapping[key] = value;
+        }
         return typeMapping;
     }
 
@@ -1707,6 +1725,13 @@ private:
     Ptr<AST::Node> strictDeprecatedContext = nullptr;
     // cjmp typechecker implementation class
     class MPTypeCheckerImpl* mpImpl;
+    /**
+     * Will be passed as a reference in TypeChecker::TypeCheckerImpl::PerformDesugarAfterTypeCheck
+     * at Perform desugar after typecheck before generic instantiation stage.
+     *
+     * Needed for Java, Objective C interop Synthetic class wrappers generation.
+     */
+    std::unordered_map<Ptr<const AST::InheritableDecl>, MemberMap> structMemberMap;
 };
 } // namespace Cangjie
 #endif

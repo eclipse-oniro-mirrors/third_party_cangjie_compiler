@@ -9,29 +9,28 @@
 /**
  * @file
  *
- * This file implements generating and inserting a constructor declaration of native handle to each @ObjCMirror
+ * This file implements desugar synthetic mirror interface wrappers.
  */
 
 #include "Handlers.h"
 #include "NativeFFI/ObjC/Utils/Common.h"
 #include "NativeFFI/Utils.h"
+#include "cangjie/AST/Create.h"
+#include "cangjie/AST/Match.h"
+#include "cangjie/AST/Node.h"
+#include "cangjie/Utils/CheckUtils.h"
 
+namespace Cangjie::Interop::ObjC {
 using namespace Cangjie::AST;
-using namespace Cangjie::Interop::ObjC;
 using namespace Cangjie::Native::FFI;
 
-void InsertMirrorCtorDecl::HandleImpl(InteropContext& ctx)
+void DesugarSyntheticWrappers::HandleImpl(InteropContext& ctx)
 {
-    for (auto& mirror : ctx.mirrors) {
-        if (mirror->TestAttr(Attribute::IS_BROKEN)) {
+    for (auto& wrapper : ctx.synWrappers) {
+        if (wrapper->TestAttr(Attribute::IS_BROKEN)) {
             continue;
         }
-        auto mirrorClass = As<ASTKind::CLASS_DECL>(mirror);
-        if (!mirrorClass) {
-            continue;
-        }
-
-        auto ctor = ctx.factory.CreateMirrorCtorDecl(*mirrorClass);
-        mirrorClass->body->decls.emplace_back(std::move(ctor));
+        wrapper->DisableAttr(Attribute::ABSTRACT);
     }
 }
+} // namespace Cangjie::Interop::ObjC

@@ -222,6 +222,8 @@ void CollectFullExportParamDecl(
     CJC_ASSERT(!fd.funcBody->paramLists.empty());
     bool fullExport = fd.isConst || fd.isInline || fd.isFrozen || IsDefaultImplementation(fd) ||
         IsGenericInCommonSerialization(serializingCommon, fd);
+    // Common replaced with specific. Even @Frozen need to be skipped, because specific will be fullExport'ed.
+    fullExport &= !fd.IsCommonMatchedWithSpecific();
 
     if (fullExport) {
         decls.emplace_back(&fd);
@@ -1278,12 +1280,10 @@ TFuncBodyOffset ASTWriter::ASTWriterImpl::SaveFuncBody(const FuncBody& funcBody)
     // 5. funcBody of default implementation which is defined in interface.
     // 6. funcBody of generic-related functions from common side
     // NOTE: desugared param function has same 'outerDecl' and 'GLOBAL' attribute will its owner function.
-    // also note that generic decls are handled in the beginning already but non-generic static members
-    // inside of generis don't need to be stored
-    bool isNonStaticGenericCJMP = fd && IsGenericInCommonSerialization(serializingCommon, *fd) &&
-        !fd->TestAttr(Attribute::STATIC);
+    // also note that generic decls are handled in the beginning already
+    bool isGenericCJMP = fd && IsGenericInCommonSerialization(serializingCommon, *fd);
     bool shouldExportBody = config.exportContent && exportFuncBody &&
-        (!fd || CanBeSrcExported(*fd) || isNonStaticGenericCJMP);
+        (!fd || CanBeSrcExported(*fd) || isGenericCJMP);
     bool validBody = shouldExportBody && Ty::IsTyCorrect(funcBody.ty) && funcBody.body;
     auto bodyIdx = validBody ? SaveExpr(*funcBody.body) : INVALID_FORMAT_INDEX;
     // CaptureKind is need if the 'funcBody' is exported.

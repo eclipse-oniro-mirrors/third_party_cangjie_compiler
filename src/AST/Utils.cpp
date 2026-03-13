@@ -597,10 +597,11 @@ bool IsVirtualMember(const Decl& decl)
     }
     return true;
 }
+
 std::vector<VarDeclWithPosition> GetVarsInitializationOrderWithPositions(const Decl& parentDecl)
 {
     std::vector<VarDeclWithPosition> commonDecls;
-    std::vector<VarDeclWithPosition> platformDecls;
+    std::vector<VarDeclWithPosition> specificDecls;
 
     std::size_t idx = 0;
     for (auto& decl : parentDecl.GetMemberDecls()) {
@@ -612,46 +613,46 @@ std::vector<VarDeclWithPosition> GetVarsInitializationOrderWithPositions(const D
         if (varDecl->TestAttr(AST::Attribute::FROM_COMMON_PART)) {
             commonDecls.push_back({varDecl, idx});
         } else {
-            platformDecls.push_back({varDecl, idx});
+            specificDecls.push_back({varDecl, idx});
         }
         idx++;
     }
 
-    std::sort(platformDecls.begin(), platformDecls.end(), [](const auto& lhs, const auto& rhs) {
+    std::sort(specificDecls.begin(), specificDecls.end(), [](const auto& lhs, const auto& rhs) {
         return lhs.decl->begin < rhs.decl->begin;
     });
 
     std::vector<VarDeclWithPosition> resultDecls;
-    auto platformDeclsIt = platformDecls.begin();
-    std::unordered_set<Ptr<const Decl>> wasPlatformVars;
+    auto specificDeclsIt = specificDecls.begin();
+    std::unordered_set<Ptr<const Decl>> wasSpecificVars;
     for (auto& [commonDecl, commonDeclOffset] : commonDecls) {
-        std::unordered_set<Ptr<const Decl>> platformVarsDeps;
+        std::unordered_set<Ptr<const Decl>> specificVarsDeps;
         for (auto& dep : commonDecl->dependencies) {
-            if (!dep->TestAttr(Attribute::PLATFORM)) {
+            if (!dep->TestAttr(Attribute::SPECIFIC)) {
                 continue;
             }
 
-            auto [_, inserted] = wasPlatformVars.emplace(dep);
+            auto [_, inserted] = wasSpecificVars.emplace(dep);
             if (inserted) {
-                platformVarsDeps.emplace(dep);
+                specificVarsDeps.emplace(dep);
             }
         }
 
-        while (!platformVarsDeps.empty()) {
-            CJC_ASSERT(platformDeclsIt != platformDecls.end());
-            auto it = platformVarsDeps.find(platformDeclsIt->decl);
-            if (it != platformVarsDeps.end()) {
-                platformVarsDeps.erase(it);
+        while (!specificVarsDeps.empty()) {
+            CJC_ASSERT(specificDeclsIt != specificDecls.end());
+            auto it = specificVarsDeps.find(specificDeclsIt->decl);
+            if (it != specificVarsDeps.end()) {
+                specificVarsDeps.erase(it);
             }
-            resultDecls.emplace_back(*platformDeclsIt);
-            platformDeclsIt++;
+            resultDecls.emplace_back(*specificDeclsIt);
+            specificDeclsIt++;
         }
 
         resultDecls.push_back({commonDecl, commonDeclOffset});
     }
 
-    for (; platformDeclsIt != platformDecls.end(); platformDeclsIt++) {
-        resultDecls.emplace_back(*platformDeclsIt);
+    for (; specificDeclsIt != specificDecls.end(); specificDeclsIt++) {
+        resultDecls.emplace_back(*specificDeclsIt);
     }
 
     return resultDecls;
@@ -746,9 +747,16 @@ void InsertMirrorVarProp(ClassDecl& decl, Attribute attrToBeSet)
     // Collect the original field
     std::vector<VarDecl*> oldVars;
     for (auto& member : members) {
-        if (member->astKind == ASTKind::VAR_DECL) {
-            oldVars.emplace_back(StaticAs<ASTKind::VAR_DECL>(member.get()));
+        if (member->astKind != ASTKind::VAR_DECL) {
+            // extra check for ast kind is required since prop decl inherits var decl
+            continue;
         }
+        auto field = StaticAs<ASTKind::VAR_DECL>(member.get());
+        if (!field->type) {
+            continue;
+        }
+        // fields without syntactic type specified are invalid and should be skipped here
+        oldVars.emplace_back(field);
     }
     // Generate and insert the new prop
     for (auto var : oldVars) {
@@ -774,9 +782,9 @@ void SetPositionAndCurFileByProvidedNode(Node& consumer, Node& provider)
 }
 
 namespace Cangjie::Interop::Java {
-bool IsImpl(const Decl& decl)
+bool IsImpl(const Node& node)
 {
-    return !decl.TestAttr(Attribute::JAVA_MIRROR) && decl.TestAttr(Attribute::JAVA_MIRROR_SUBTYPE);
+    return !node.TestAttr(Attribute::JAVA_MIRROR) && node.TestAttr(Attribute::JAVA_MIRROR_SUBTYPE);
 }
 
 bool IsJObject(const Decl& decl)
@@ -791,19 +799,24 @@ bool IsJObject(const Decl& decl, const std::string& packageName)
         packageName == INTEROP_JAVA_LANG_PACKAGE;
 }
 
-bool IsMirror(const Decl& decl)
+bool IsMirror(const Node& node)
 {
-    return decl.TestAttr(Attribute::JAVA_MIRROR);
+    return node.TestAttr(Attribute::JAVA_MIRROR);
 }
 
-bool IsCJMapping(const Decl& decl)
+bool IsCJMapping(const Node& node)
 {
-    return decl.TestAttr(Attribute::JAVA_CJ_MAPPING);
+    return node.TestAttr(Attribute::JAVA_CJ_MAPPING);
 }
 
-bool IsObject(const Decl& decl)
+bool IsObject(const Node& node)
 {
-    return decl.ty->IsObject();
+    return node.ty->IsObject();
+}
+
+bool IsFwdClass(const Node& node)
+{
+    return node.TestAttr(Attribute::CJ_MIRROR_JAVA_INTERFACE_FWD);
 }
 
 /**
@@ -840,11 +853,9 @@ void InsertJavaRefGetterStubWithBody(ClassDecl& decl)
     decl.body->decls.emplace_back(std::move(fd));
 }
 
-bool IsDeclAppropriateForSyntheticClassGeneration(const Decl& decl)
+bool IsDeclAppropriateForSyntheticClassGeneration(const Node& node)
 {
-    return decl.TestAttr(Attribute::JAVA_MIRROR) &&
-        (decl.astKind == ASTKind::INTERFACE_DECL ||
-            (decl.astKind == ASTKind::CLASS_DECL && decl.TestAttr(Attribute::ABSTRACT)));
+    return IsMirror(node) && (node.IsInterfaceDecl() || node.IsAbstractClass());
 }
 
 std::string GetSyntheticNameFromClassLike(const ClassLikeDecl& cld)
@@ -876,10 +887,10 @@ void InsertSyntheticClassDecl(ClassLikeDecl& decl, File& file)
         synthetic->inheritedTypes.emplace_back(std::move(jobject));
     }
     synthetic->inheritedTypes.emplace_back(CreateRefType(decl));
-    
+
     synthetic->fullPackageName = decl.fullPackageName;
     SetPositionAndCurFileByProvidedNode(*synthetic, decl);
-    
+
     synthetic->body = MakeOwned<ClassBody>();
     SetPositionAndCurFileByProvidedNode(*synthetic->body, *synthetic);
 
@@ -888,3 +899,40 @@ void InsertSyntheticClassDecl(ClassLikeDecl& decl, File& file)
     file.decls.emplace_back(std::move(synthetic));
 }
 } // namespace Cangjie::Interop::Java
+
+namespace Cangjie::Interop::ObjC {
+
+std::string GetSyntheticNameFromClassLike(const ClassLikeDecl& classLikeDecl)
+{
+    return classLikeDecl.identifier.Val() + SYNTHETIC_CLASS_SUFFIX;
+}
+
+bool IsDeclAppropriateForSyntheticClassGeneration(const Decl& decl)
+{
+    return decl.TestAttr(Attribute::OBJ_C_MIRROR) && decl.astKind == ASTKind::INTERFACE_DECL;
+}
+
+// abstract on parser stage, on sema stage abstractness will be removed
+void InsertSyntheticClassDecl(ClassLikeDecl& decl, File& file)
+{
+    auto synthetic = MakeOwned<ClassDecl>();
+    synthetic->CloneAttrs(decl);
+    synthetic->EnableAttr(Attribute::OBJ_C_MIRROR_SYNTHETIC_WRAPPER, Attribute::COMPILER_ADD, Attribute::ABSTRACT);
+    synthetic->DisableAttr(Attribute::OBJ_C_MIRROR);
+    synthetic->identifier = GetSyntheticNameFromClassLike(decl);
+    synthetic->identifier.SetPos(decl.identifier.Begin(), decl.identifier.End());
+
+    synthetic->inheritedTypes.emplace_back(CreateRefType(decl));
+
+    synthetic->fullPackageName = decl.fullPackageName;
+    SetPositionAndCurFileByProvidedNode(*synthetic, decl);
+
+    synthetic->body = MakeOwned<ClassBody>();
+    SetPositionAndCurFileByProvidedNode(*synthetic->body, *synthetic);
+
+    synthetic->moduleName = ::Cangjie::Utils::GetRootPackageName(decl.fullPackageName);
+
+    file.decls.emplace_back(std::move(synthetic));
+}
+
+} // namespace Cangjie::Interop::ObjC

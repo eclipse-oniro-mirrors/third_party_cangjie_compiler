@@ -12,6 +12,7 @@
 #include "cangjie/IncrementalCompilation/IncrementalScopeAnalysis.h"
 #include "cangjie/IncrementalCompilation/Utils.h"
 #include "cangjie/Mangle/ASTMangler.h"
+#include "cangjie/Utils/SafePointer.h"
 
 using namespace Cangjie::AST;
 
@@ -156,7 +157,7 @@ private:
                     break;
             }
         }
-        if (pc) {
+        if (pc && pc->funcBody) {
             for (auto& pl : pc->funcBody->paramLists) {
                 for (auto& param : pl->params) {
                     if (param->isMemberParam) {
@@ -215,6 +216,7 @@ private:
 
     void VisitVarWithPattern(const VarWithPatternDecl& decl)
     {
+        CJC_NULLPTR_CHECK(decl.irrefutablePattern);
         Walker(decl.irrefutablePattern.get(), [this](Ptr<Node> node) {
             if (auto varDecl = DynamicCast<VarDecl*>(node)) {
                 WalkDecl(*varDecl);
@@ -416,12 +418,9 @@ private:
 };
 
 ASTCacheCalculator::ASTCacheCalculator(const AST::Package& p, const std::pair<bool, bool>& srcInfo)
-    : impl{new ASTCacheCalculatorImpl{*this, p, srcInfo}}
+    : impl{MakeOwned<ASTCacheCalculatorImpl>(*this, p, srcInfo)}
 {
 }
-ASTCacheCalculator::~ASTCacheCalculator()
-{
-    delete impl;
-}
+ASTCacheCalculator::~ASTCacheCalculator() = default;
 void ASTCacheCalculator::Walk() const { impl->Walk(); }
 }

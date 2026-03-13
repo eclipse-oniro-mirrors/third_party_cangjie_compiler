@@ -15,6 +15,7 @@
 #ifndef CANGJIE_CONSTANTSUTILS_H
 #define CANGJIE_CONSTANTSUTILS_H
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <string_view>
@@ -45,6 +46,7 @@ inline const std::string SANCOV_VARIABLE_FLAG = "$sancov$";
 
 // File extension.
 inline const std::string SERIALIZED_FILE_EXTENSION = ".cjo";
+constexpr std::string_view SERIALIZED_FILE_FLAG_EXTENSION = ".cjo.flag";
 inline const std::string CJ_D_FILE_EXTENSION = ".cj.d";
 inline const std::string FULL_BCHIR_SERIALIZED_FILE_EXTENSION = ".full.bchir";
 inline const std::string BCHIR_SERIALIZED_FILE_EXTENSION = ".bchir";
@@ -95,7 +97,7 @@ inline const std::string MACRO_OBJECT_NAME = "MACRO_OBJECT";
 constexpr std::string_view IF_AVAILABLE = "IfAvailable";
 
 // Standard library package name
-// Please do not change the const char[] type to std::string type because the initialization order of 
+// Please do not change the const char[] type to std::string type because the initialization order of
 // std::string and std::map types across translation units is undefined,especially on the Windows platform.
 inline const std::string DEFAULT_PACKAGE_NAME = "default";
 inline constexpr const char CORE_PACKAGE_NAME[] = "std.core";
@@ -146,14 +148,36 @@ inline const std::string INTEROP_JSTRING_NAME = "JString";
 inline const std::string INTEROP_JARRAY_NAME = "JArray";
 inline const std::string INTEROP_JAVA_LANG_PACKAGE = "java.lang";
 inline const std::string JAVA_REF_FIELD_NAME = "$javaref";
+inline const std::string JAVA_FWD_CLASS_SUFFIX = "_fwd";
+inline const std::string JAVA_INTERFACE_FWD_CLASS_DEFAULT_METHOD_SUFFIX = "_default_impl" ;
+inline const std::string JAVA_SELF_OBJECT = "selfobj";
 constexpr auto JAVA_REF_GETTER_FUNC_NAME = "$getJavaRef";
 constexpr auto INTEROPLIB_CFFI_JAVA_ENTITY = "Java_CFFI_JavaEntity";
+constexpr auto JAVA_OBJECT_CONTROLLER = "JavaObjectController";
+constexpr auto JAVA_OBJECT_CONTROLLER_NAME = "controller";
+constexpr auto JAVA_OVERRIDE_MASK_NAME = "overrideMask";
+constexpr auto ENV = "env";
 } // namespace Cangjie::Interop::Java
+
+namespace Interop::ObjC {
+inline const std::string OBJ_C_ID_IDENT = "ObjCId";
+inline const std::string OBJ_C_POINTER_IDENT = "ObjCPointer";
+inline const std::string OBJ_C_FUNC_IDENT = "ObjCFunc";
+inline const std::string OBJ_C_BLOCK_IDENT = "ObjCBlock";
+inline const std::string OBJ_C_LANG_PACKAGE_IDENT = "objc.lang";
+inline const std::string NATIVE_HANDLE_IDENT = "$obj";
+inline const std::string GET_OBJ_C_CLASS_IDENT = "$getObjCClass";
+inline const std::string REGISTRY_ID_IDENT = "$registryId";
+inline const std::string REGISTRY_ID_SETTER_SELECTOR = "set$registryId:";
+inline const std::string SYNTHETIC_CLASS_SUFFIX = "$impl";
+inline const std::string NATIVE_HANDLE_GETTER_IDENT = "$getObj";
+inline const std::string OBJ_C_FWD_CLASS_SUFFIX = "_fwd";
+} // namespace Interop::ObjC
 
 // Headless instrinsics
 inline const std::string GET_TYPE_FOR_TYPE_PARAMETER_FUNC_NAME = "getTypeForTypeParameter";
 inline const std::string IS_SUBTYPE_TYPES_FUNC_NAME = "isSubtypeTypes";
- 
+
 constexpr std::string_view ORG_NAME_SEPARATOR{"@"};
 } // namespace Cangjie
 #endif // CANGJIE_CONSTANTSUTILS_H

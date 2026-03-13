@@ -597,6 +597,10 @@ public:
 
     bool enableMemoryCollect = false; /**< Whether enable memory usage report. */
 
+    enum class InteropLanguage : uint8_t { NA, Java, ObjC };
+
+    InteropLanguage targetInteropLanguage{InteropLanguage::NA};
+
     std::optional<unsigned int> errorCountLimit = 8; /**< limits the amount of errors compiler prints */
 
 #ifdef CANGJIE_CHIR_WFC_OFF
@@ -616,9 +620,14 @@ public:
     std::string optPassOptions = ""; /**< customized opt pass options from user.*/
 
     enum class OutputMode : uint8_t {
-        EXECUTABLE, STATIC_LIB, SHARED_LIB, CHIR
+        EXECUTABLE, STATIC_LIB, SHARED_LIB, CHIR, OBJ
     };
     OutputMode outputMode = OutputMode::EXECUTABLE;
+
+    enum class CompileTarget : uint8_t {
+        EXECUTABLE, STATIC_LIB, SHARED_LIB, DEFAULT
+    };
+    CompileTarget compileTarget = CompileTarget::DEFAULT;
 
     bool enableFuncSections = false;
     bool enableDataSections = false;
@@ -820,6 +829,10 @@ public:
     /// Whether to compile .cj.d files. Note that when true, .cj files are not processed.
     bool compileCjd{false};
 
+    bool cjdbMode = false; /** whether the option used in cjdb */
+
+    std::string interopCJPackageConfigPath = "./"; /**< cjinterop .toml package config file paths */
+    
     enum class SanitizerType : uint8_t {
         NONE,
         ADDRESS,
@@ -840,11 +853,13 @@ public:
     /**
      * @brief Determine if the output mode is executable.
      *
-     * @return bool Returns true if the output mode is executable, otherwise returns false.
+     * @return bool Returns true if the output mode is executable or obj and compileTarget is executable,
+     * otherwise returns false.
      */
     bool CompileExecutable() const
     {
-        return (outputMode == GlobalOptions::OutputMode::EXECUTABLE);
+        return (outputMode == GlobalOptions::OutputMode::EXECUTABLE) ||
+            (outputMode == GlobalOptions::OutputMode::OBJ && compileTarget == CompileTarget::EXECUTABLE);
     }
 
     /**
@@ -1129,9 +1144,14 @@ public:
         return emitCHIRPhase != CandidateEmitCHIRPhase::NA;
     }
 
-    bool IsCompilingCJMP() const
+    bool IsCompilingCJMPSpecific() const
     {
         return inputChirFiles.size() > 0;
+    }
+
+    bool IsCompilingCJMP() const
+    {
+        return IsCompilingCJMPSpecific() || outputMode == GlobalOptions::OutputMode::CHIR;
     }
 
 protected:
@@ -1146,6 +1166,7 @@ private:
 
     bool SetupConditionalCompilationCfg();
     void SetupChirOptions();
+    void SetupCompileTargetOptions();
     bool ReprocessOutputs();
     bool CheckOutputPathLength() const;
     bool ReprocessInputs();
@@ -1154,6 +1175,7 @@ private:
     bool CheckScanDependencyOptions() const;
     bool CheckSanitizerOptions() const;
     bool CheckLtoOptions() const;
+    bool CheckOutputModeOptions();
     bool CheckCompileAsExeOptions() const;
     bool CheckPgoOptions() const;
     bool CheckCompileMacro() const;
@@ -1181,6 +1203,7 @@ private:
     std::string OptimizationLevelToSerializedString() const;
     std::string StackTraceFormatToSerializedString() const;
     std::string OutputModeToSerializedString() const;
+    std::string CompileTargetToSerializedString() const;
     std::string SelectedCHIROptsToSerializedString() const;
     std::string OverflowStrategyToSerializedString() const;
     std::string SanitizerTypeToSerializedString() const;

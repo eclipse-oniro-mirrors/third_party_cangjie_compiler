@@ -18,7 +18,6 @@
 
 #include <cstdint>
 #ifndef CANGJIE_ENABLE_GCOV
-static_assert(true);
 #include <exception>
 #endif
 #include <type_traits>

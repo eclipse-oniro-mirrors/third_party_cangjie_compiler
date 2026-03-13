@@ -21,6 +21,7 @@
 #include "ScopeManager.h"
 #include "TypeCheckUtil.h"
 #include "cangjie/AST/Clone.h"
+#include "cangjie/AST/Node.h"
 #include "cangjie/AST/Symbol.h"
 #include "cangjie/AST/Types.h"
 #include "cangjie/AST/Walker.h"
@@ -30,6 +31,7 @@
 #include "cangjie/Sema/TypeManager.h"
 #include "cangjie/Utils/ProfileRecorder.h"
 #include "CJMP/MPTypeCheckerImpl.h"
+#include "InheritanceChecker/MemberSignature.h"
 
 namespace Cangjie {
 class Synthesizer;
@@ -121,8 +123,11 @@ public:
      */
     void PerformDesugarAfterInstantiation(ASTContext& ctx, AST::Package& pkg);
 
+    // Parse package config file and storage to corresponding pkg.
+    void ParsePackageConfigFile(Ptr<AST::Package>& pkg, InteropCJPackageConfigReader packagesFullConfig);
+
     // Desugar after sema.
-    void PerformDesugarAfterSema(const std::vector<Ptr<AST::Package>>& pkgs);
+    void PerformDesugarAfterSema(std::vector<Ptr<AST::Package>>& pkgs);
 
     /**
      * Synthesize the given @p expr in given @p scopeName and return the found candidate decls or types.
@@ -418,6 +423,10 @@ private:
      * Add Object to all ClassDecls' inheritedTypes if there is no one.
      */
     void AddSuperClassObjectForClassDecl(ASTContext& ctx);
+    /**
+     * Add super interface to all ClassDecls' inheritedTypes if there is no one.
+     */
+    void AddSuperInterfaceForClassLikeDecl(ASTContext& ctx);
     void CheckAndAddSubDecls(
         const AST::Type& type, AST::ClassDecl& cd, bool& hasSuperClass, int& superClassLikeNum) const;
     bool HasSuperClass(AST::ClassDecl& cd) const;
@@ -427,9 +436,13 @@ private:
      */
     void AddObjectSuperClass(ASTContext& ctx, AST::ClassDecl& cd);
     /**
-     * LLVM-java interop scenario.
+     * CJNative-java interop scenario.
      */
     bool AddJObjectSuperClassJavaInterop(ASTContext& ctx, AST::ClassDecl& cd);
+    /**
+     * CJNative-objc interop scenario.
+     */
+    void AddObjCIdSuperInterfaceObjCInterop(ASTContext& ctx, AST::ClassLikeDecl& classLikeDecl);
     void AddDefaultSuperCall(const AST::FuncBody& funcBody) const;
     /**
      * If there is no default constructor, insert one.
@@ -1229,6 +1242,7 @@ private:
     bool CheckRefTypeCheckAccessLegality(const ASTContext& ctx, AST::RefType& rt, const AST::Decl& target);
     void CheckRefTypeWithRealTarget(AST::RefType& rt);
     void HandleAliasForRefType(AST::RefType& rt, Ptr<AST::Decl>& target);
+    bool CheckTypeParametersForAliasRef(AST::RefType& rt, const AST::TypeAliasDecl& aliasDecl);
 
     void GetRevTypeMapping(
         std::vector<Ptr<AST::Ty>>& params, std::vector<Ptr<AST::Ty>>& args, MultiTypeSubst& revTyMap);
@@ -1490,11 +1504,6 @@ private:
     std::unordered_map<Ptr<AST::Decl>, std::unordered_set<Ptr<AST::Decl>>> CopyDefaultImplement(
         const AST::Package& pkg);
     void HandleDefaultImplement(const AST::Package& pkg);
-
-    Ptr<AST::Ty> SubstituteTypeAliasInTy(
-        AST::Ty& ty, bool needSubstituteGeneric = false, const TypeSubst& typeMapping = {});
-    Ptr<AST::Ty> GetUnaliasedTypeFromTypeAlias(
-        const AST::TypeAliasTy& target, const std::vector<Ptr<AST::Ty>>& typeArgs);
     void SubstituteTypeForTypeAliasTypeMapping(
         const AST::TypeAliasDecl& tad, const std::vector<Ptr<AST::Ty>>& typeArgs, TypeSubst& typeMapping) const;
     TypeSubst GenerateTypeMappingForTypeAliasDecl(const AST::TypeAliasDecl& tad) const;
@@ -1519,6 +1528,11 @@ private:
         }
         typeMapping = GenerateTypeMappingForTypeAliasDecl(tad);
         SubstituteTypeForTypeAliasTypeMapping(tad, typeArgs, typeMapping);
+        // Also generate direct mapping from type alias decl's type parameters to the provided type arguments
+        auto directMapping = TypeCheckUtil::GenerateTypeMapping(tad, typeArgs);
+        for (auto& [key, value] : directMapping) {
+            typeMapping[key] = value;
+        }
         return typeMapping;
     }
 
@@ -1569,6 +1583,10 @@ private:
     void CheckTypeArgLegalityOfJArrayCtor(const AST::NameReferenceExpr& re);
     void CheckStaticMemberAccessLegality(const AST::MemberAccess& ma, const AST::Decl& target);
     void CheckInstanceMemberAccessLegality(const ASTContext& ctx, const AST::MemberAccess& ma, const AST::Decl& target);
+    bool CheckLegalityOfReferenceIsSkip(Ptr<AST::Node> node);
+    AST::VisitAction CheckLegalityOfReferenceForNameReferenceExpr(ASTContext& ctx, Ptr<AST::NameReferenceExpr> nameRef);
+    AST::VisitAction CheckLegalityOfReferenceForExpr(unsigned id, ASTContext& ctx, Ptr<AST::Expr> node);
+    void CheckLegalityOfReference(unsigned id, ASTContext& ctx, AST::Node& node);
     void CheckLegalityOfReference(ASTContext& ctx, AST::Node& node);
     void CheckLegalityOfUnsafeAndInout(AST::Node& root);
 
@@ -1644,8 +1662,6 @@ private:
     Ptr<AST::Ty> SynLiteralInBinaryExpr(ASTContext& ctx, AST::BinaryExpr& be);
     void SynBinaryLeafs(ASTContext& ctx, AST::BinaryExpr& be);
     void HandleAlias(Ptr<AST::Expr> expr, std::vector<Ptr<AST::Decl>>& targets);
-    std::vector<Ptr<AST::Ty>> RecursiveSubstituteTypeAliasInTy(
-        Ptr<const AST::Ty> ty, bool needSubstituteGeneric, const TypeSubst& typeMapping = {});
     template <class T>
     void SubstituteTypeArguments(std::vector<OwnedPtr<AST::Type>>& typeArguments, T& type, const TypeSubst& typeMapping)
     {
@@ -1660,7 +1676,7 @@ private:
         }
         for (auto& it : type.typeArguments) {
             auto newTypeArg = AST::ASTCloner::Clone(it.get());
-            newTypeArg->ty = newTypeArg->ty ? SubstituteTypeAliasInTy(*newTypeArg->ty, true, typeMapping)
+            newTypeArg->ty = newTypeArg->ty ? typeManager.SubstituteTypeAliasInTy(*newTypeArg->ty, true, typeMapping)
                                             : TypeManager::GetInvalidTy();
             if (auto ity = DynamicCast<AST::IntersectionTy*>(newTypeArg->ty); ity && ity->tys.empty()) {
                 continue;
@@ -1709,6 +1725,13 @@ private:
     Ptr<AST::Node> strictDeprecatedContext = nullptr;
     // cjmp typechecker implementation class
     class MPTypeCheckerImpl* mpImpl;
+    /**
+     * Will be passed as a reference in TypeChecker::TypeCheckerImpl::PerformDesugarAfterTypeCheck
+     * at Perform desugar after typecheck before generic instantiation stage.
+     *
+     * Needed for Java, Objective C interop Synthetic class wrappers generation.
+     */
+    std::unordered_map<Ptr<const AST::InheritableDecl>, MemberMap> structMemberMap;
 };
 } // namespace Cangjie
 #endif

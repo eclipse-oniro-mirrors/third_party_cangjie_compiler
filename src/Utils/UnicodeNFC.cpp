@@ -235,7 +235,6 @@ struct Decompositions {
                 DecomposeCanonical(codepoint, [this](UTF32 p) { PushBack(p); });
             } else {
                 if (buffer.empty()) {
-                    // std::cout<<"Decompose "<<0<<" return "<<"None\n";
                     return {};
                 } else {
                     SortPending();
@@ -246,7 +245,6 @@ struct Decompositions {
         }
         auto ch = buffer[ready.begin].second;
         IncrementNextReady();
-        // std::cout<<"Decompose "<<1<<" return "<<std::hex<<ch<<std::dec<<'\n';
         return {ch};
     }
 

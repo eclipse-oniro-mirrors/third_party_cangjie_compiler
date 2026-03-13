@@ -299,7 +299,7 @@ std::vector<ClassType*> CustomType::GetSuperTypesRecusively(CHIRBuilder& builder
     std::set<std::pair<const Type*, const Type*>>* visited)
 {
     std::vector<ClassType*> inheritanceList;
-    for (auto interface : GetImplementedInterfaceTys(&builder)) {
+    for (auto interface : GetImplementedInterfaceTys(&builder, visited)) {
         GetAllInstantiatedParentType(*interface, builder, inheritanceList, visited);
     }
     if (auto classTy = DynamicCast<ClassType*>(this)) {
@@ -844,7 +844,11 @@ std::vector<ClassType*> CustomType::CalculateExtendImplementedInterfaceTys(CHIRB
 {
     std::vector<ClassType*> allParents;
     for (auto extendDef : def->GetExtends()) {
-        if (!IsEqualOrInstantiatedTypeOf(*extendDef->GetExtendedType(), builder, visited)) {
+        std::set<std::pair<const Type*, const Type*>> visited2;
+        if (visited != nullptr) {
+            visited2 = *visited;
+        }
+        if (!IsEqualOrInstantiatedTypeOf(*extendDef->GetExtendedType(), builder, &visited2)) {
             continue;
         }
         auto res = extendDef->GetExtendedType()->CalculateGenericTyMapping(*this);
@@ -1277,7 +1281,11 @@ std::vector<ClassType*> BuiltinType::GetSuperTypesRecusively(CHIRBuilder& builde
 {
     std::vector<ClassType*> inheritanceList;
     for (auto extendDef : GetExtends(&builder)) {
-        if (!IsEqualOrInstantiatedTypeOf(*extendDef->GetExtendedType(), builder, visited)) {
+        std::set<std::pair<const Type*, const Type*>> visited2;
+        if (visited != nullptr) {
+            visited2 = *visited;
+        }
+        if (!IsEqualOrInstantiatedTypeOf(*extendDef->GetExtendedType(), builder, &visited2)) {
             continue;
         }
         for (auto interface : extendDef->GetImplementedInterfaceTys()) {
@@ -1512,7 +1520,11 @@ bool Type::SatisfyGenericConstraints(const GenericType& type, CHIRBuilder& build
     std::set<std::pair<const Type*, const Type*>>* visited) const
 {
     for (auto upperBound : type.GetUpperBounds()) {
-        if (!IsEqualOrSubTypeOf(*ReplaceRawGenericArgType(*upperBound, instMap, builder), builder, visited)) {
+        std::set<std::pair<const Type*, const Type*>> visited2;
+        if (visited != nullptr) {
+            visited2 = *visited;
+        }
+        if (!IsEqualOrSubTypeOf(*ReplaceRawGenericArgType(*upperBound, instMap, builder), builder, &visited2)) {
             return false;
         }
     }

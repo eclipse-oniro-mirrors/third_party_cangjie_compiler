@@ -109,6 +109,11 @@ OwnedPtr<Expr> ASTLoader::ASTLoaderImpl::LoadCallExpr(const PackageFormat::Expr&
     if (info->hasSideEffect()) {
         ce->EnableAttr(Attribute::SIDE_EFFECT);
     }
+
+    if (auto nre = DynamicCast<NameReferenceExpr*>(ce->baseFunc.get()); nre) {
+        nre->isAlone = false;
+    }
+
     return ce;
 }
 
@@ -172,6 +177,11 @@ OwnedPtr<Expr> ASTLoader::ASTLoaderImpl::LoadSubscriptExpr(const PackageFormat::
     auto info = expr.info_as_SubscriptInfo();
     CJC_NULLPTR_CHECK(info);
     se->isTupleAccess = info->isTupleAccess();
+
+    if (auto nre = DynamicCast<NameReferenceExpr*>(se->baseExpr.get()); nre) {
+        nre->isAlone = false;
+    }
+
     return se;
 }
 

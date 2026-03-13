@@ -414,12 +414,12 @@ OwnedPtr<RefType> CreateRefType(const std::string& refName, std::vector<Ptr<Type
     return ret;
 }
 
-OwnedPtr<RefType> CreateRefType(InheritableDecl& typeDecl)
+OwnedPtr<RefType> CreateRefType(InheritableDecl& typeDecl, Ptr<Ty> instantTy)
 {
     auto ret = MakeOwned<RefType>();
     ret->ref.identifier = typeDecl.identifier;
     ret->ref.target = &typeDecl;
-    ret->ty = typeDecl.ty;
+    ret->ty = instantTy ? instantTy : typeDecl.ty;
     ret->EnableAttr(Attribute::COMPILER_ADD);
     return ret;
 }
@@ -725,11 +725,16 @@ OwnedPtr<TypePattern> CreateTypePattern(
     return typePattern;
 }
 
-OwnedPtr<ImportSpec> CreateImportSpec(
-    const std::string& fullPackageName, const std::string& item, const std::string& alias)
+OwnedPtr<ImportSpec> CreateImportSpec(const std::string& fullPackageName, const std::string& item,
+    const std::string& alias, const FullPackageNameToPrefixPaths& cache)
 {
     auto import = MakeOwned<ImportSpec>();
-    auto names = Utils::SplitQualifiedName(fullPackageName);
+    std::vector<std::string> names;
+    if (cache.find(fullPackageName) != cache.end()) {
+        names = cache.at(fullPackageName);
+    } else {
+        names = Utils::SplitQualifiedName(fullPackageName);
+    }
     CJC_ASSERT(names.size() >= 1 && !item.empty());
     if (!alias.empty()) {
         import->content.kind = ImportKind::IMPORT_ALIAS;

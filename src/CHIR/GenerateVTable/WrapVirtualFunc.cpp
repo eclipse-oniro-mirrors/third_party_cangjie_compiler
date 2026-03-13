@@ -111,7 +111,7 @@ bool JudgeIfNeedVirtualWrapper(const VirtualFuncInfo& parentFuncInfo, const Func
 // maybe we can not deserialize virutal wrapper function, because it's not in source code
 void TryDeleteVirtuallWrapperFunc(CustomTypeDef& customTypeDef, FuncBase& finalFunc, CHIRBuilder& builder)
 {
-    if (!customTypeDef.TestAttr(Attribute::PLATFORM)) {
+    if (!customTypeDef.TestAttr(Attribute::SPECIFIC)) {
         return;
     }
     if (!finalFunc.TestAttr(Attribute::FINAL)) {
@@ -295,7 +295,7 @@ void WrapVirtualFunc::CreateVirtualWrapperFunc(Func& func, FuncType& wrapperTy,
         .args = args,
         .instTypeArgs = instArgTypes,
         .thisType = thisInstTy}, entry);
-
+    apply->SetDebugLocation(rawFunc->GetDebugLocation());
     auto res = TypeCastOrBoxIfNeeded(*apply->GetResult(), *wrapperRetTy, builder, *entry, INVALID_LOCATION);
     CreateAndAppendExpression<Store>(builder, builder.GetUnitTy(), res, func.GetReturnValue(), entry);
     entry->AppendExpression(builder.CreateTerminator<Exit>(entry));

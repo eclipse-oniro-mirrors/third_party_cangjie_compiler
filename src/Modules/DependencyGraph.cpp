@@ -181,3 +181,12 @@ void ImportManager::DependencyGraph::AddDependency(
         }
     }
 }
+
+void ImportManager::DependencyGraph::Clear()
+{
+    dependencyMap.clear();
+    pkgReExportMap.clear();
+    cacheDirectDependencyPackageDecls.clear();
+    cacheDependencyPackageDecls.clear();
+    cacheDependencyPackageNames.clear();
+}

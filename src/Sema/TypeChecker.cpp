@@ -25,7 +25,9 @@
 #include "ExtraScopes.h"
 #include "JoinAndMeet.h"
 #include "NativeFFI/Java/BeforeTypeCheck/GenerateJavaMirror.h"
+#include "NativeFFI/Java/AfterTypeCheck/InteropLibBridge.h"
 #include "NativeFFI/ObjC/BeforeTypeCheck/Desugar.h"
+#include "NativeFFI/ObjC/Utils/InteropLibBridge.h"
 #include "Plugin/PluginCustomAnnoChecker.h"
 #include "TypeCheckUtil.h"
 
@@ -708,111 +710,6 @@ void TypeChecker::TypeCheckerImpl::SubstituteTypeArguments(
     if (auto qt = DynamicCast<AST::QualifiedType*>(tad.type.get())) {
         SubstituteTypeArguments(typeArguments, *qt, typeMapping);
     }
-}
-
-Ptr<AST::Ty> TypeChecker::TypeCheckerImpl::SubstituteTypeAliasInTy(
-    AST::Ty& ty, bool needSubstituteGeneric, const TypeSubst& typeMapping)
-{
-    if (!Ty::IsTyCorrect(&ty)) {
-        return TypeManager::GetInvalidTy();
-    }
-    if (ty.kind <= TypeKind::TYPE_BOOLEAN) {
-        return &ty;
-    }
-    std::vector<Ptr<Ty>> typeArgs = RecursiveSubstituteTypeAliasInTy(&ty, needSubstituteGeneric, typeMapping);
-    switch (ty.kind) {
-        case TypeKind::TYPE_CLASS: {
-            if (auto ctt = DynamicCast<ClassThisTy*>(&ty); ctt) {
-                return typeManager.GetClassThisTy(*ctt->declPtr, typeArgs);
-            }
-            return typeManager.GetClassTy(*static_cast<ClassTy&>(ty).declPtr, typeArgs);
-        }
-        case TypeKind::TYPE_STRUCT: {
-            return typeManager.GetStructTy(*static_cast<StructTy&>(ty).declPtr, typeArgs);
-        }
-        case TypeKind::TYPE_INTERFACE: {
-            return typeManager.GetInterfaceTy(*static_cast<InterfaceTy&>(ty).declPtr, typeArgs);
-        }
-        case TypeKind::TYPE_ENUM: {
-            return typeManager.GetEnumTy(*static_cast<EnumTy&>(ty).declPtr, typeArgs);
-        }
-        case TypeKind::TYPE_FUNC: {
-            auto returnTy = typeArgs.back();
-            typeArgs.pop_back();
-            auto& funcTy = static_cast<FuncTy&>(ty);
-            return typeManager.GetFunctionTy(typeArgs, returnTy, {funcTy.isC, false, funcTy.hasVariableLenArg});
-        }
-        case TypeKind::TYPE: {
-            auto inner = GetUnaliasedTypeFromTypeAlias(static_cast<TypeAliasTy&>(ty), typeArgs);
-            if (auto nestedAlias = DynamicCast<TypeAliasTy>(inner)) {
-                auto type = Ty::GetDeclPtrOfTy(nestedAlias);
-                // the aliased type is in cycle, stop recursive substitution to avoid endless loop
-                if (type && type->TestAttr(Attribute::IN_REFERENCE_CYCLE)) {
-                    return nestedAlias;
-                }
-                return SubstituteTypeAliasInTy(*nestedAlias, needSubstituteGeneric, typeMapping);
-            }
-            return inner;
-        }
-        case TypeKind::TYPE_TUPLE: {
-            return typeManager.GetTupleTy(typeArgs);
-        }
-        case TypeKind::TYPE_ARRAY: {
-            auto& arrayTy = static_cast<ArrayTy&>(ty);
-            return typeManager.GetArrayTy(typeArgs[0], arrayTy.dims);
-        }
-        case TypeKind::TYPE_VARRAY: {
-            auto& varrayTy = static_cast<VArrayTy&>(ty);
-            CJC_ASSERT(!typeArgs.empty() && typeArgs[0] != nullptr);
-            return typeManager.GetVArrayTy(*typeArgs[0], varrayTy.size);
-        }
-        case TypeKind::TYPE_POINTER: {
-            return typeManager.GetPointerTy(typeArgs[0]);
-        }
-        case TypeKind::TYPE_GENERICS: {
-            if (!needSubstituteGeneric) {
-                return &ty;
-            }
-            auto found = typeMapping.find(StaticCast<GenericsTy*>(&ty));
-            if (found != typeMapping.end()) {
-                return found->second;
-            }
-            // This type will not be used, just for placeholder and marking current is substituted with typealias.
-            return typeManager.GetIntersectionTy({&ty});
-        }
-        default:
-            return &ty;
-    }
-}
-
-std::vector<Ptr<Ty>> TypeChecker::TypeCheckerImpl::RecursiveSubstituteTypeAliasInTy(
-    Ptr<const Ty> ty, bool needSubstituteGeneric, const TypeSubst& typeMapping)
-{
-    CJC_ASSERT(ty); // Caller guarantees;
-    std::vector<Ptr<Ty>> typeArgs;
-    for (auto typeArg : ty->typeArgs) {
-        CJC_ASSERT(typeArg);
-        if (Ty::IsTyCorrect(typeArg) || needSubstituteGeneric) {
-            auto noTypeAliasArg = SubstituteTypeAliasInTy(*typeArg, needSubstituteGeneric, typeMapping);
-            typeArgs.push_back(noTypeAliasArg);
-        } else {
-            typeArgs.push_back(typeArg);
-        }
-    }
-    return typeArgs;
-}
-
-Ptr<Ty> TypeChecker::TypeCheckerImpl::GetUnaliasedTypeFromTypeAlias(
-    const TypeAliasTy& target, const std::vector<Ptr<Ty>>& typeArgs)
-{
-    CJC_NULLPTR_CHECK(target.declPtr->type);
-    auto aliasedType = target.declPtr->type.get();
-    // Since 'SubstituteTypeAliasInTy' was called from inner to outer, we only need to substitute current type.
-    // Only need to substitute with given typeArgument for given alias target.
-    TypeSubst typeMapping = GenerateTypeMapping(*target.declPtr, typeArgs);
-    Ptr<Ty> type = typeManager.GetInstantiatedTy(aliasedType->ty, typeMapping);
-    CJC_ASSERT(target.declPtr);
-    return type;
 }
 
 namespace {
@@ -1761,9 +1658,7 @@ void TypeChecker::TypeCheckerImpl::TypeCheckCompositeBody(
 
 void TypeChecker::TypeCheckerImpl::CheckJavaInteropLibImport(Decl& decl)
 {
-    constexpr auto INTEROPLIB_JAVA_PACKAGE_NAME = "interoplib.interop";
-    auto interopPackage = importManager.GetPackageDecl(INTEROPLIB_JAVA_PACKAGE_NAME);
-    if (!interopPackage) {
+    if (!Interop::Java::InteropLibBridge::IsInteropLibAccessible(importManager)) {
         diag.DiagnoseRefactor(DiagKindRefactor::sema_java_mirror_interoplib_must_be_imported, decl);
         decl.EnableAttr(Attribute::IS_BROKEN);
     }
@@ -1771,9 +1666,7 @@ void TypeChecker::TypeCheckerImpl::CheckJavaInteropLibImport(Decl& decl)
 
 void TypeChecker::TypeCheckerImpl::CheckObjCInteropLibImport(Decl& decl)
 {
-    constexpr auto INTEROPLIB_OBJ_C_PACKAGE_NAME = "interoplib.objc";
-    auto interopPackage = importManager.GetPackageDecl(INTEROPLIB_OBJ_C_PACKAGE_NAME);
-    if (!interopPackage) {
+    if (!Interop::ObjC::InteropLibBridge::IsInteropLibAccessible(importManager)) {
         diag.DiagnoseRefactor(DiagKindRefactor::sema_objc_mirror_interoplib_must_be_imported, decl);
         decl.EnableAttr(Attribute::IS_BROKEN);
     }
@@ -2003,7 +1896,8 @@ void MarkImplicitUsedFunctions(const Package& pkg)
             {"arrayInitByCollection", "arrayInitByFunction", "composition", "handleException",
                 "createOverflowExceptionMsg", "createArithmeticExceptionMsg", "getCommandLineArgs"}},
         {AST_PACKAGE_NAME,
-            {MACRO_OBJECT_NAME, "refreshTokensPosition", "refreshPos", "unsafePointerCastFromUint8Array"}}};
+            {MACRO_OBJECT_NAME, "refreshTokensPosition", "refreshPos", "unsafePointerCastFromUint8Array",
+                "transformTokens"}}};
     auto found = SPECIAL_EXPORTED_FUNCS.find(pkg.fullPackageName);
     if (found == SPECIAL_EXPORTED_FUNCS.end()) {
         return;
@@ -2139,6 +2033,12 @@ std::vector<Ptr<ASTContext>> TypeChecker::TypeCheckerImpl::PreTypeCheck(const st
             CollectDeclsWithMember(pkg, *ctx);
         }
     }
+
+    for (auto pkg : pkgs) {
+        mpImpl->MatchSpecificWithCommon(*pkg);
+        mpImpl->CheckNotAllowedAnnotations(*pkg);
+    }
+
     return contexts;
 }
 
@@ -2154,7 +2054,8 @@ void TypeChecker::TypeCheckerImpl::PostTypeCheck(std::vector<Ptr<ASTContext>>& c
         // Check legality of usage after sema type completed.
         CheckLegalityOfUsage(*ctx, *ctx->curPackage);
         // Check cjmp match rules.
-        mpImpl->MatchPlatformWithCommon(*ctx->curPackage);
+        mpImpl->CheckReturnAndVariableTypes(*ctx->curPackage);
+        mpImpl->ValidateMatchedAnnotationsAndModifiers(*ctx->curPackage);
         AddAttrForDefaultFuncParam(*ctx->curPackage);
         // Because of the cjlint checking policy, desugar of propDecl should be done in sema stage for now.
         DesugarForPropDecl(*ctx->curPackage);
@@ -2177,7 +2078,7 @@ void TypeChecker::TypeCheckerImpl::PrepareTypeCheck(ASTContext& ctx, Package& pk
     ctx.searcher->InvalidateCache();
 
     CheckPrimaryCtorBeforeMerge(pkg);
-    // Merging common classes into platform if any
+    // Merging common classes into specific if any
     mpImpl->PrepareTypeCheck4CJMP(pkg);
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND

@@ -337,8 +337,8 @@ bool IsOverrideOrShadow(TypeManager& typeManager, const FuncDecl& src, const Fun
         }
         if (typeManager.IsFuncParameterTypesIdentical(srcParamTys, targetParamTys)) {
             bool isCrossPlatform =
-                (src.TestAttr(AST::Attribute::COMMON) && target.TestAttr(AST::Attribute::PLATFORM)) ||
-                (src.TestAttr(AST::Attribute::PLATFORM) && target.TestAttr(AST::Attribute::COMMON));
+                (src.TestAttr(AST::Attribute::COMMON) && target.TestAttr(AST::Attribute::SPECIFIC)) ||
+                (src.TestAttr(AST::Attribute::SPECIFIC) && target.TestAttr(AST::Attribute::COMMON));
             if (isCrossPlatform) {
                 continue;
             }
@@ -624,6 +624,16 @@ Ptr<const Modifier> FindModifier(const Decl& d, TokenKind kind)
     return mod;
 }
 
+Ptr<Annotation> FindFirstAnnotation(const Decl& decl, AnnotationKind kind)
+{
+    auto found = std::find_if(decl.annotations.begin(), decl.annotations.end(),
+        [&kind](const auto& anno) { return anno.get()->kind == kind; });
+    if (found != decl.annotations.end()) {
+        return (*found).get();
+    }
+    return nullptr;
+}
+
 void AddArrayLitConstructor(ArrayLit& al)
 {
     auto decl = Ty::GetDeclPtrOfTy(al.ty);
@@ -796,7 +806,7 @@ std::vector<Ptr<Ty>> GetParamTysInArgsOrder(TypeManager& tyMgr, const CallExpr& 
             paramHasTy[index] = true;
         } else {
             return {};
-        }    
+        }
     }
     for (auto it : std::as_const(paramHasTy)) {
         if (!it) {
@@ -869,7 +879,9 @@ bool IsNeedRuntimeCheck(TypeManager& typeManager, Ty& srcTy, Ty& targetTy)
     if (isFinalType(srcTy) && isFinalType(targetTy)) {
         auto srcDecl = Ty::GetDeclPtrOfTy(&srcTy);
         auto targetDecl = Ty::GetDeclPtrOfTy(&targetTy);
-        return srcDecl == targetDecl;
+        if (srcDecl || targetDecl) {
+            return srcDecl == targetDecl;
+        }
     }
     return (srcTy.IsClassLike() && targetTy.IsClassLike()) || srcTy.IsGeneric() || targetTy.IsGeneric() ||
         srcTy.HasGeneric() || targetTy.HasGeneric() || typeManager.IsSubtype(&srcTy, &targetTy, true, false) ||
@@ -1102,6 +1114,7 @@ OwnedPtr<GenericParamDecl> CreateGenericParamDecl(Decl& decl, const std::string&
     typeParam->identifier = name;
     typeParam->ty = typeManager.GetGenericsTy(*typeParam);
     typeParam->outerDecl = &decl;
+    typeParam->fullPackageName = decl.fullPackageName;
     return typeParam;
 }
 
@@ -1120,11 +1133,14 @@ Ptr<FuncDecl> GenerateGetTypeForTypeParamIntrinsic(Package& pkg, TypeManager& ty
     funcBody->paramLists.emplace_back(CreateFuncParamList(std::vector<OwnedPtr<FuncParam>>{}));
     funcBody->retType = MakeOwned<RefType>();
     funcBody->retType->ty = retTy;
+    funcBody->retType->EnableAttr(Attribute::COMPILER_ADD);
     funcBody->generic = MakeOwned<Generic>();
     funcBody->generic->typeParameters.emplace_back(CreateGenericParamDecl(*decl, typeManager));
     funcBody->ty = funcTy;
 
     decl->curFile = file;
+    decl->begin = file->begin;
+    decl->end = file->begin;
     decl->identifier = GET_TYPE_FOR_TYPE_PARAMETER_FUNC_NAME;
     decl->fullPackageName = pkg.fullPackageName;
     decl->ty = funcTy;
@@ -1151,11 +1167,13 @@ Ptr<FuncDecl> GenerateIsSubtypeTypesIntrinsic(Package& pkg, TypeManager& typeMan
     funcBody->retType = MakeOwned<RefType>();
     funcBody->retType->ty = retTy;
     funcBody->generic = MakeOwned<Generic>();
-    funcBody->generic->typeParameters.emplace_back(CreateGenericParamDecl(*decl, typeManager));
-    funcBody->generic->typeParameters.emplace_back(CreateGenericParamDecl(*decl, typeManager));
+    funcBody->generic->typeParameters.emplace_back(CreateGenericParamDecl(*decl, "T1", typeManager));
+    funcBody->generic->typeParameters.emplace_back(CreateGenericParamDecl(*decl, "T2", typeManager));
     funcBody->ty = funcTy;
 
     AddCurFile(*decl, file);
+    decl->begin = file->begin;
+    decl->end = file->begin;
     decl->identifier = IS_SUBTYPE_TYPES_FUNC_NAME;
     decl->fullPackageName = pkg.fullPackageName;
     decl->ty = funcTy;
@@ -1274,21 +1292,21 @@ bool IsLegalAccess(Symbol* curComposite, const Decl& d, const AST::Node& node, I
     }
     // 4. otherwise accessing private decl must inside same decl.
     auto expectedOuter = outerDeclOfTarget;
-    if (expectedOuter->platformImplementation) {
-        expectedOuter = expectedOuter->platformImplementation;
+    if (expectedOuter->specificImplementation) {
+        expectedOuter = expectedOuter->specificImplementation;
     }
     return curComposite && curComposite->node == expectedOuter;
 }
 
-Ptr<Decl> FindCorrespondingCommonDecl(const Decl& platformDecl)
+Ptr<Decl> FindCorrespondingCommonDecl(const Decl& specificDecl)
 {
-    if (platformDecl.curFile == nullptr || platformDecl.curFile->curPackage == nullptr) {
+    if (specificDecl.curFile == nullptr || specificDecl.curFile->curPackage == nullptr) {
         return nullptr;
     }
 
-    for (const auto& file : platformDecl.curFile->curPackage->files) {
+    for (const auto& file : specificDecl.curFile->curPackage->files) {
         for (const auto& decl : file->decls) {
-            if (decl->platformImplementation == &platformDecl) {
+            if (decl->specificImplementation == &specificDecl) {
                 return decl;
             }
         }

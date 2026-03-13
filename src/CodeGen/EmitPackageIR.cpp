@@ -15,9 +15,9 @@
 #include "CGModule.h"
 #include "CJNative/CGTypes/CGExtensionDef.h"
 #include "CJNative/CGTypes/EnumCtorTIOrTTGenerator.h"
+#include "CJNative/CJNativeMetadata.h"
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
 #include "CJNative/CHIRSplitter.h"
-#include "CJNative/CJNativeReflectionInfo.h"
 #endif
 #include "DIBuilder.h"
 #include "EmitFunctionIR.h"
@@ -108,7 +108,7 @@ void GenerateExtensionDefs(CGModule& cgMod)
     }
 }
 
-std::vector<llvm::Constant*> TopologicalSortStaticGIs(CGContext& cgCtx, std::vector<llvm::Constant*> content)
+std::vector<llvm::Constant*> TopologicalSortStaticGIs(const CGContext& cgCtx, std::vector<llvm::Constant*> content)
 {
     auto indegree = cgCtx.GetIndegreeOfTypes();
     auto& partialOrder = cgCtx.GetDependentPartialOrderOfTypes();
@@ -124,10 +124,12 @@ std::vector<llvm::Constant*> TopologicalSortStaticGIs(CGContext& cgCtx, std::vec
         q.pop();
         res.emplace_back(u);
         for (auto c : content) {
-            if (auto it = partialOrder.find(CGContext::PartialOrderPair{u, c}); it != partialOrder.end()) {
-                if (auto& i = indegree.at(c); --i == 0) {
-                    q.push(c);
-                }
+            auto it = partialOrder.find(CGContext::PartialOrderPair{u, c});
+            if (it == partialOrder.end()) {
+                continue;
+            }
+            if (auto& i = indegree.at(c); --i == 0) {
+                q.push(c);
             }
         }
     }
@@ -311,12 +313,9 @@ void EmitTIOrTTForCustomDefs(CGModule& cgMod)
         switch (customDef->GetCustomKind()) {
             case CHIR::CustomDefKind::TYPE_ENUM: {
                 auto chirEnumType = StaticCast<CHIR::EnumDef*>(customDef)->GetType();
-                auto cgEnumType = StaticCast<CGEnumType*>(CGType::GetOrCreate(cgMod, chirEnumType));
-                if (!cgEnumType->IsTrivial() && !cgEnumType->IsZeroSizeEnum()) {
-                    const auto& ctors = chirEnumType->GetConstructorInfos(cgMod.GetCGContext().GetCHIRBuilder());
-                    for (auto ctorIndex = 0U; ctorIndex < ctors.size(); ++ctorIndex) {
-                        EnumCtorTIOrTTGenerator(cgMod, *chirEnumType, ctorIndex).Emit();
-                    }
+                const auto& ctors = chirEnumType->GetConstructorInfos(cgMod.GetCGContext().GetCHIRBuilder());
+                for (auto ctorIndex = 0U; ctorIndex < ctors.size(); ++ctorIndex) {
+                    EnumCtorTIOrTTGenerator(cgMod, *chirEnumType, ctorIndex).Emit();
                 }
                 break;
             }
@@ -342,6 +341,50 @@ void EmitCJSDKVersion(const CGModule& cgMod)
     cjSdkVersion->setAlignment(llvm::Align(1));
     cjSdkVersion->setLinkage(linkageType);
     cgMod.GetCGContext().AddLLVMUsedVars(cjSdkVersion->getName().str());
+}
+
+void GenerateReflectionMetadata(CGModule& module, const SubCHIRPackage& subCHIRPkg)
+{
+    auto& globalOptions = module.GetCGContext().GetCGPkgContext().GetGlobalOptions();
+    uint8_t reflectionMode = globalOptions.disableReflection
+        ? GenReflectMode::NO_REFLECT
+        : GenReflectMode::FULL_REFLECT;
+
+    const std::array<MetadataKind, 6> allKinds = {
+        CodeGen::MetadataKind::PKG_METADATA,
+        CodeGen::MetadataKind::CLASS_METADATA,
+        CodeGen::MetadataKind::STRUCT_METADATA,
+        CodeGen::MetadataKind::ENUM_METADATA,
+        CodeGen::MetadataKind::GF_METADATA,
+        CodeGen::MetadataKind::GV_METADATA
+    };
+
+    auto runTask = [&](CodeGen::MetadataKind kind) {
+        std::unique_ptr<MetadataInfo> info = nullptr;
+        switch (kind) {
+            case CodeGen::MetadataKind::PKG_METADATA:
+                info = std::make_unique<PkgMetadataInfo>(module, subCHIRPkg, reflectionMode); break;
+            case CodeGen::MetadataKind::CLASS_METADATA:
+                info = std::make_unique<ClassMetadataInfo>(module, subCHIRPkg, reflectionMode); break;
+            case CodeGen::MetadataKind::STRUCT_METADATA:
+                info = std::make_unique<StructMetadataInfo>(module, subCHIRPkg, reflectionMode); break;
+            case CodeGen::MetadataKind::ENUM_METADATA:
+                info = std::make_unique<EnumMetadataInfo>(module, subCHIRPkg, reflectionMode); break;
+            case CodeGen::MetadataKind::GF_METADATA:
+                info = std::make_unique<GFMetadataInfo>(module, subCHIRPkg, reflectionMode); break;
+            case CodeGen::MetadataKind::GV_METADATA:
+                info = std::make_unique<GVMetadataInfo>(module, subCHIRPkg, reflectionMode); break;
+            default: break;
+        }
+
+        if (info) {
+            info->Gen();
+        }
+    };
+
+    for (auto kind : allKinds) {
+        runTask(kind);
+    }
 }
 
 void GenSubCHIRPackage(CGModule& cgMod)
@@ -371,7 +414,7 @@ void GenSubCHIRPackage(CGModule& cgMod)
     cgMod.Opt();
     InlineFunction(cgMod);
     DumpIRIfNeeded(cgMod, "ReplaceAndInlineFunc", subDirNum);
-    CJNativeReflectionInfo(cgMod, subCHIRPkg).Gen();
+    GenerateReflectionMetadata(cgMod, subCHIRPkg);
     cgMod.GenTypeInfo(); // for reflect generated typeinfo
     DumpIRIfNeeded(cgMod, "GenReflectionInfo", subDirNum);
     cgMod.diBuilder->Finalize();
@@ -541,14 +584,14 @@ llvm::Value* GenerateMainRetVal(IRBuilder2& irBuilder, llvm::Value* userMainRetV
 
 llvm::Function* CreateMainFunc(const CGModule& cgMod)
 {
-    auto& context = cgMod.GetCGContext().GetLLVMContext();
-    auto i32Ty = llvm::Type::getInt32Ty(context);
-    auto i8PtrPtrTy = llvm::Type::getInt8PtrTy(context)->getPointerTo();
     // Create @main func.
     auto module = cgMod.GetLLVMModule();
     auto mainFunc = module->getFunction("main");
     CJC_ASSERT(!mainFunc && "The main function is generated repeatedly.");
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
+    auto& context = cgMod.GetCGContext().GetLLVMContext();
+    auto i32Ty = llvm::Type::getInt32Ty(context);
+    auto i8PtrPtrTy = llvm::Type::getInt8PtrTy(context)->getPointerTo();
     auto voidType = llvm::Type::getVoidTy(context);
     auto mainFuncType = llvm::FunctionType::get(voidType, {i32Ty, i8PtrPtrTy}, false);
     mainFunc = llvm::cast<llvm::Function>(module->getOrInsertFunction("main", mainFuncType).getCallee());

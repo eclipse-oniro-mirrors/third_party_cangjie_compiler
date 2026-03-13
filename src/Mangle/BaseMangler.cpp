@@ -191,7 +191,7 @@ std::string BaseMangler::MangleFullPackageName(const std::string& packageName) c
 
 std::string BaseMangler::MangleFullPackageName(const AST::Decl& decl) const
 {
-    return MangleFullPackageName(decl.fullPackageName);
+    return MangleFullPackageName(decl.GetFullPackageName());
 }
 
 std::string BaseMangler::GetPrefixOfType(const AST::Ty& ty) const
@@ -445,6 +445,7 @@ std::string BaseMangler::MangleVarWithPatternDecl(
     }
 
     std::optional<size_t> index = GetIndexOfWildcard(vwpDecl, prefix);
+    CJC_ASSERT_WITH_MSG(index.has_value(), "Index of wildcard should not be empty");
     mangleStr += MANGLE_CANGJIE_PREFIX + MANGLE_NESTED_PREFIX;
     std::vector<std::string> genericsTypeStack;
     mangleStr += ManglePrefix(vwpDecl, prefix, genericsTypeStack, true);
@@ -608,7 +609,7 @@ std::string BaseMangler::MangleDecl(const Decl& decl, const std::vector<Ptr<Node
         } else {
             std::string name = decl.identifier;
             if (decl.astKind == ASTKind::GENERIC_PARAM_DECL && decl.outerDecl &&
-                decl.outerDecl->TestAnyAttr(Attribute::COMMON, Attribute::PLATFORM) &&
+                decl.outerDecl->TestAnyAttr(Attribute::COMMON, Attribute::SPECIFIC) &&
                 decl.outerDecl->TestAttr(Attribute::GENERIC)) {
                 auto genericsTy = StaticCast<const GenericsTy*>(decl.ty);
                 auto result = std::find_if(genericsTypeStack.rbegin(), genericsTypeStack.rend(),
@@ -815,6 +816,7 @@ std::string BaseMangler::ManglePrefix(const Node& node, const std::vector<Ptr<No
                 }
 
                 std::optional<size_t> index = GetIndexOfWildcard(vwpDecl, prefix);
+                CJC_ASSERT_WITH_MSG(index.has_value(), "Index of wildcard should not be empty");
                 mangleStr += MANGLE_ANONYMOUS_VARIABLE_PREFIX;
                 mangleStr += MangleUtils::DecimalToManglingNumber(std::to_string(index.value()));
                 mangled += mangleStr;
@@ -852,7 +854,7 @@ std::string BaseMangler::ManglePrefix(const Node& node, const std::vector<Ptr<No
 std::string BaseMangler::ManglePackage(const Decl& decl) const
 {
     std::string genericPackageName = ManglePackageNameForGeneric(decl);
-    return genericPackageName.empty() ? MangleFullPackageName(decl.fullPackageName) : genericPackageName;
+    return genericPackageName.empty() ? MangleFullPackageName(decl) : genericPackageName;
 }
 
 std::unique_ptr<ManglerContext> BaseMangler::PrepareContextForPackage(const Ptr<AST::Package> pkg)

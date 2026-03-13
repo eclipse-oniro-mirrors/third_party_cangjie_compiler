@@ -37,7 +37,7 @@ template <> void CHIRDeserializer::CHIRDeserializerImpl::Config(const PackageFor
 // =========================== Generic Deserializer ==============================
 
 bool CHIRDeserializer::Deserialize(const std::string& fileName, Cangjie::CHIR::CHIRBuilder& chirBuilder,
-    Cangjie::CHIR::ToCHIR::Phase& phase, bool compilePlatform)
+    Cangjie::CHIR::ToCHIR::Phase& phase, bool compileSpecific)
 {
     if (FileUtil::IsDir(fileName)) {
         Errorln(fileName, " is a directory.");
@@ -47,14 +47,18 @@ bool CHIRDeserializer::Deserialize(const std::string& fileName, Cangjie::CHIR::C
         Errorln(fileName, " not exist.");
         return false;
     }
-    CHIRDeserializerImpl deserializer(chirBuilder, compilePlatform);
+    CHIRDeserializerImpl deserializer(chirBuilder, compileSpecific);
     std::vector<uint8_t> serializationInfo;
     std::string failedReason;
     if (!FileUtil::ReadBinaryFileToBuffer(fileName, serializationInfo, failedReason)) {
         Errorln(failedReason, ".");
         return false;
     }
-    flatbuffers::Verifier verifier(serializationInfo.data(), serializationInfo.size());
+    // Disable max depth and max tables verification.
+    flatbuffers::Verifier::Options options;
+    options.max_depth = std::numeric_limits<::flatbuffers::uoffset_t>::max();
+    options.max_tables = std::numeric_limits<::flatbuffers::uoffset_t>::max();
+    flatbuffers::Verifier verifier(serializationInfo.data(), serializationInfo.size(), options);
     if (!verifier.VerifyBuffer<PackageFormat::CHIRPackage>()) {
         Errorln("validation of '", fileName, "' failed, please confirm it was created by compiler whose version is '",
             CANGJIE_VERSION, "'.");
@@ -147,9 +151,6 @@ AttributeInfo CreateAttr(const uint64_t attrs)
 std::string GetMangleNameFromIdentifier(std::string& identifier)
 {
     CJC_ASSERT(!identifier.empty());
-    if (identifier.empty()) {
-        return "";
-    }
     if (identifier[0] == '@') {
         return identifier.substr(1);
     } else {
@@ -192,7 +193,7 @@ template <> MemberVarInfo CHIRDeserializer::CHIRDeserializerImpl::Create(const P
     auto rawMangledName = obj->rawMangledName()->str();
     auto type = GetType<Type>(obj->type());
     auto attributeInfo = CreateAttr(obj->attributes());
-    if (compilePlatform) {
+    if (compileSpecific) {
         attributeInfo.SetAttr(Attribute::DESERIALIZED, true);
     }
     auto loc = Create<DebugLocation>(obj->loc());
@@ -277,7 +278,7 @@ template <> EnumDef* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const P
     auto identifier = obj->base()->identifier()->str();
     auto packageName = obj->base()->packageName()->str();
     auto attrs = CreateAttr(obj->base()->attributes());
-    if (compilePlatform) {
+    if (compileSpecific) {
         attrs.SetAttr(CHIR::Attribute::DESERIALIZED, true);
     }
     auto imported = attrs.TestAttr(CHIR::Attribute::IMPORTED);
@@ -294,7 +295,7 @@ template <> StructDef* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const
     auto identifier = obj->base()->identifier()->str();
     auto packageName = obj->base()->packageName()->str();
     auto attrs = CreateAttr(obj->base()->attributes());
-    if (compilePlatform) {
+    if (compileSpecific) {
         attrs.SetAttr(CHIR::Attribute::DESERIALIZED, true);
     }
     auto imported = attrs.TestAttr(CHIR::Attribute::IMPORTED);
@@ -312,7 +313,7 @@ template <> ClassDef* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const 
     auto packageName = obj->base()->packageName()->str();
     auto isClass = obj->kind() == PackageFormat::ClassDefKind::ClassDefKind_CLASS;
     auto attrs = CreateAttr(obj->base()->attributes());
-    if (compilePlatform) {
+    if (compileSpecific) {
         attrs.SetAttr(CHIR::Attribute::DESERIALIZED, true);
     }
     auto imported = attrs.TestAttr(CHIR::Attribute::IMPORTED);
@@ -330,7 +331,7 @@ template <> ExtendDef* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const
     auto packageName = obj->base()->packageName()->str();
     auto attrs = CreateAttr(obj->base()->attributes());
     auto imported = attrs.TestAttr(CHIR::Attribute::IMPORTED);
-    if (compilePlatform) {
+    if (compileSpecific) {
         attrs.SetAttr(CHIR::Attribute::DESERIALIZED, true);
     }
     auto genericParams = GetType<GenericType>(obj->genericParams());
@@ -654,7 +655,7 @@ template <> GlobalVar* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(const
     auto packageName = obj->packageName()->str();
     auto rawMangledName = obj->rawMangledName()->str();
     auto attrs = CreateAttr(obj->base()->attributes());
-    if (compilePlatform) {
+    if (compileSpecific) {
         attrs.SetAttr(Attribute::DESERIALIZED, true);
     }
     auto result = builder.CreateGlobalVar(
@@ -672,7 +673,7 @@ template <> ImportedFunc* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(co
     auto packageName = obj->packageName()->str();
     auto genericTypeParams = GetType<GenericType>(obj->genericTypeParams());
     auto attrs = CreateAttr(obj->base()->base()->attributes());
-    if (compilePlatform) {
+    if (compileSpecific) {
         attrs.SetAttr(Attribute::DESERIALIZED, true);
     }
     auto importedFunc = builder.CreateImportedVarOrFunc<ImportedFunc>(type, GetMangleNameFromIdentifier(identifier),
@@ -696,7 +697,7 @@ template <> ImportedVar* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(con
     auto rawMangledName = obj->rawMangledName()->str();
     auto packageName = obj->packageName()->str();
     auto attrs = CreateAttr(obj->base()->base()->attributes());
-    if (compilePlatform) {
+    if (compileSpecific) {
         attrs.SetAttr(Attribute::DESERIALIZED, true);
     }
     auto importedVar = builder.CreateImportedVarOrFunc<ImportedVar>(
@@ -1569,7 +1570,7 @@ void CHIRDeserializer::CHIRDeserializerImpl::ConfigCustomTypeDef(
         obj.AddStaticMemberVar(var);
     }
     obj.AppendAttributeInfo(CreateAttr(buffer->attributes()));
-    if (compilePlatform) {
+    if (compileSpecific) {
         obj.EnableAttr(Attribute::DESERIALIZED);
     }
     obj.SetAnnoInfo(Create<AnnoInfo>(buffer->annoInfo()));
@@ -1685,7 +1686,7 @@ template <> void CHIRDeserializer::CHIRDeserializerImpl::Config(const PackageFor
     obj.SetAnnoInfo(Create<AnnoInfo>(buffer->base()->annoInfo()));
     obj.SetParentRawMangledName(buffer->parentName()->str());
     obj.AppendAttributeInfo(CreateAttr(buffer->base()->attributes()));
-    if (compilePlatform) {
+    if (compileSpecific) {
         obj.EnableAttr(Attribute::DESERIALIZED);
     }
     obj.SetPropLocation(Create<DebugLocation>(buffer->propLoc()));

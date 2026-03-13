@@ -35,7 +35,7 @@ void Translator::BindingFuncParam(
             continue;
         }
         auto loc = TranslateLocation(*param);
-        auto paramLoc = GetVarLoc(builder.GetChirContext(), *param);
+        auto paramLoc = GetDeclLoc(builder.GetChirContext(), *param);
         // Don't need to report unused parameter on defaut value parameter function.
         auto debug = CreateAndAppendExpression<Debug>(
             paramLoc, loc, builder.GetUnitTy(), arg, param->identifier.GetRawText(), block);
@@ -242,7 +242,7 @@ Ptr<Value> Translator::Visit(const AST::FuncBody& funcBody)
         auto func = funcBody.funcDecl;
         if (IsInstanceConstructor(*func)) {
             CJC_NULLPTR_CHECK(func->outerDecl);
-            if (func->outerDecl->TestAnyAttr(AST::Attribute::COMMON, AST::Attribute::PLATFORM)) {
+            if (func->outerDecl->TestAnyAttr(AST::Attribute::COMMON, AST::Attribute::SPECIFIC)) {
                 ret = TranslateConstructorFunc(*func->outerDecl, funcBody);
             } else {
                 ret = TranslateConstructorFuncInline(*func->outerDecl, funcBody);

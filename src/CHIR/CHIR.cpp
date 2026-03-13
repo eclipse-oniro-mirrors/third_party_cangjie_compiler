@@ -1196,14 +1196,13 @@ bool ToCHIR::Run()
         return false;
     }
     RecordCHIRExprNum("opt");
-    RemoveUnusedImports(false);
     DoClosureConversion();
     RecordCHIRExprNum("cc");
     CreateBoxTypeForRecursionValueType();
     if (!RunConstantEvaluation()) {
         return false;
     }
-    RemoveUnusedImports(true);
+    ReplaceSrcCodeImportedValueWithSymbol();
 
     // annotation check depends on const eval
     if (!RunAnnotationChecks()) {

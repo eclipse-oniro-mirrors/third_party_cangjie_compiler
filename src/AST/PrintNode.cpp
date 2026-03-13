@@ -83,12 +83,12 @@ void PrintModifiers(const Decl& decl, unsigned indent, std::ostream& stream = st
     }
 }
 
-void PrintTarget(unsigned indent, const Decl& target, std::string addition = "target", std::ostream& stream = std::cout)
+void PrintTarget(unsigned indent, const Decl& target, std::ostream& stream = std::cout, std::string addition = "target")
 {
     if (target.mangledName.empty()) {
-        PrintIndent(stream, indent, addition + ": ptr:", &target);
+        PrintIndent(stream, indent, addition + " ptr:", &target);
     } else {
-        PrintIndent(stream, indent, addition + ": mangledName:", "\"" + target.exportId + "\"");
+        PrintIndent(stream, indent, addition + " mangledName:", "\"" + target.mangledName + "\"");
     }
 }
 
@@ -121,7 +121,11 @@ void PrintBasic(unsigned indent, const Node& node, std::ostream& stream = std::c
             PrintNode(d->annotationsArray.get(), indent, "annotationsArray", stream);
         }
         if (d->outerDecl) {
-            PrintTarget(indent, *d->outerDecl, "outerDecl", stream);
+            PrintTarget(indent, *d->outerDecl, stream, "outerDecl");
+        }
+    } else if (auto t = DynamicCast<Type>(&node)) {
+        if (!Ty::IsInitialTy(t->aliasTy)) {
+            PrintIndent(stream, indent, "aliasTy:", t->aliasTy->String());
         }
     }
     if (!node.comments.IsEmpty()) {
@@ -427,12 +431,13 @@ void PrintVarDecl(unsigned indent, const VarDecl& varDecl, std::ostream& stream 
     PrintModifiers(varDecl, indent, stream);
     PrintNode(varDecl.type.get(), indent + ONE_INDENT, "type", stream);
     PrintNode(varDecl.initializer.get(), indent + ONE_INDENT, "initializer", stream);
+    PrintIndent(stream, indent + ONE_INDENT, "parentPattern:", varDecl.parentPattern.get());
     PrintIndent(stream, indent, "}");
 }
 
 void PrintBasicpeAliasDecl(unsigned indent, const TypeAliasDecl& alias, std::ostream& stream = std::cout)
 {
-    PrintIndent(stream, indent, "TypeAliasDecl", alias.identifier.Val(), "{");
+    PrintIndent(stream, indent, "TypeAliasDecl:", alias.identifier.Val(), "{");
     PrintBasic(indent + ONE_INDENT, alias, stream);
     if (alias.generic) {
         PrintGeneric(indent + ONE_INDENT, *alias.generic, stream);
@@ -477,7 +482,7 @@ void PrintInterfaceDecl(unsigned indent, const InterfaceDecl& interfaceDecl, std
         PrintGeneric(indent + ONE_INDENT, *interfaceDecl.generic, stream);
     }
     if (!interfaceDecl.inheritedTypes.empty()) {
-        PrintIndent(stream, indent + ONE_INDENT, "inheritedTypes: [");
+        PrintIndent(stream, indent + ONE_INDENT, "inheritedTypes [");
         for (auto& it : interfaceDecl.inheritedTypes) {
             PrintNode(it.get(), indent + TWO_INDENT, "", stream);
         }
@@ -527,6 +532,13 @@ void PrintStructDecl(unsigned indent, const StructDecl& decl, std::ostream& stre
     PrintModifiers(decl, indent, stream);
     if (decl.generic) {
         PrintGeneric(indent + ONE_INDENT, *decl.generic, stream);
+    }
+    if (!decl.inheritedTypes.empty()) {
+        PrintIndent(stream, indent + ONE_INDENT, "inheritedTypes [");
+        for (auto& it : decl.inheritedTypes) {
+            PrintNode(it.get(), indent + TWO_INDENT, "", stream);
+        }
+        PrintIndent(stream, indent + ONE_INDENT, "]");
     }
     PrintIndent(stream, indent + ONE_INDENT, "StructBody {");
     PrintNode(decl.body.get(), indent + TWO_INDENT, "", stream);
@@ -857,11 +869,11 @@ void PrintMemberAccess(unsigned indent, const MemberAccess& expr, std::ostream& 
         PrintIndent(stream, indent + ONE_INDENT, "]");
     }
     if (expr.target) {
-        PrintTarget(indent + ONE_INDENT, *expr.target, "", stream);
+        PrintTarget(indent + ONE_INDENT, *expr.target, stream);
     }
     PrintIndent(stream, indent + ONE_INDENT, "targets [");
     for (auto t : expr.targets) {
-        PrintTarget(indent + TWO_INDENT, *t, "", stream);
+        PrintTarget(indent + TWO_INDENT, *t, stream);
     }
     PrintIndent(stream, indent + ONE_INDENT, "]");
     PrintIndent(stream, indent, "}");
@@ -934,7 +946,7 @@ void PrintCallExpr(unsigned indent, const CallExpr& expr, std::ostream& stream =
         PrintIndent(stream, indent + ONE_INDENT, "]");
     }
     if (expr.resolvedFunction) {
-        PrintTarget(indent + ONE_INDENT, *expr.resolvedFunction, "resolvedFunction", stream);
+        PrintTarget(indent + ONE_INDENT, *expr.resolvedFunction, stream, "resolvedFunction");
     }
     PrintIndent(stream, indent, "}");
 }
@@ -1050,11 +1062,11 @@ void PrintRefExpr(unsigned indent, const RefExpr& refExpr, std::ostream& stream 
         PrintIndent(stream, indent + ONE_INDENT, "]");
     }
     if (refExpr.ref.target) {
-        PrintTarget(indent + ONE_INDENT, *refExpr.ref.target, "", stream);
+        PrintTarget(indent + ONE_INDENT, *refExpr.ref.target, stream);
     }
     PrintIndent(stream, indent + ONE_INDENT, "targets [");
     for (auto t : refExpr.ref.targets) {
-        PrintTarget(indent + TWO_INDENT, *t, "", stream);
+        PrintTarget(indent + TWO_INDENT, *t, stream);
     }
     PrintIndent(stream, indent + ONE_INDENT, "]");
     PrintIndent(stream, indent, "}");
@@ -1194,11 +1206,11 @@ void PrintRefType(unsigned indent, const RefType& refType, std::ostream& stream 
         PrintIndent(stream, indent + ONE_INDENT, "]");
     }
     if (refType.ref.target) {
-        PrintTarget(indent + ONE_INDENT, *refType.ref.target, "", stream);
+        PrintTarget(indent + ONE_INDENT, *refType.ref.target, stream);
     }
     PrintIndent(stream, indent + ONE_INDENT, "targets [");
     for (auto t : refType.ref.targets) {
-        PrintTarget(indent + TWO_INDENT, *t, "", stream);
+        PrintTarget(indent + TWO_INDENT, *t, stream);
     }
     PrintIndent(stream, indent + ONE_INDENT, "]");
     PrintIndent(stream, indent, "}");
@@ -1278,7 +1290,7 @@ void PrintQualifiedType(unsigned indent, const QualifiedType& type, std::ostream
     PrintNode(type.baseType.get(), indent + ONE_INDENT, "baseType", stream);
     PrintIndent(stream, indent + ONE_INDENT, "field:", type.field.Val());
     if (type.target) {
-        PrintTarget(indent + ONE_INDENT, *type.target, "", stream);
+        PrintTarget(indent + ONE_INDENT, *type.target, stream);
     }
     PrintIndent(stream, indent, "}");
 }
@@ -1375,24 +1387,36 @@ void PrintCommandTypePattern(
     }
 }
 
+void PrintFeatureId(unsigned indent, const FeatureId& featureId, std::ostream& stream = std::cout)
+{
+    PrintIndent(stream, indent, "FeatureId ", featureId.ToString(), " {");
+    PrintBasic(indent + ONE_INDENT, featureId, stream);
+    PrintIndent(stream, indent, "}");
+}
+
+void PrintFeaturesSet(unsigned indent, const FeaturesSet& featuresSet, std::ostream& stream = std::cout)
+{
+    PrintIndent(stream, indent, "FeaturesSet {");
+    PrintBasic(indent + ONE_INDENT, featuresSet, stream);
+    PrintIndent(stream, indent + ONE_INDENT, "featureIds: ", "[");
+    for (auto& item : featuresSet.content) {
+        PrintNode(&item, indent + TWO_INDENT, "", stream);
+    }
+    PrintIndent(stream, indent + ONE_INDENT, "]");
+    PrintIndent(stream, indent, "}");
+}
+
 void PrintFeaturesDirective(
     unsigned indent, const FeaturesDirective& featuresDirective, std::ostream& stream = std::cout)
 {
     PrintIndent(stream, indent, "FeaturesDirective:", "features", "{");
-    PrintIndent(stream, indent + ONE_INDENT, "ids: ", "[");
-    if (!featuresDirective.content.empty()) {
-        std::stringstream ss;
-        for (size_t i = 0; i < featuresDirective.content.size(); i++) {
-            ss << featuresDirective.content[i].ToString();
-            if (i < featuresDirective.content.size() - 1) { ss << ", "; }
-        }
-        PrintIndent(stream, indent + TWO_INDENT, ss.str());
-    } else {
-        PrintIndent(stream, indent + TWO_INDENT, "// no feature arguments");
+    PrintBasic(indent + ONE_INDENT, featuresDirective, stream);
+    PrintIndent(stream, indent + ONE_INDENT, "annotations: [");
+    for (auto& anno : featuresDirective.annotations) {
+        PrintAnnotation(indent + TWO_INDENT, *anno.get(), stream);
     }
     PrintIndent(stream, indent + ONE_INDENT, "]");
-    PrintIndent(
-        stream, indent + ONE_INDENT, "position:", featuresDirective.begin.ToString(), featuresDirective.end.ToString());
+    PrintNode(featuresDirective.featuresSet.get(), indent + ONE_INDENT, "", stream);
     PrintIndent(stream, indent, "}");
 }
 
@@ -1557,7 +1581,9 @@ void PrintNode(Ptr<const Node> node, unsigned indent, const std::string& additio
             const CommandTypePattern& cmdTypePattern) { PrintCommandTypePattern(indent, cmdTypePattern, stream); },
         [indent, &stream](const VarOrEnumPattern& ve) { PrintVarOrEnumPattern(indent, ve, stream); },
         // ----------- package----------------------
-        [&indent, &stream](const FeaturesDirective& feature) { PrintFeaturesDirective(indent, feature, stream); },
+        [&indent, &stream](const FeatureId& featureId) { PrintFeatureId(indent, featureId, stream); },
+        [&indent, &stream](const FeaturesSet& featuresSet) { PrintFeaturesSet(indent, featuresSet, stream); },
+        [&indent, &stream](const FeaturesDirective& featureDir) { PrintFeaturesDirective(indent, featureDir, stream); },
         [&indent, &stream](const PackageSpec& package) { PrintPackageSpec(indent, package, stream); },
         [&indent, &stream](const ImportSpec& import) {
             if (import.IsImportMulti()) {

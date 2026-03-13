@@ -21,9 +21,11 @@
 #include "TypeCheckUtil.h"
 #include "TypeCheckerImpl.h"
 
+#include "cangjie/AST/AttributePack.h"
 #include "cangjie/AST/Match.h"
 #include "cangjie/AST/Node.h"
 #include "cangjie/AST/Utils.h"
+#include "cangjie/AST/Walker.h"
 #include "cangjie/Basic/Print.h"
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "cangjie/Utils/Utils.h"
@@ -159,11 +161,19 @@ void GetLocalUnInitsInExpr(const Ptr<Node>& node, std::unordered_set<Ptr<Decl>>&
     }).Walk();
 }
 
+// In common classes and structs cannot assign values to common let fields in any constructor
+inline bool IsImutFieldInCtorOfCommonClassStruct(const VarDecl& vd, bool inInitFunction)
+{
+    return (vd.TestAnyAttr(Attribute::IN_STRUCT, Attribute::IN_CLASSLIKE) && inInitFunction &&
+        vd.TestAttr(Attribute::COMMON));
+}
+
 inline bool NotAssignableVariable(const VarDecl& vd, bool inInitFunction)
 {
     return !vd.isVar &&
         (vd.TestAnyAttr(Attribute::GLOBAL, Attribute::INITIALIZED, Attribute::ENUM_CONSTRUCTOR) ||
-            (vd.TestAnyAttr(Attribute::IN_STRUCT, Attribute::IN_CLASSLIKE) && !inInitFunction));
+            (vd.TestAnyAttr(Attribute::IN_STRUCT, Attribute::IN_CLASSLIKE) && !inInitFunction) ||
+            IsImutFieldInCtorOfCommonClassStruct(vd, inInitFunction));
 }
 
 inline bool CanSkipInitCheck(const Node& node)
@@ -262,7 +272,7 @@ void CollectDeclsFromPropDecl(const OwnedPtr<Decl>& decl, const PropDecl& pd, st
     }
 }
 
-void UpdateContextVaraiables(std::unordered_set<Ptr<const AST::VarDecl>>& contextVariables, const Decl& d)
+void UpdateContextVariables(std::unordered_set<Ptr<const AST::VarDecl>>& contextVariables, const Decl& d)
 {
     if (d.TestAnyAttr(Attribute::GLOBAL, Attribute::STATIC)) {
         return;
@@ -297,6 +307,12 @@ bool MayBeStructTy(const VarDecl& target)
         }
     }
     return false;
+}
+
+bool FromCommonPart(const Decl& decl)
+{
+    return decl.TestAttr(Attribute::FROM_COMMON_PART) ||
+        (decl.curFile && decl.curFile->TestAttr(Attribute::FROM_COMMON_PART));
 }
 } // namespace
 
@@ -368,7 +384,7 @@ void InitializationChecker::CheckNonCommonVariablesInitInCommonDecl(const Inheri
     }
     // if there is no initFuncDecls, common decl no-common member variable init check here
     for (auto decl : info.nonFuncDecls) {
-        if (auto vd = DynamicCast<VarDecl *>(decl); vd) {
+        if (auto vd = DynamicCast<VarDecl*>(decl); vd) {
             if (!vd->TestAttr(Attribute::COMMON) && vd->initializer == nullptr) {
                 diag.Diagnose(*decl, DiagKind::sema_class_uninitialized_field, decl->identifier.Val());
             }
@@ -390,7 +406,14 @@ void InitializationChecker::CheckInitialization(Ptr<AST::Node> n)
         }
         n->EnableAttr(Attribute::INITIALIZATION_CHECKED);
         if (auto decl = DynamicCast<Decl>(n)) {
-            UpdateContextVaraiables(contextVariables[ScopeManagerApi::GetScopeGateName(decl->scopeName)], *decl);
+            UpdateContextVariables(contextVariables[ScopeManagerApi::GetScopeGateName(decl->scopeName)], *decl);
+            if (FromCommonPart(*decl)) {
+                // When a declaration is deserialized from CJO, it means that it has been
+                // already analyzed during common compilation.
+                // The initialization checker cannot perform analysis for some deserialized AST nodes
+                // so we have to skip the analysis
+                return VisitAction::SKIP_CHILDREN;
+            }
         }
         switch (n->astKind) {
             case ASTKind::FUNC_PARAM:
@@ -662,7 +685,11 @@ void InitializationChecker::CheckLetFlag(const Expr& ae, const Expr& expr)
         case ASTKind::REF_EXPR:
             if (auto vd = DynamicCast<VarDecl*>(expr.GetTarget());
                 vd && (NotAssignableVariable(*vd, inInitFunction) || IsAssignLetDefinedOuterLoop(ctx, *vd, ae))) {
-                DiagCannotAssignToImmutable(diag, ae, expr);
+                if (vd->TestAttr(Attribute::COMMON) && inInitFunction) {
+                    DiagCJMPCannotAssignToImmutableCommonInCtor(diag, ae, expr);
+                } else {
+                    DiagCannotAssignToImmutable(diag, ae, expr);
+                }
             }
             break;
         case ASTKind::MEMBER_ACCESS:
@@ -1033,9 +1060,8 @@ bool InitializationChecker::CheckInitInExpr(Ptr<Node> node)
         case ASTKind::LET_PATTERN_DESTRUCTOR: {
             auto& lpd = StaticCast<LetPatternDestructor>(*node);
             return std::all_of(lpd.patterns.cbegin(), lpd.patterns.cend(),
-                [this](const OwnedPtr<Pattern>& p) {
-                    return CheckInitInExpr(p.get());
-                }) && CheckInitInExpr(lpd.initializer.get());
+                       [this](const OwnedPtr<Pattern>& p) { return CheckInitInExpr(p.get()); }) &&
+                CheckInitInExpr(lpd.initializer.get());
         }
         case ASTKind::VAR_PATTERN:
             StaticCast<VarPattern>(node)->varDecl->EnableAttr(Attribute::INITIALIZED);
@@ -1598,21 +1624,21 @@ void InitializationChecker::CheckInitInConstructors(FuncDecl& fd, const std::vec
     }
 
     if (auto classDecl = As<ASTKind::CLASS_DECL>(fd.funcBody->parentClassLike)) {
-        if (auto superClass = classDecl->GetSuperClassDecl(); superClass
-            && superClass->TestAnyAttr(Attribute::JAVA_MIRROR, Attribute::JAVA_MIRROR_SUBTYPE)) {
-                for (auto decl : unInitNonFuncDecls) {
-                    if (decl->astKind != ASTKind::VAR_DECL || !decl->TestAttr(Attribute::COMPILER_ADD)) {
-                        continue;
-                    }
-                    if (decl->identifier != Interop::Java::JAVA_REF_FIELD_NAME) {
-                        continue;
-                    }
-                    /*
-                        Only `javaref` field in mirrors and impls initialization has to be skipped.
-                        This field is initialized in JavaInterop desugar stage
-                    */
-                    decl->EnableAttr(Attribute::INITIALIZED);
+        if (auto superClass = classDecl->GetSuperClassDecl();
+            superClass && superClass->TestAnyAttr(Attribute::JAVA_MIRROR, Attribute::JAVA_MIRROR_SUBTYPE)) {
+            for (auto decl : unInitNonFuncDecls) {
+                if (decl->astKind != ASTKind::VAR_DECL || !decl->TestAttr(Attribute::COMPILER_ADD)) {
+                    continue;
                 }
+                if (decl->identifier != Interop::Java::JAVA_REF_FIELD_NAME) {
+                    continue;
+                }
+                /*
+                    Only `javaref` field in mirrors and impls initialization has to be skipped.
+                    This field is initialized in JavaInterop desugar stage
+                */
+                decl->EnableAttr(Attribute::INITIALIZED);
+            }
         }
     }
 
@@ -1678,7 +1704,7 @@ CollectDeclsInfo InitializationChecker::CollectDecls(const Decl& decl)
         info.annotations.push_back(decl.annotationsArray);
     }
     if (auto enumDecl = DynamicCast<EnumDecl>(&decl)) {
-        for (auto& ctor: enumDecl->constructors) {
+        for (auto& ctor : enumDecl->constructors) {
             if (ctor->annotationsArray) {
                 info.annotations.push_back(ctor->annotationsArray);
             }

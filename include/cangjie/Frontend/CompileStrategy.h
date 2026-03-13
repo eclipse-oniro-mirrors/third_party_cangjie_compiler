@@ -62,6 +62,10 @@ protected:
      * Do TypeCheck and Generic Instantiation.
      */
     void TypeCheck() const;
+    /**
+     * Interop config toml file check format.
+     */
+    void InteropConfigTomlCheck();
     CompilerInstance* ci = nullptr;
     // A collection of file ids, used to determine whether the id is conflicted.
     std::unordered_set<unsigned int> fileIds;

@@ -17,6 +17,9 @@
 #include "TypeCheckUtil.h"
 #include "TypeCheckerImpl.h"
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include "cangjie/AST/ASTContext.h"
 #include "cangjie/AST/Clone.h"
 #include "cangjie/AST/Match.h"
@@ -188,6 +191,14 @@ void CreateGenericConstraints(Generic& generic)
         }
     }
 }
+
+inline std::string GetNormalizedName(const Symbol& sym)
+{
+    // Deserialized `static init()` identifier is "static.init".
+    // But duplication conflict need to be reported with just parsed `static init()` with identifier "init".
+    bool isStaticConstructor = sym.node->TestAttr(Attribute::STATIC) && sym.node->TestAttr(Attribute::CONSTRUCTOR);
+    return isStaticConstructor && sym.name == "static.init" ? "init" : sym.name;
+}
 } // namespace
 
 void TypeChecker::TypeCheckerImpl::CheckRedefinition(ASTContext& ctx)
@@ -249,9 +260,9 @@ void TypeChecker::TypeCheckerImpl::CollectDeclMapAndCheckRedefinitionForOneSymbo
             found.front()->TestAttr(Attribute::GLOBAL, Attribute::PRIVATE) &&
             sym.node->curFile != found.front()->curFile;
         bool multiPlat =
-            sym.node->TestAttr(Cangjie::AST::Attribute::COMMON) && found.front()->TestAttr(Attribute::PLATFORM);
+            sym.node->TestAttr(Cangjie::AST::Attribute::COMMON) && found.front()->TestAttr(Attribute::SPECIFIC);
         multiPlat =
-            multiPlat || (sym.node->TestAttr(Attribute::PLATFORM) && found.front()->TestAttr(Attribute::COMMON));
+            multiPlat || (sym.node->TestAttr(Attribute::SPECIFIC) && found.front()->TestAttr(Attribute::COMMON));
         if (!privateGlobalInDifferentFile && !multiPlat) {
             DiagRedefinitionWithFoundNode(diag, StaticCast<Decl>(*sym.node), *found.front());
         }
@@ -400,8 +411,8 @@ Ptr<Ty> TypeChecker::TypeCheckerImpl::GetTyFromASTType(ASTContext& ctx, RefType&
             if (d1->scopeLevel > d2->scopeLevel) {
                 return true;
             } else if (d1->scopeLevel == d2->scopeLevel) {
-                // Ranking overloads also by platform > common
-                if (d1->TestAttr(Attribute::PLATFORM)) {
+                // Ranking overloads also by specific > common
+                if (d1->TestAttr(Attribute::SPECIFIC)) {
                     return true;
                 }
             }
@@ -427,8 +438,8 @@ Ptr<Ty> TypeChecker::TypeCheckerImpl::GetTyFromASTType(ASTContext& ctx, RefType&
         // this condition. scopeTargets is sorted, so only need to check whether
         // scope levels are equal or not. If they are equal then rt is ambiguous.
         (targets[0]->scopeLevel > targets[1]->scopeLevel) ||
-        // With equal scope levels platform declaration are prefered over the common ones
-        (targets[0]->TestAttr(Attribute::PLATFORM))) {
+        // With equal scope levels specific declaration are prefered over the common ones
+        (targets[0]->TestAttr(Attribute::SPECIFIC))) {
         target = targets[0];
         if (auto builtin = DynamicCast<BuiltInDecl>(target); builtin && builtin->type == BuiltInType::CFUNC) {
             auto ty = GetTyFromASTCFuncType(ctx, rt);
@@ -839,7 +850,17 @@ void TypeChecker::TypeCheckerImpl::ResolveTypeAlias(const std::vector<Ptr<ASTCon
 void TypeChecker::TypeCheckerImpl::SetTypeTy(ASTContext& ctx, Type& type)
 {
     type.ty = GetTyFromASTType(ctx, &type);
-    type.ty = SubstituteTypeAliasInTy(*type.ty);
+    // Set aliasTy for a type reference if refer a type alias. Use to export alias info when export cjo.
+    if (auto target = type.GetTarget(); target && target->ty->kind == TypeKind::TYPE) {
+        std::vector<Ptr<Ty>> typeArgs;
+        for (auto typeArg : type.GetTypeArgs()) {
+            typeArgs.emplace_back(typeArg->ty);
+        }
+        TypeSubst typeMapping = GenerateTypeMapping(*target, typeArgs);
+        auto instAliasedTy = typeManager.GetInstantiatedTy(target->ty, typeMapping);
+        type.aliasTy = instAliasedTy;
+    }
+    type.ty = typeManager.SubstituteTypeAliasInTy(*type.ty);
 }
 
 void TypeChecker::TypeCheckerImpl::SubstituteTypeAliasForAlias(TypeAliasDecl& tad)
@@ -857,7 +878,7 @@ void TypeChecker::TypeCheckerImpl::SubstituteTypeAliasForAlias(TypeAliasDecl& ta
             case ASTKind::OPTION_TYPE: {
                 auto type = StaticAs<ASTKind::TYPE>(node);
                 CJC_ASSERT(type->ty != nullptr);
-                type->ty = SubstituteTypeAliasInTy(*type->ty);
+                type->ty = typeManager.SubstituteTypeAliasInTy(*type->ty);
                 return VisitAction::WALK_CHILDREN;
             }
             default:
@@ -897,7 +918,7 @@ void TypeChecker::TypeCheckerImpl::ResolveNames(ASTContext& ctx)
         return VisitAction::WALK_CHILDREN;
     };
     std::vector<Symbol*> syms = GetToplevelDecls(ctx);
-    for (auto& sym : syms) {
+    for (auto sym : syms) {
         CJC_NULLPTR_CHECK(sym);
         Walker(sym->node, id, resolveSingleType).Walk();
     }
@@ -1146,12 +1167,29 @@ void TypeChecker::TypeCheckerImpl::AddSuperClassObjectForClassDecl(ASTContext& c
         if (HasSuperClass(*cd)) {
             continue;
         }
+
         if (cd->TestAnyAttr(Attribute::JAVA_MIRROR, Attribute::JAVA_MIRROR_SUBTYPE)) {
             if (!AddJObjectSuperClassJavaInterop(ctx, *cd)) {
                 AddObjectSuperClass(ctx, *cd);
             }
         } else {
             AddObjectSuperClass(ctx, *cd);
+        }
+    }
+}
+
+void TypeChecker::TypeCheckerImpl::AddSuperInterfaceForClassLikeDecl(ASTContext& ctx)
+{
+    // TODO: move it to Interop::ObjC
+    std::vector<Symbol*> syms = GetAllDecls(ctx);
+    for (auto& sym : syms) {
+        CJC_ASSERT(sym && sym->node);
+        if (!sym->node->TestAnyAttr(Attribute::OBJ_C_MIRROR, Attribute::OBJ_C_MIRROR_SUBTYPE)) {
+            continue;
+        }
+
+        if (auto classLikeDecl = As<ASTKind::CLASS_LIKE_DECL>(sym->node); classLikeDecl) {
+            AddObjCIdSuperInterfaceObjCInterop(ctx, *classLikeDecl);
         }
     }
 }
@@ -1531,7 +1569,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckFuncStaticConflict(const std::vector<
         for (const auto& func : staticFuncs) {
             DiagStaticAndNonStaticOverload(diag, *func, *firstNonStatic);
         }
-    }
+}
 }
 
 bool TypeChecker::TypeCheckerImpl::PreCheckFuncRedefinitionWithSameSignature(
@@ -1601,7 +1639,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckFuncRedefinition(const ASTContext& ct
             continue; // Do not collect invalid/macro expanded node.
         }
         std::string scopeName = ScopeManagerApi::GetScopeNameWithoutTail(sym->scopeName);
-        auto names = std::make_pair(sym->name, scopeName);
+        auto names = std::make_pair(GetNormalizedName(*sym), scopeName);
         auto fd = StaticAs<ASTKind::FUNC_DECL>(sym->node);
         if (fd->propDecl) {
             continue; // Do not check for property's getter/setter.
@@ -1612,7 +1650,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckFuncRedefinition(const ASTContext& ct
             candidates[names] = {fd};
         }
     }
-    MPTypeCheckerImpl::FilterOutCommonCandidatesIfPlatformExist(candidates);
+    MPTypeCheckerImpl::FilterOutCommonCandidatesIfSpecificExist(candidates);
     auto candidatesForImport = candidates;
     for (const auto& [names, funcs] : std::as_const(candidates)) {
         PreCheckMacroRedefinition(funcs);
@@ -1776,7 +1814,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckUsage(ASTContext& ctx, const Package&
     // Build and check extend decls for each type.
     BuildExtendMap(ctx);
 
-    mpImpl->UpdatePlatformMemberGenericTy(
+    mpImpl->UpdateSpecificMemberGenericTy(
         ctx, [this](ASTContext& ctx, ASTKind kind) { return this->GetSymsByASTKind(ctx, kind); });
     // Check duplicate interface inheritance for nominal decls. NOTE: Should resolve typeAlias first.
     StructDeclCircleOrDupCheck(ctx);
@@ -1784,6 +1822,8 @@ void TypeChecker::TypeCheckerImpl::PreCheckUsage(ASTContext& ctx, const Package&
     CheckAllDeclAttributes(ctx);
     // Add Object as super class for class declaration.
     AddSuperClassObjectForClassDecl(ctx);
+    // Add super interface for class declaration.
+    AddSuperInterfaceForClassLikeDecl(ctx);
     // Collector assumption collection of generic declaration.
     CollectAndCheckAssumption(ctx);
     // Check extend generic param & reset inheritance checking flag.
@@ -1830,6 +1870,17 @@ void TypeChecker::TypeCheckerImpl::PreCheckInvalidInherit(const ASTContext& ctx,
 }
 
 namespace {
+inline constexpr bool IsTypeDeclKind(ASTKind kind) noexcept
+{
+    return kind == ASTKind::CLASS_DECL || kind == ASTKind::STRUCT_DECL || kind == ASTKind::ENUM_DECL ||
+        kind == ASTKind::INTERFACE_DECL || kind == ASTKind::EXTEND_DECL || kind == ASTKind::BUILTIN_DECL;
+}
+
+inline constexpr bool IsMemberDeclKind(ASTKind kind) noexcept
+{
+    return kind == ASTKind::FUNC_DECL || kind == ASTKind::PROP_DECL || kind == ASTKind::VAR_DECL;
+}
+
 Ptr<Decl> GetTypeDecl(TypeManager& tyMgr, Ptr<Decl> d)
 {
     if (auto ed = DynamicCast<ExtendDecl*>(d)) {
@@ -1863,13 +1914,11 @@ MemSig MemDecl2Sig(Decl& d)
 
 void TypeChecker::TypeCheckerImpl::CollectDeclsWithMember(Ptr<Package> pkg, ASTContext& ctx)
 {
-    const std::set<ASTKind> TYPE_DECLS{ASTKind::CLASS_DECL, ASTKind::STRUCT_DECL, ASTKind::ENUM_DECL,
-        ASTKind::INTERFACE_DECL, ASTKind::EXTEND_DECL, ASTKind::BUILTIN_DECL};
-    const std::set<ASTKind> MEMBER_DECLS{ASTKind::FUNC_DECL, ASTKind::PROP_DECL, ASTKind::VAR_DECL};
-    std::map<Ptr<Decl>, std::unordered_set<MemSig, MemSigHash>> decl2Mems;
-    std::set<Ptr<Decl>> allTops; // includes extendDecl needed for finding super types
-    auto mapDecl = [this, &ctx, &decl2Mems, &MEMBER_DECLS](Ptr<Decl> d) {
-        if (MEMBER_DECLS.count(d->astKind) == 0) {
+    std::unordered_map<Ptr<Decl>, std::unordered_set<MemSig, MemSigHash>> decl2Mems;
+    std::unordered_set<Ptr<Decl>> allTops; // includes extendDecl needed for finding super types
+    std::unordered_set<Ptr<Decl>> processedDecls;
+    auto mapDecl = [this, &ctx, &decl2Mems](Ptr<Decl> d) {
+        if (!IsMemberDeclKind(d->astKind)) {
             return;
         }
         auto sig = MemDecl2Sig(*d);
@@ -1882,8 +1931,11 @@ void TypeChecker::TypeCheckerImpl::CollectDeclsWithMember(Ptr<Package> pkg, ASTC
             decl2Mems[top].insert(sig);
         }
     };
-    auto collectDecl = [&allTops, &TYPE_DECLS, &mapDecl](Ptr<Decl> top) {
-        if (TYPE_DECLS.count(top->astKind) > 0) {
+    auto collectDecl = [&allTops, &mapDecl, &processedDecls](Ptr<Decl> top) {
+        if (!processedDecls.insert(top).second) {
+            return;
+        }
+        if (IsTypeDeclKind(top->astKind)) {
             allTops.emplace(top);
         }
         for (auto& d : top->GetMemberDecls()) {
@@ -1892,28 +1944,27 @@ void TypeChecker::TypeCheckerImpl::CollectDeclsWithMember(Ptr<Package> pkg, ASTC
     };
     // collect this package
     std::vector<Symbol*> syms = GetAllDecls(ctx);
-    for (auto& sym : syms) {
+    for (auto sym : syms) {
         collectDecl(StaticCast<Decl*>(sym->node));
     }
     // collect imported
     for (auto& file : pkg->files) {
-        auto imported = importManager.GetImportedDecls(*file);
-        for (auto& [_, tops] : imported) {
-            for (auto& top : tops) {
-                collectDecl(top);
-            }
+        std::vector<Ptr<Decl>> importedDecls = importManager.GetAllImportedDecls(*file);
+        for (auto decl : importedDecls) {
+            collectDecl(decl);
         }
     }
     // collect builtin extends, which somehow is not included in imported
     for (auto& [_, tops] : typeManager.builtinTyToExtendMap) {
-        for (auto& top : tops) {
+        for (auto top : tops) {
             collectDecl(top);
         }
     }
+
     // Members are not propagated to inherited types here, since it may take
     // too much time & memory; only remember accesible subtypes here.
     // Inherited members are computed on-demand.
-    for (auto& top : allTops) {
+    for (auto top : allTops) {
         auto realTop = GetTypeDecl(typeManager, top);
         if (auto inheritable = DynamicCast<InheritableDecl*>(top)) {
             for (auto sup : inheritable->GetAllSuperDecls()) {

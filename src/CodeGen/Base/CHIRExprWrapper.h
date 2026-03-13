@@ -151,7 +151,7 @@ public:
 #ifndef NDEBUG
             Errorln(chirExpr.ToString() + "\n");
 #endif
-            CJC_ASSERT(false && "Incorrect ApplyExpr from CHIR, type arguments are missing.");
+            CJC_ASSERT_WITH_MSG(false, "Incorrect ApplyExpr from CHIR, type arguments are missing.");
         }
     }
 
@@ -159,17 +159,13 @@ public:
     {
         if (GetInstantiatedTypeArgs().size() != GetCalleeTypeArgsNum()) {
 #ifndef NDEBUG
-            Errorln(chirExpr.ToString() + "\n");
+            Errorln(chirExpr.ToString());
 #endif
-            CJC_ASSERT(false && "Incorrect ApplyExpr from CHIR, type arguments are missing.");
+            CJC_ASSERT_WITH_MSG(false, "Incorrect ApplyExpr from CHIR, type arguments are missing.");
         }
     }
 
-    CHIRApplyWrapper(const CHIRApplyWrapper& chirExprW) : CHIRCallExpr(chirExprW.chirExpr)
-    {
-    }
-
-    ~CHIRApplyWrapper() = default;
+    ~CHIRApplyWrapper() override = default;
 
     CHIR::Value* GetCallee() const
     {
@@ -279,7 +275,7 @@ public:
     {
     }
 
-    ~CHIRInvokeWrapper() = default;
+    ~CHIRInvokeWrapper() override = default;
 
     CHIR::Value* GetObject() const
     {
@@ -405,7 +401,7 @@ public:
     {
     }
 
-    ~CHIRInvokeStaticWrapper() = default;
+    ~CHIRInvokeStaticWrapper() override = default;
 
     std::string GetMethodName() const
     {
@@ -523,7 +519,7 @@ public:
     {
     }
 
-    ~CHIRUnaryExprWrapper() = default;
+    ~CHIRUnaryExprWrapper() override = default;
 
     CHIR::Value* GetOperand() const
     {
@@ -567,7 +563,7 @@ public:
     {
     }
 
-    ~CHIRBinaryExprWrapper() = default;
+    ~CHIRBinaryExprWrapper() override = default;
 
     CHIR::Value* GetLHSOperand() const
     {
@@ -619,7 +615,7 @@ public:
     {
     }
 
-    ~CHIRSpawnWrapper() = default;
+    ~CHIRSpawnWrapper() override = default;
 
     CHIR::Value* GetFuture() const
     {
@@ -678,7 +674,7 @@ public:
     {
     }
 
-    ~CHIRTypeCastWrapper() = default;
+    ~CHIRTypeCastWrapper() override = default;
 
     CHIR::Value* GetSourceValue() const
     {
@@ -728,7 +724,7 @@ public:
     {
     }
 
-    ~CHIRIntrinsicWrapper() = default;
+    ~CHIRIntrinsicWrapper() override = default;
 
     CHIR::IntrinsicKind GetIntrinsicKind() const
     {
@@ -760,7 +756,7 @@ public:
     {
     }
 
-    ~CHIRAllocateWrapper() = default;
+    ~CHIRAllocateWrapper() override = default;
 
     CHIR::Type* GetType() const
     {
@@ -784,7 +780,7 @@ public:
     {
     }
 
-    ~CHIRRawArrayAllocateWrapper() = default;
+    ~CHIRRawArrayAllocateWrapper() override = default;
 
     CHIR::Value* GetSize() const
     {

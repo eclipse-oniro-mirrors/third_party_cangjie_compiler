@@ -51,7 +51,7 @@ public:
     void CheckTestSuite(const std::vector<OwnedPtr<AST::Package>>& packages);
     static void ConstructTestSuite(const std::string& moduleName,
         std::vector<OwnedPtr<AST::Package>>& srcPkgs,
-        const std::vector<Ptr<AST::PackageDecl>> importedPkgs, bool compileTestsOnly, bool mockEnabled);
+        const std::vector<Ptr<AST::PackageDecl>> importedPkgs, bool compileTestsOnly);
 
     static bool IsTestRegistrationFunction(const Ptr<AST::Decl> funcDecl);
     DiagnosticEngine& diag;
@@ -62,7 +62,7 @@ private:
     void CheckFunctionWithAtTest(
         AST::MacroExpandDecl& med, const std::vector<Ptr<AST::FuncDecl>>& funcs, const std::string& macroName);
     static void ConstructTestImports(AST::Package& pkg, TestModule& module);
-    static void ConstructTestEntry(AST::Package& pkg, TestModule& module, bool mockEnabled);
+    static void ConstructTestEntry(AST::Package& pkg, TestModule& module);
     static Ptr<AST::Package> FindMainPartPkgForTestPkg(
         const Ptr<AST::Package> testPackage, std::vector<Ptr<AST::PackageDecl>> importedPkgs);
 };

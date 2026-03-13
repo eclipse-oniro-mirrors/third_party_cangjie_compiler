@@ -85,10 +85,10 @@ bool RequireInstantiation(const Decl& decl, bool isInOpenContext)
 {
     // Skip instantiations in common code compilation because:
     // 1. Common code may be incomplete at this stage
-    // 2. Platform source sets can modify the implementation
+    // 2. Specific source sets can modify the implementation
     //
-    // Also skip common declarations with platform implementations
-    if (g_outputMode == GlobalOptions::OutputMode::CHIR || decl.IsCommonMatchedWithPlatform()) {
+    // Also skip common declarations with specific implementations
+    if (g_outputMode == GlobalOptions::OutputMode::CHIR || decl.IsCommonMatchedWithSpecific()) {
         return false;
     }
     if (IsCPointerFrozenMember(decl)) {
@@ -1708,6 +1708,7 @@ OwnedPtr<Node> PartialInstantiation::InstantiateWithRearrange(Ptr<Node> node, co
                 auto& maTarget = static_cast<MemberAccess&>(target);
                 TargetAddrMapInsert(maFrom.target, maTarget.target);
                 TargetAddrMapInsert(maFrom.callOrPattern, maTarget.callOrPattern);
+                CJC_ASSERT(maFrom.targets.size() == maTarget.targets.size());
                 for (size_t i = 0; i < maFrom.targets.size(); i++) {
                     TargetAddrMapInsert(maFrom.targets[i], maTarget.targets[i]);
                 }

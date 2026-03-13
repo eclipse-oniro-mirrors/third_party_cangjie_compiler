@@ -64,14 +64,9 @@ public:
         return llvmType == that.llvmType;
     }
 
-    CGContext& GetCGContext() const
-    {
-        return cgCtx;
-    }
-
     llvm::Type* GetLLVMType() const
     {
-        CJC_ASSERT(llvmType != nullptr);
+        CJC_NULLPTR_CHECK(llvmType);
         return llvmType;
     }
 
@@ -303,7 +298,7 @@ public:
               instantiatedParamTypes(instantiatedParamTypes)
         {
         }
-        TypeExtraInfo(size_t addrspace) : addrspace(addrspace)
+        explicit TypeExtraInfo(size_t addrspace) : addrspace(addrspace)
         {
         }
         bool operator==(const TypeExtraInfo& rhs) const

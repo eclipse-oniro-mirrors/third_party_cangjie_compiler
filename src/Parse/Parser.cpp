@@ -27,6 +27,16 @@
 using namespace Cangjie;
 using namespace Cangjie::AST;
 
+namespace Cangjie {
+const std::unordered_map<AST::AnnotationKind, std::string> ANNO_KIND_TO_NAME = [] {
+    std::unordered_map<AST::AnnotationKind, std::string> result;
+    for (const auto& [name, kind] : NAME_TO_ANNO_KIND) {
+        result[kind] = name;
+    }
+    return result;
+}();
+}
+
 Parser::Parser(unsigned int fileID, const std::string& input, DiagnosticEngine& diag, SourceManager& sm,
     bool attachComment, bool parseDeclFile)
     : impl{new ParserImpl{fileID, input, diag, sm, attachComment, parseDeclFile}}
@@ -66,6 +76,30 @@ bool ParserImpl::ParsePackageHeaderEnd()
     return seeingFileEnd;
 }
 
+void ParserImpl::CheckAndHandleUnexpectedTopLevelDeclAfterFeatures()
+{
+    if (!IsExpectedTokenAfterFeaturesOrPackage(true)) {
+        DiagAndSuggestKeywordForExpectedDeclaration({"features", "macro", "package", "import", "func", "let", "var",
+            "const", "enum", "type", "struct", "class", "interface", "extend", "main"});
+        auto consumeTarget = [this]() {
+            return IsExpectedTokenAfterFeaturesOrPackage(true);
+        };
+        ConsumeUntilAny(consumeTarget, false);
+    }
+}
+
+bool ParserImpl::IsExpectedTokenAfterFeaturesOrPackage(bool allowPackageKeyword)
+{
+    if (Seeing(TokenKind::SEMI) || SeeingImport() || SeeingDecl() || SeeingMacroCallDecl() || SeeingInitializer() ||
+        SeeingFinalizer() || SeeingBuiltinAnnotation() || Seeing(TokenKind::END)) {
+        return true;
+    }
+    if (allowPackageKeyword && (SeeingPackage() || SeeingMacroPackage())) {
+        return true;
+    }
+    return false;
+}
+
 size_t ParserImpl::GetLineNum() const
 {
     std::unordered_set<int64_t> lines;
@@ -91,14 +125,19 @@ OwnedPtr<File> ParserImpl::ParseTopLevel()
     SkipBlank(TokenKind::NL);
      /**
      * preamble
-     *  : featureSpec? packageHeader? importSpec*
+     *  : featureDirective? packageHeader? importSpec*
      *  ;
     */
     // Parse features in TopLevel
-    if (SeeingFeature()) {
-        ParseFeatureDirective(ret->feature);
-    }
     PtrVector<Annotation> annos;
+    if (SeeingBuiltinAnnotation()) {
+        ParseAnnotations(annos);
+    }
+    if (SeeingFeatures()) {
+        ParseTopLvlFeatures(ret->feature, annos);
+    } else {
+        CheckAndHandleUnexpectedTopLevelDeclAfterFeatures();
+    }
     if (SeeingBuiltinAnnotation()) {
         ParseAnnotations(annos);
     }
@@ -394,7 +433,7 @@ OwnedPtr<Decl> ParserImpl::ParsePropDecl(
 void ParserImpl::CheckClassLikePropAbstractness(AST::PropDecl& prop)
 {
     CJC_NULLPTR_CHECK(prop.outerDecl);
-    if (prop.outerDecl->TestAnyAttr(Attribute::JAVA_MIRROR, Attribute::OBJ_C_MIRROR)) {
+    if (prop.outerDecl->TestAnyAttr(Attribute::JAVA_MIRROR)) {
         prop.DisableAttr(Attribute::ABSTRACT);
         return;
     }
@@ -403,15 +442,21 @@ void ParserImpl::CheckClassLikePropAbstractness(AST::PropDecl& prop)
     bool isCommon = prop.TestAttr(Attribute::COMMON);
     auto outerModifiers = prop.outerDecl->modifiers;
     bool inAbstract = HasModifier(outerModifiers, TokenKind::ABSTRACT);
-    bool inCJMP = HasModifier(outerModifiers, TokenKind::PLATFORM) || HasModifier(outerModifiers, TokenKind::COMMON);
+    bool inCJMP = HasModifier(outerModifiers, TokenKind::SPECIFIC) || HasModifier(outerModifiers, TokenKind::COMMON);
     bool inAbstractCJMP = inAbstract && inCJMP;
     bool inClass = prop.outerDecl->astKind == ASTKind::CLASS_DECL;
     bool inAbstractCJMPClass = inAbstractCJMP && inClass;
+    bool inObjCMirror = prop.outerDecl->TestAttr(Attribute::OBJ_C_MIRROR);
 
     if (HasModifier(prop.modifiers, TokenKind::ABSTRACT) && !isCommon && !inAbstractCJMP &&
         !isJavaMirrorOrJavaMirrorSubtype) {
         ParseDiagnoseRefactor(DiagKindRefactor::parse_explicitly_abstract_only_for_cjmp_abstract_class,
             lastToken.End(), "property");
+    }
+
+    if (inObjCMirror) {
+        prop.DisableAttr(Attribute::ABSTRACT);
+        return;
     }
 
     if (inAbstractCJMPClass && prop.TestAttr(Attribute::ABSTRACT) &&

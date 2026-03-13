@@ -374,13 +374,13 @@ void TypeChecker::TypeCheckerImpl::AddDefaultCtor(InheritableDecl& decl) const
 
     // Do not add default constructor to Objective-C mirrors declarations
     // because it requires explicitly added one
-    if (decl.TestAnyAttr(Attribute::OBJ_C_MIRROR)) {
+    if (decl.TestAnyAttr(Attribute::OBJ_C_MIRROR, Attribute::OBJ_C_MIRROR_SYNTHETIC_WRAPPER)) {
         return;
     }
 
     // Do not add default constructor to common class(struct) because
     // it requires explicitly added one
-    // Do not add default constructor to platform class(struct) because it
+    // Do not add default constructor to specific class(struct) because it
     // always has one in common class(struct) due to above requirement
     if (decl.astKind == ASTKind::STRUCT_DECL) {
         auto structDecl = StaticAs<ASTKind::STRUCT_DECL>(&decl);

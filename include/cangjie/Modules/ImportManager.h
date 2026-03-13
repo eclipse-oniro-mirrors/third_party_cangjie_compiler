@@ -103,6 +103,12 @@ public:
     std::vector<std::pair<std::string, std::vector<Ptr<AST::Decl>>>> GetImportedDecls(const AST::File& file) const;
 
     /**
+     * Get all imported decls as a flat vector (without grouping by name).
+     * This is more efficient when you only need all decls without name grouping.
+     */
+    std::vector<Ptr<AST::Decl>> GetAllImportedDecls(const AST::File& file) const;
+
+    /**
      * Get all accessible decls by @param file and @param name, and return decls.
      */
     std::vector<Ptr<AST::Decl>> GetImportedDeclsByName(const AST::File& file, const std::string& name) const;
@@ -236,9 +242,10 @@ public:
 
     /**
      * For LSP, set cached cjo data @p cjoData and optional corresponding sha256 digest @p encrypt
-     * for @param fullPackageName .
+     * for @param fullPackageName and @p changeState.
      */
-    void SetPackageCjoCache(const std::string& fullPackageName, const std::vector<uint8_t>& cjoData) const;
+    void SetPackageCjoCache(const std::string& fullPackageName, const std::vector<uint8_t>& cjoData,
+        CjoManager::CjoChangeState changeState = CjoManager::CjoChangeState::ADDED) const;
 
     /**
      * For LSP, clear all cached cjo data.
@@ -335,6 +342,10 @@ public:
     {
         return cjoManager->GetSearchPath();
     }
+    void UpdateSearchPath(const std::string& cangjieModules)
+    {
+        return cjoManager->UpdateSearchPath(cangjieModules);
+    }
     void DeleteASTWriters() noexcept;
     void DeleteASTLoaders() noexcept;
 
@@ -399,6 +410,24 @@ private:
 
 private:
     /**
+    * @brief Parameters for handling already parsed packages
+    */
+    struct ParsedPackageContext {
+        const std::string& fullPackageName;
+        const std::string& cjoPath;
+        AST::Package& curPkg;
+        AST::Package& importPkg;
+        bool isMacroRelated;
+        bool isVisible;
+        bool isRecursive;
+    };
+
+    /**
+     * Handle already parsed package logic.
+     */
+    void HandleAlreadyParsedPackage(const ParsedPackageContext& context, bool& success);
+
+    /**
      * Used in `ResolveImportedPackageForFile` to handle package which has been parsed.
      * @return `false` if error occurred in recursive call of `ResolveImportedPackageForFile`,
      *          return `true` for normal case.
@@ -419,7 +448,7 @@ private:
      */
     bool ResolveImportedPackageForFile(AST::File& file, bool isRecursive = false);
 
-    void HandleSTDPackage(const std::string& fullPackageName, const std::string& cjoPath, bool isRecursive = false);
+    void HandleStdPackage(const std::string& fullPackageName, const std::string& cjoPath, bool isRecursive = false);
 
     void AddImportedDeclsForSourcePackage(const AST::Package& pkg);
 
@@ -441,6 +470,15 @@ private:
     bool IsDeclAccessible(const AST::File& file, AST::Decl& decl) const;
     const Ptr<AST::Type> FindImplmentInterface(
         const AST::File& file, const AST::Decl& member, const Ptr<AST::Type>& id) const;
+    /**
+     * Check if BuildIndex has been called.
+     */
+    bool HasBuildIndex() const;
+
+    /**
+     * Clear all caches for rebuild index in LSP.
+     */
+    void ClearCachesForRebuild();
 
     friend class PackageManager;
 
@@ -455,6 +493,7 @@ private:
         const std::set<std::string>& GetAllDependencyPackageNames(
             const std::string& fullPackageName, bool includeMacroPkg);
         void AddDependenciesForPackage(AST::Package& pkg);
+        void Clear();
 
     private:
         const std::map<std::string, std::set<Ptr<const AST::ImportSpec>, AST::CmpNodeByPos>>& GetEdges(

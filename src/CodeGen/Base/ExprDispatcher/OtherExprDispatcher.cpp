@@ -25,9 +25,9 @@
 #include "IRAttribute.h"
 #include "IRBuilder.h"
 #include "Utils/CGUtils.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
-#include "cangjie/CHIR/Type/ClassDef.h"
-#include "cangjie/CHIR/Value.h"
+#include "cangjie/CHIR/IR/Expression/Terminator.h"
+#include "cangjie/CHIR/IR/Type/ClassDef.h"
+#include "cangjie/CHIR/IR/Value/Value.h"
 
 namespace {
 using namespace Cangjie;
@@ -271,6 +271,20 @@ llvm::Value* HandleUnBoxExpr(IRBuilder2& irBuilder, const CHIR::Expression& chir
     auto cgVal = (cgMod | unboxExpr.GetSourceValue());
     auto targetCHIRType = unboxExpr.GetTargetTy();
     auto targetCGType = CGType::GetOrCreate(cgMod, targetCHIRType);
+    // if unbox a boxtype parameter, need to check the real type from OverrideSrcFuncType
+    // and if the real type has size, then we just return the src value
+    auto srcFuncType = chirExpr.GetTopLevelFunc()->Get<CHIR::OverrideSrcFuncType>();
+    if (srcFuncType && unboxExpr.GetSourceValue()->IsParameter() && DeRef(*unboxExpr.GetSourceTy())->IsBox()) {
+        for (size_t i = 0; i < chirExpr.GetTopLevelFunc()->GetNumOfParams(); i++) {
+            if (unboxExpr.GetSourceValue()->GetIdentifier() ==
+                chirExpr.GetTopLevelFunc()->GetParam(i)->GetIdentifier()) {
+                auto cgParamType = CGType::GetOrCreate(cgMod, srcFuncType->GetParamType(i));
+                if (cgParamType->GetSize()) {
+                    return cgVal->GetRawValue();
+                }
+            }
+        }
+    }
     if (targetCGType->IsReference()) {
         return cgVal->GetRawValue();
     }

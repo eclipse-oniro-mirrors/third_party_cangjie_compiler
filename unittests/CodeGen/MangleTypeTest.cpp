@@ -7,7 +7,7 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "CGTest.h"
-#include "cangjie/CHIR/Type/Type.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
 #include "cangjie/CodeGen/CGUtils.h"
 
 using TypeKind = Cangjie::CHIR::Type::TypeKind;

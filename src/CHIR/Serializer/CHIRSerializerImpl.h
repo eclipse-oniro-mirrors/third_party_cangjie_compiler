@@ -23,13 +23,13 @@
 #include <iostream>
 #include <queue>
 
-#include "cangjie/CHIR/CHIRBuilder.h"
-#include "cangjie/CHIR/CHIRContext.h"
-#include "cangjie/CHIR/Package.h"
+#include "cangjie/CHIR/IR/CHIRBuilder.h"
+#include "cangjie/CHIR/IR/CHIRContext.h"
+#include "cangjie/CHIR/IR/Package.h"
 #include "cangjie/CHIR/Serializer/CHIRSerializer.h"
-#include "cangjie/CHIR/Type/Type.h"
-#include "cangjie/CHIR/UserDefinedType.h"
-#include "cangjie/CHIR/Value.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
+#include "cangjie/CHIR/Utils/UserDefinedType.h"
+#include "cangjie/CHIR/IR/Value/Value.h"
 
 namespace Cangjie::CHIR {
 
@@ -79,7 +79,7 @@ private:
     template <typename FBT, typename T> std::vector<flatbuffers::Offset<FBT>> SerializeVec(const std::vector<T>& vec);
     template <typename FBT, typename T>
     std::vector<flatbuffers::Offset<FBT>> SerializeSetToVec(const std::unordered_set<T>& set) const;
-    std::vector<flatbuffers::Offset<PackageFormat::VTableElement>> SerializeVTable(const VTableType& obj);
+    std::vector<flatbuffers::Offset<PackageFormat::VTableInType>> SerializeVTable(const VTableInDef& obj);
     // Dispatchers
     template <typename T> flatbuffers::Offset<void> Dispatch(const T& obj);
 

@@ -18,8 +18,8 @@
 #include "Base/CGTypes/CGArrayType.h"
 #include "CGContext.h"
 #include "cangjie/Basic/UGTypeKind.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
-#include "cangjie/CHIR/Value.h"
+#include "cangjie/CHIR/IR/Expression/Terminator.h"
+#include "cangjie/CHIR/IR/Value/Value.h"
 #include "cangjie/Option/Option.h"
 
 namespace Cangjie {
@@ -372,6 +372,7 @@ public:
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     static void EraseReplaceableAlloca(const CGModule& cgModule, llvm::Function& function);
     static void AddZeroInitForStructWithRefField(CGModule& cgModule, llvm::Function& function);
+    static void LICM4GetMethodOuterTI(CGModule& cgMod, llvm::Function& function);
 #endif
 
 private:

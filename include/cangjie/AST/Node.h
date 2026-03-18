@@ -2765,8 +2765,8 @@ struct FeatureId : Node {
 
 /**
  * FeaturesSet
- *     : LCURL NL* 
- *     FeatureId NL* (COMMA NL* FeatureId NL*)* 
+ *     : LCURL NL*
+ *     FeatureId NL* (COMMA NL* FeatureId NL*)*
  *     RCURL
  *     ;
  */
@@ -2782,7 +2782,7 @@ struct FeaturesSet: Node {
 
 /**
  * featuresDirective
- *     : annotationList? FEATURES NL* 
+ *     : annotationList? FEATURES NL*
  *     FeaturesSet
  *     end+
  *     ;
@@ -3023,7 +3023,8 @@ public:
         return allDependentStdPkgs;
     }
 
-    const std::vector<LambdaPattern>& GetLambdaPatterns() const {
+    const std::vector<LambdaPattern>& GetLambdaPatterns() const
+    {
         return lambdaPatterns;
     }
 };

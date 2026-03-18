@@ -12,10 +12,11 @@
 #include "Base/CGTypes/CGFunctionType.h"
 #include "CGModule.h"
 #include "IRBuilder.h"
+#include "LICMOptimizer.h"
 #include "Utils/BlockScopeImpl.h"
 #include "Utils/CGCommonDef.h"
 #include "Utils/CGUtils.h"
-#include "cangjie/CHIR/AttributeInfo.h"
+#include "cangjie/CHIR/IR/AttributeInfo.h"
 
 namespace Cangjie::CodeGen {
 void EmitBasicBlockIR(CGModule& cgMod, const CHIR::Block& chirBB);
@@ -193,6 +194,7 @@ void CGFunction::Opt() const
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     EraseReplaceableAlloca(cgMod, *function);
     AddZeroInitForStructWithRefField(cgMod, *function);
+    LICMOptimizer(cgMod, *this).Run();
 #endif
 }
 

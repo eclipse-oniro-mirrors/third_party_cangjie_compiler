@@ -50,7 +50,8 @@ void CompileStrategy::InteropConfigTomlCheck() {
     if (ci->invocation.globalOptions.enableInteropCJMapping &&
         ci->invocation.globalOptions.interopCJPackageConfigPath != "./" &&
         !packagesFullConfig.Parse(ci->invocation.globalOptions.interopCJPackageConfigPath)) {
-        ci->diag.DiagnoseRefactor(DiagKindRefactor::sema_cj_mapping_generic_method_not_get_instance_config, DEFAULT_POSITION, ci->invocation.globalOptions.interopCJPackageConfigPath);
+            ci->diag.DiagnoseRefactor(DiagKindRefactor::sema_cj_mapping_generic_method_not_get_instance_config,
+                                      DEFAULT_POSITION, ci->invocation.globalOptions.interopCJPackageConfigPath);
     }
 }
 
@@ -325,11 +326,11 @@ public:
         for (auto& it : s.ci->bufferCache) {
             const std::string& filePath = it.first;
             const CompilerInstance::SrcCodeChangeState state = it.second.state;
-            
+
             if (state == CompilerInstance::SrcCodeChangeState::UNCHANGED) {
                 continue;
             }
-            
+
             if (state == CompilerInstance::SrcCodeChangeState::DELETED) {
                 DeleteFileInPackage(package, filePath);
                 deletedFiles.push_back(filePath);

@@ -11,7 +11,7 @@
 #include "Base/CGTypes/CGFunctionType.h"
 #include "Base/CGTypes/CGRefType.h"
 #include "Base/CGTypes/CGTupleType.h"
-#include "cangjie/CHIR/Type/StructDef.h"
+#include "cangjie/CHIR/IR/Type/StructDef.h"
 
 namespace Cangjie::CodeGen {
 void CGContextImpl::Clear()

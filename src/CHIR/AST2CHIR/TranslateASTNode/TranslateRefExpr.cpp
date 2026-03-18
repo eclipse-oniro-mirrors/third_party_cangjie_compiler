@@ -9,8 +9,8 @@
 #include "cangjie/AST/Utils.h"
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
-#include "cangjie/CHIR/ConstantUtils.h"
-#include "cangjie/CHIR/Type/Type.h"
+#include "cangjie/CHIR/Utils/ConstantUtils.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
 #include "cangjie/Mangle/CHIRManglingUtils.h"
 
 using namespace Cangjie::AST;
@@ -139,7 +139,7 @@ Value* Translator::TranslateThisOrSuperRef(const AST::RefExpr& refExpr)
     CJC_ASSERT(thisLeftValueInfo.path.empty());
     auto thisLeftValueBase = thisLeftValueInfo.base;
     auto thisLeftValueBaseTy = thisLeftValueInfo.base->GetType();
-    CJC_ASSERT(thisLeftValueBaseTy->GetRefDims() <= 1);
+    CJC_ASSERT(GetRefDims(*thisLeftValueBaseTy) <= 1);
     if (thisLeftValueBaseTy->IsValueOrGenericTypeWithRefDims(1)) {
         auto loadThis = CreateAndAppendExpression<Load>(
             loc, StaticCast<RefType*>(thisLeftValueBaseTy)->GetBaseType(), thisLeftValueBase, currentBlock);
@@ -203,11 +203,9 @@ Value* Translator::TranslateVarRef(const AST::RefExpr& refExpr)
     return varLeftValueBase;
 }
 
-InvokeCallContext Translator::GenerateInvokeCallContext(
-    const InstCalleeInfo& instFuncType, Value& caller, const AST::FuncDecl& callee, const std::vector<Value*>& args)
+InvokeCallContext Translator::GenerateInvokeCallContext(const InstCalleeInfo& instFuncType, Value& caller,
+    const AST::FuncDecl& callee, const std::vector<Value*>& args, const OverflowStrategy strategy)
 {
-    auto funcType = builder.GetType<FuncType>(instFuncType.instParamTys, instFuncType.instRetTy);
-    FuncCallType funcCallType{callee.identifier, funcType, instFuncType.instantiatedTypeArgs};
     auto tempDecl = typeManager.GetTopOverriddenFuncDecl(&callee);
     const AST::FuncDecl* originalFuncDecl = tempDecl ? tempDecl.get() : &callee;
     auto originalFuncType = StaticCast<FuncType*>(TranslateType(*originalFuncDecl->ty));
@@ -229,6 +227,10 @@ InvokeCallContext Translator::GenerateInvokeCallContext(
             originalGenericTypeParams.emplace_back(StaticCast<GenericType*>(TranslateType(*(genericTy->ty))));
         }
     }
+    auto funcName = callee.identifier.Val();
+    if (IsOverflowOpCall(callee)) {
+        funcName = OverflowStrategyPrefix(strategy) + funcName;
+    }
     
     auto invokeInfo = InvokeCallContext {
         .caller = &caller,
@@ -238,7 +240,7 @@ InvokeCallContext Translator::GenerateInvokeCallContext(
             .thisType = instFuncType.thisType
         },
         .virMethodCtx = VirMethodContext {
-            .srcCodeIdentifier = callee.identifier,
+            .srcCodeIdentifier = funcName,
             .originalFuncType = originalFuncType,
             .genericTypeParams = originalGenericTypeParams
         }

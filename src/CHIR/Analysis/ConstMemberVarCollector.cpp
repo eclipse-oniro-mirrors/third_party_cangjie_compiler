@@ -14,8 +14,8 @@
 
 #include "cangjie/CHIR/Analysis/ConstMemberVarCollector.h"
 
-#include "cangjie/CHIR/Utils.h"
-#include "cangjie/CHIR/Visitor/Visitor.h"
+#include "cangjie/CHIR/Utils/Utils.h"
+#include "cangjie/CHIR/Utils/Visitor/Visitor.h"
 #include "cangjie/Utils/Casting.h"
 
 namespace Cangjie::CHIR {
@@ -91,7 +91,7 @@ void ConstMemberVarCollector::JudgeIfOnlyDerivedType(
         // only analyse constructor.
         auto func = StaticCast<Func*>(method);
         param = func->GetParam(0);
-        Visitor::Visit(*func, preVisit, []([[maybe_unused]] Expression& e) { return VisitResult::CONTINUE; });
+        Visitor::Visit(*func, preVisit);
     }
 }
 

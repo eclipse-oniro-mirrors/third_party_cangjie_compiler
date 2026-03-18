@@ -10,7 +10,7 @@
 #define CANGJIE_CHIR_ANALYSIS_VALUE_DOMAIN_H
 
 #include "cangjie/CHIR/Analysis/Analysis.h"
-#include "cangjie/CHIR/Value.h"
+#include "cangjie/CHIR/IR/Value/Value.h"
 
 #include <algorithm>
 #include <memory>
@@ -124,7 +124,7 @@ public:
      * @brief create a bound domain.
      * @param isTop create top is true else bottom.
      */
-    explicit ValueDomain(bool isTop) : kind(isTop ? ValueKind::TOP : ValueKind::BOTTOM), ref(nullptr)
+    ValueDomain(bool isTop) : kind(isTop ? ValueKind::TOP : ValueKind::BOTTOM), ref(nullptr)
     {
     }
 
@@ -132,7 +132,7 @@ public:
      * @brief create a ref domain.
      * @param ref ref to create domain.
      */
-    explicit ValueDomain(Ref* ref) : kind(ValueKind::REF), ref(ref)
+    ValueDomain(Ref* ref) : kind(ValueKind::REF), ref(ref)
     {
     }
 
@@ -140,7 +140,7 @@ public:
      * @brief create an object domain.
      * @param absVal object to create domain.
      */
-    explicit ValueDomain(std::unique_ptr<AbstractValue> absVal)
+    ValueDomain(std::unique_ptr<AbstractValue> absVal)
         : kind(ValueKind::VAL), ref(nullptr), absVal(std::move(absVal))
     {
     }
@@ -355,6 +355,11 @@ public:
     {
         CJC_ASSERT(kind != ValueKind::REF);
         return absVal ? absVal.get() : nullptr;
+    }
+
+    bool IsRef() const
+    {
+        return kind == ValueKind::REF;
     }
 
 private:

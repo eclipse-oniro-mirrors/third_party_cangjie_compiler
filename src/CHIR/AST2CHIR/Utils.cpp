@@ -9,7 +9,7 @@
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
 
 #include "cangjie/AST/Utils.h"
-#include "cangjie/CHIR/Utils.h"
+#include "cangjie/CHIR/Utils/Utils.h"
 
 namespace Cangjie {
 namespace CHIR {
@@ -75,17 +75,11 @@ FuncType* AdjustFuncType(FuncType& funcType, const AST::FuncDecl& funcDecl, CHIR
         std::vector<Type*> paramsTy;
         paramsTy.reserve(params.size() + 1); // additional 1 means the type of this.
         auto thisTy = chirType.TranslateType(*funcDecl.outerDecl->ty);
-        // ClassLike decl has already been added ref type by `TranslateType`, so we just needs add ref type to
-        // constructor and mut function of non-classLike type.
-        if (IsStructMutFunction(funcDecl)) {
-            paramsTy.emplace_back(builder.GetType<RefType>(thisTy));
-        } else {
-            paramsTy.emplace_back(thisTy);
-        }
+        paramsTy.emplace_back(AddRefIfFuncIsMutOrClass(*thisTy, funcDecl, builder));
         paramsTy.insert(paramsTy.end(), params.begin(), params.end());
 
         if (funcDecl.TestAttr(AST::Attribute::CONSTRUCTOR) || funcDecl.IsFinalizer()) {
-            return builder.GetType<FuncType>(paramsTy, builder.GetVoidTy());
+            return builder.GetType<FuncType>(paramsTy, builder.GetUnitTy());
         } else {
             return builder.GetType<FuncType>(paramsTy, funcType.GetReturnType());
         }
@@ -290,18 +284,14 @@ std::string OverflowStrategyPrefix(OverflowStrategy ovf)
 
 void SetCompileTimeValueFlagRecursivly(Func& initFunc)
 {
-    auto setConstFlagForLambda = [](BlockGroup& body) {
-        std::function<VisitResult(Expression&)> preVisit = [&preVisit](Expression& expr) {
-            if (expr.GetExprKind() == CHIR::ExprKind::LAMBDA) {
-                auto& lambda = StaticCast<Lambda&>(expr);
-                lambda.SetCompileTimeValue();
-                Visitor::Visit(*lambda.GetBody(), preVisit);
-            }
-            return VisitResult::CONTINUE;
-        };
-        Visitor::Visit(body, preVisit);
+    auto preVisit = [](Expression& expr) {
+        if (expr.GetExprKind() == CHIR::ExprKind::LAMBDA) {
+            auto& lambda = StaticCast<Lambda&>(expr);
+            lambda.SetCompileTimeValue();
+        }
+        return VisitResult::CONTINUE;
     };
-    setConstFlagForLambda(*initFunc.GetBody());
+    Visitor::Visit(initFunc, preVisit);
 }
 
 MemberVarInfo GetMemberVarByName(const CustomTypeDef& def, const std::string& varName)
@@ -380,6 +370,18 @@ std::pair<Type*, bool> GetInstMemberTypeByNameCheckingReadOnly(
     CJC_NULLPTR_CHECK(concreteType);
     return GetInstMemberTypeByNameCheckingReadOnly(
         *StaticCast<CustomType*>(concreteType->StripAllRefs()), names, builder);
+}
+
+Type* AddRefIfFuncIsMutOrClass(Type& thisType, const AST::FuncDecl& funcDecl, CHIRBuilder& builder)
+{
+    if (thisType.IsRef()) {
+        return &thisType;
+    }
+    if (thisType.IsClassOrArray() || funcDecl.TestAnyAttr(AST::Attribute::MUT, AST::Attribute::CONSTRUCTOR)) {
+        return builder.GetType<RefType>(&thisType);
+    } else {
+        return &thisType;
+    }
 }
 } // namespace CHIR
 } // namespace Cangjie

@@ -23,9 +23,9 @@
 #include "cangjie/Basic/Print.h"
 #include "cangjie/Basic/Version.h"
 #include "cangjie/CHIR/CHIR.h"
-#include "cangjie/CHIR/CHIRPrinter.h"
 #include "cangjie/CHIR/Serializer/CHIRDeserializer.h"
-#include "cangjie/CHIR/UserDefinedType.h"
+#include "cangjie/CHIR/Utils/CHIRPrinter.h"
+#include "cangjie/CHIR/Utils/UserDefinedType.h"
 #include "cangjie/Driver/TempFileManager.h"
 #include "cangjie/Frontend/CompileStrategy.h"
 #include "cangjie/IncrementalCompilation/ASTCacheCalculator.h"
@@ -1182,7 +1182,7 @@ CHIR::CHIRContext& CompilerInstance::GetCHIRContext()
 }
 
 // used only by cjlint
-const CHIR::AnalysisWrapper<CHIR::ConstAnalysis, CHIR::ConstDomain>& CompilerInstance::GetConstAnalysisWrapper() const
+const CHIR::ConstAnalysisWrapper& CompilerInstance::GetConstAnalysisWrapper() const
 {
     return chirData.GetConstAnalysisResult();
 }
@@ -1241,12 +1241,12 @@ std::vector<CHIR::FuncBase*> CHIRData::GetConstVarInitFuncs() const
     return initFuncsForConstVar;
 }
 
-CHIR::AnalysisWrapper<CHIR::ConstAnalysis, CHIR::ConstDomain>& CHIRData::GetConstAnalysisResultRef()
+CHIR::ConstAnalysisWrapper& CHIRData::GetConstAnalysisResultRef()
 {
     return constAnalysisWrapper;
 }
 
-const CHIR::AnalysisWrapper<CHIR::ConstAnalysis, CHIR::ConstDomain>& CHIRData::GetConstAnalysisResult() const
+const CHIR::ConstAnalysisWrapper& CHIRData::GetConstAnalysisResult() const
 {
     return constAnalysisWrapper;
 }

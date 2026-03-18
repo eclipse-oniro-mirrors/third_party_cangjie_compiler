@@ -15,6 +15,21 @@
 
 using namespace Cangjie::CHIR;
 
+namespace {
+bool HasFuncCallWithNothingRetVal(const Block& block)
+{
+    for (auto expr : block.GetNonTerminatorExpressions()) {
+        if (!Cangjie::Is<FuncCall>(expr)) {
+            continue;
+        }
+        auto type = expr->GetResultType()->StripAllRefs();
+        if (type->IsNothing()) {
+            return true;
+        }
+    }
+    return false;
+}
+}
 VarInitCheck::VarInitCheck(DiagAdapter* diag) : diag(diag)
 {
 }
@@ -196,10 +211,8 @@ void VarInitCheck::UseBeforeInitCheck(
             auto parent = terminator->GetParentBlock();
             bool isForInGeneratedExit = terminator->Get<SkipCheck>() == SkipKind::SKIP_FORIN_EXIT;
             bool isExitForLocalFunc = parent->GetParentBlockGroup() != func->GetBody();
-            auto parentBlockSize = parent->GetExpressions().size();
-            bool isNothingExit =
-                parentBlockSize > 1U && parent->GetExpressionByIdx(parentBlockSize - 2U)->GetResultType()->IsNothing();
-            if (isForInGeneratedExit || isExitForLocalFunc || isNothingExit) {
+            // if a func call's return type is Nothing, it means this func call is related with Exception
+            if (isForInGeneratedExit || isExitForLocalFunc || HasFuncCallWithNothingRetVal(*parent)) {
                 return;
             }
             if (auto uninitedMembers = state.GetMaybeUninitedLocalMembers(); !uninitedMembers.empty()) {

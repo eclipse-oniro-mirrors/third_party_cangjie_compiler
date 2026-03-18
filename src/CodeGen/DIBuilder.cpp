@@ -11,7 +11,8 @@
 #include "Base/CGTypes/CGType.h"
 #include "Utils/CGUtils.h"
 #include "cangjie/Basic/SourceManager.h"
-#include "cangjie/CHIR/Type/Type.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
+#include "cangjie/Utils/CastingTemplate.h"
 #include "cangjie/Utils/CheckUtils.h"
 
 namespace Cangjie {
@@ -267,7 +268,9 @@ void DIBuilder::SetSubprogram(const CHIR::Func* func, llvm::Function* function)
         }
     }
 #endif
-    auto funcType = lineInfoOnly ? CreateDefaultFunctionType() : CreateFuncType(StaticCast<CHIR::FuncType*>(funcTy));
+    auto funcType = lineInfoOnly || func->TestAttr(CHIR::Attribute::NO_DEBUG_INFO)
+        ? CreateDefaultFunctionType()
+        : CreateFuncType(StaticCast<CHIR::FuncType*>(funcTy));
     llvm::DINode::DIFlags flags = llvm::DINode::FlagPrototyped;
     flags |= isGV ? llvm::DINode::FlagArtificial : llvm::DINode::FlagZero;
     llvm::DISubprogram::DISPFlags spFlags = llvm::DISubprogram::SPFlagDefinition;
@@ -926,6 +929,9 @@ void DIBuilder::CreateMethodType(
     }
     auto diFile = GetOrCreateFile(customDef.GetDebugLocation());
     for (auto method : allMethods) {
+        if (method->TestAttr(CHIR::Attribute::NO_DEBUG_INFO)) {
+            continue;
+        }
         bool hasThis = !method->TestAttr(CHIR::Attribute::STATIC);
         // the name of parameter init function is useless for debug, and may cause duplicate identifier error
         auto name = IsParaInitFunc(*method)

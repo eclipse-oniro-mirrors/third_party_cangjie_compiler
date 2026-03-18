@@ -24,7 +24,7 @@
 #include "IRBuilder.h"
 #include "Utils/CGCommonDef.h"
 #include "Utils/CGUtils.h"
-#include "cangjie/CHIR/Type/Type.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
 
 namespace Cangjie::CodeGen {
 class CGExtensionDef {
@@ -65,9 +65,10 @@ private:
      * The first element is FuncPtr if the second is `false` or TypeInfo if the second is `true`.
      */
     std::pair<llvm::Constant*, bool> GenerateInterfaceFn(const CHIR::ClassType& inheritedType);
-    llvm::Constant* GenerateOuterTi(const CHIR::VirtualFuncInfo& funcInfo);
-    llvm::Constant* GenerateOuterTiFn(const CHIR::VirtualFuncInfo& funcInfo);
-    llvm::Constant* GenerateFuncTableForType(const std::vector<CHIR::VirtualFuncInfo>& vtableInType);
+    llvm::Constant* GenerateOuterTi(const CHIR::VirtualMethodInfo& funcInfo);
+    llvm::Constant* GenerateOuterTiFn(const CHIR::VirtualMethodInfo& funcInfo);
+    llvm::Constant* GenerateFuncTableForType(
+        const CHIR::ClassType& inheritedType, const CHIR::VTableInType& vtableInType);
     llvm::Constant* GenerateWhereConditionFn();
     llvm::Value* CreateTypeComparison(
         IRBuilder2& irBuilder, llvm::Value* typeInfo, const CHIR::Type& staticType, const std::string& prefix);

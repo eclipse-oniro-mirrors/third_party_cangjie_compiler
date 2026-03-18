@@ -18,11 +18,11 @@
 #include "cangjie/AST/NodeX.h"
 #include "cangjie/CHIR/AST2CHIR/AST2CHIRNodeMap.h"
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/ExceptionTypeMapping.h"
-#include "cangjie/CHIR/CHIRBuilder.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
-#include "cangjie/CHIR/Type/CHIRType.h"
-#include "cangjie/CHIR/Utils.h"
-#include "cangjie/CHIR/Value.h"
+#include "cangjie/CHIR/IR/CHIRBuilder.h"
+#include "cangjie/CHIR/IR/Expression/Terminator.h"
+#include "cangjie/CHIR/IR/Type/CHIRType.h"
+#include "cangjie/CHIR/Utils/Utils.h"
+#include "cangjie/CHIR/IR/Value/Value.h"
 #include "cangjie/Option/Option.h"
 #include "cangjie/Sema/GenericInstantiationManager.h"
 #include "cangjie/Utils/CheckUtils.h"
@@ -650,7 +650,8 @@ private:
     void SetSymbolTable(const AST::Node& node, Value& val, bool isLocal = true);
     Ptr<Value> GetSymbolTable(const AST::Node& node) const;
     Ptr<CustomTypeDef> GetNominalSymbolTable(const AST::Node& node);
-    Ptr<Value> TypeCastOrBoxIfNeeded(Value& val, Type& expectedTy, const DebugLocation& loc, bool needCheck = true);
+    Ptr<Value> TypeCastOrBoxIfNeeded(
+        Value& val, Type& expectedTy, const DebugLocation& loc = INVALID_LOCATION, bool needCheck = true);
     Ptr<Block> GetBlockByAST(const AST::Block& block)
     {
         auto val = GetSymbolTable(block);
@@ -971,9 +972,13 @@ private:
     Ptr<Value> TranslateFuncMemberAccess(const AST::MemberAccess& member);
     Value* WrapMemberMethodByLambda(const AST::FuncDecl& funcDecl, const InstCalleeInfo& instFuncType, Value* thisObj);
     bool IsVirtualFuncCall(
-        const ClassDef& obj, const AST::FuncDecl& funcDecl, bool isSuperCall);
-    InvokeCallContext GenerateInvokeCallContext(const InstCalleeInfo& instFuncType,
-        Value& caller, const AST::FuncDecl& callee, const std::vector<Value*>& args);
+        const CustomTypeDef& obj, const AST::FuncDecl& funcDecl, bool baseExprIsSuper);
+    InvokeCallContext GenerateInvokeCallContext(const InstCalleeInfo& instFuncType, Value& caller,
+        const AST::FuncDecl& callee, const std::vector<Value*>& args,
+        const OverflowStrategy strategy = OverflowStrategy::THROWING);
+    InstCalleeInfo GetInstCalleeInfoFromVarInit(const AST::RefExpr& expr);
+    std::pair<Type*, FuncCallType> GetExactParentTypeAndFuncType(
+        const AST::NameReferenceExpr& expr, Type& thisType, const AST::FuncDecl& funcDecl, bool& isVirtualFuncCall);
     InstCalleeInfo GetInstCalleeInfoFromRefExpr(const AST::RefExpr& expr);
     InstCalleeInfo GetInstCalleeInfoFromMemberAccess(const AST::MemberAccess& expr);
     Ptr<Value> GetBaseFromMemberAccess(const AST::Expr& base);
@@ -1112,8 +1117,7 @@ private:
 
     void HandleInitializedArgVal(const AST::CallExpr& ce, std::vector<Value*>& args);
 
-    void TranslateThisObjectForNonStaticMemberFuncCall(
-        const AST::CallExpr& expr, std::vector<Value*>& args, bool needsMutableThis);
+    Value* TranslateThisObjectForNonStaticMemberFuncCall(const AST::CallExpr& expr, bool needsMutableThis);
     void TranslateTrivialArgsWithSugar(
         const AST::CallExpr& expr, std::vector<Value*>& args, const std::vector<Type*>& expectedArgTys);
     Value* TranslateTrivialArgWithNoSugar(const AST::FuncArg& arg, Type* expectedArgTy, const DebugLocation& loc);

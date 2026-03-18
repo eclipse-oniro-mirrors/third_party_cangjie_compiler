@@ -9,16 +9,16 @@
 #include <algorithm>
 #include <type_traits>
 
-#include "cangjie/CHIR/CHIRCasting.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
-#include "cangjie/CHIR/GeneratedFromForIn.h"
-#include "cangjie/CHIR/Type/ClassDef.h"
-#include "cangjie/CHIR/Type/CustomTypeDef.h"
-#include "cangjie/CHIR/Type/EnumDef.h"
-#include "cangjie/CHIR/Type/StructDef.h"
-#include "cangjie/CHIR/Type/Type.h"
-#include "cangjie/CHIR/UserDefinedType.h"
-#include "cangjie/CHIR/Utils.h"
+#include "cangjie/CHIR/Utils/CHIRCasting.h"
+#include "cangjie/CHIR/IR/Expression/Terminator.h"
+#include "cangjie/CHIR/IR/Annotation.h"
+#include "cangjie/CHIR/IR/Type/ClassDef.h"
+#include "cangjie/CHIR/IR/Type/CustomTypeDef.h"
+#include "cangjie/CHIR/IR/Type/EnumDef.h"
+#include "cangjie/CHIR/IR/Type/StructDef.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
+#include "cangjie/CHIR/Utils/UserDefinedType.h"
+#include "cangjie/CHIR/Utils/Utils.h"
 #include "cangjie/Utils/FileUtil.h"
 #include "cangjie/Utils/ICEUtil.h"
 #include "cangjie/Basic/Version.h"
@@ -237,37 +237,32 @@ AbstractMethodInfo CHIRDeserializer::CHIRDeserializerImpl::Create(const PackageF
 }
 
 template <>
-VirtualFuncTypeInfo CHIRDeserializer::CHIRDeserializerImpl::Create(const PackageFormat::VirtualFuncTypeInfo* obj)
+VirtualMethodInfo CHIRDeserializer::CHIRDeserializerImpl::Create(const PackageFormat::VirtualMethodInfo* obj)
 {
-    auto sigType = GetType<FuncType>(obj->sigType());
+    auto condition = FuncSigInfo {
+        .funcName = obj->funcName()->str(),
+        .funcType = GetType<FuncType>(obj->sigType()),
+        .genericTypeParams = GetType<GenericType>(obj->methodGenericTypeParams())
+    };
+    auto funcPtr = GetValue<FuncBase>(obj->instance());
+    auto attributeInfo = CreateAttr(obj->attributes());
     auto originalType = GetType<FuncType>(obj->originalType());
     auto parentType = GetType<Type>(obj->parentType());
     auto returnType = GetType<Type>(obj->returnType());
-    auto methodGenericTypeParams = GetType<GenericType>(obj->methodGenericTypeParams());
-
-    return VirtualFuncTypeInfo{sigType, originalType, parentType, returnType, methodGenericTypeParams};
-}
-
-template <> VirtualFuncInfo CHIRDeserializer::CHIRDeserializerImpl::Create(const PackageFormat::VirtualFuncInfo* obj)
-{
-    auto srcCodeIdentifier = obj->srcCodeIdentifier()->str();
-    auto instance = GetValue<FuncBase>(obj->instance());
-    auto attributeInfo = CreateAttr(obj->attributes());
-    auto typeInfo = Create<VirtualFuncTypeInfo>(obj->typeInfo());
-    return VirtualFuncInfo{srcCodeIdentifier, instance, attributeInfo, typeInfo};
+    return VirtualMethodInfo(std::move(condition), funcPtr, attributeInfo, *originalType, *parentType, *returnType);
 }
 
 template <>
-VTableType CHIRDeserializer::CHIRDeserializerImpl::Create(
-    const flatbuffers::Vector<flatbuffers::Offset<PackageFormat::VTableElement>>* obj)
+VTableInDef CHIRDeserializer::CHIRDeserializerImpl::Create(
+    const flatbuffers::Vector<flatbuffers::Offset<PackageFormat::VTableInType>>* obj)
 {
-    VTableType vtable = {};
+    VTableInDef vtableInDef;
     for (auto item : *obj) {
-        auto ty = GetType<ClassType>(item->ty());
-        std::vector<VirtualFuncInfo> info = Create<VirtualFuncInfo>(item->info());
-        vtable[ty] = info;
+        auto ty = GetType<ClassType>(item->srcParentType());
+        std::vector<VirtualMethodInfo> info = Create<VirtualMethodInfo>(item->virtualMethods());
+        vtableInDef.AddNewItemToTypeVTable(*ty, std::move(info));
     }
-    return vtable;
+    return vtableInDef;
 }
 
 // =========================== Custom Type Define Deserializer ==============================
@@ -431,8 +426,6 @@ template <> GenericType* CHIRDeserializer::CHIRDeserializerImpl::Deserialize(con
     auto identifier = obj->identifier()->str();
     auto srcCodeIndentifier = obj->srcCodeIdentifier()->str();
     auto genericType = builder.GetType<GenericType>(identifier, srcCodeIndentifier);
-    genericType->orphanFlag = obj->orphanFlag();
-    genericType->skipCheck = obj->skipCheck();
     genericTypeConfig.emplace_back(genericType, obj);
     return genericType;
 }
@@ -1513,6 +1506,10 @@ void CHIRDeserializer::CHIRDeserializerImpl::ConfigBase(const PackageFormat::Bas
                 base.Set<CHIR::WrappedRawMethod>(
                     GetValue<FuncBase>(static_cast<const PackageFormat::WrappedRawMethod*>(anno)->rawMethod()));
                 break;
+            case PackageFormat::Annotation::Annotation_overrideSrcFuncType:
+                base.Set<CHIR::OverrideSrcFuncType>(
+                    GetType<FuncType>(static_cast<const PackageFormat::OverrideSrcFuncType*>(anno)->type()));
+                break;
             default:
                 continue;
         }
@@ -1575,8 +1572,8 @@ void CHIRDeserializer::CHIRDeserializerImpl::ConfigCustomTypeDef(
     }
     obj.SetAnnoInfo(Create<AnnoInfo>(buffer->annoInfo()));
     auto vtable =
-        Create<VTableType, flatbuffers::Vector<flatbuffers::Offset<PackageFormat::VTableElement>>>(buffer->vtable());
-    obj.SetVTable(vtable);
+        Create<VTableInDef, flatbuffers::Vector<flatbuffers::Offset<PackageFormat::VTableInType>>>(buffer->vtable());
+    obj.SetVTable(std::move(vtable));
     auto varInitializationFunc = GetValue<FuncBase>(buffer->varInitializationFunc());
     if (varInitializationFunc) {
         obj.SetVarInitializationFunc(varInitializationFunc);
@@ -1684,7 +1681,6 @@ template <> void CHIRDeserializer::CHIRDeserializerImpl::Config(const PackageFor
     }
     obj.SetRawMangledName(buffer->rawMangledName()->str());
     obj.SetAnnoInfo(Create<AnnoInfo>(buffer->base()->annoInfo()));
-    obj.SetParentRawMangledName(buffer->parentName()->str());
     obj.AppendAttributeInfo(CreateAttr(buffer->base()->attributes()));
     if (compileSpecific) {
         obj.EnableAttr(Attribute::DESERIALIZED);
@@ -1722,7 +1718,7 @@ template <> void CHIRDeserializer::CHIRDeserializerImpl::Config(const PackageFor
     // set identifier for convenient comparision.
     obj.identifier = buffer->base()->identifier()->str();
     if (buffer->isRetVal()) {
-        obj.SetRetValue();
+        obj.SetRetValue(true);
     }
 }
 

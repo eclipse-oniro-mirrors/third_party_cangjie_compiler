@@ -13,7 +13,7 @@
 
 #include "llvm/IR/Module.h"
 
-#include "cangjie/CHIR/CHIRBuilder.h"
+#include "cangjie/CHIR/IR/CHIRBuilder.h"
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "cangjie/IncrementalCompilation/CachedMangleMap.h"
 #include "cangjie/Option/Option.h"

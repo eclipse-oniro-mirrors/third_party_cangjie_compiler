@@ -6,11 +6,12 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+#include "cangjie/AST/AttributePack.h"
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
 #include "cangjie/AST/Walker.h"
-#include "cangjie/CHIR/ConstantUtils.h"
-#include "cangjie/CHIR/IntrinsicKind.h"
+#include "cangjie/CHIR/Utils/ConstantUtils.h"
+#include "cangjie/CHIR/IR/IntrinsicKind.h"
 
 using namespace Cangjie::CHIR;
 using namespace Cangjie;
@@ -65,13 +66,6 @@ std::vector<Type*> Translator::GetFuncInstArgs(const AST::CallExpr& expr)
         }
     }
     return funcInstTypeArgs;
-}
-
-static bool IsPropertySetterCall(const AST::CallExpr& expr)
-{
-    auto func = expr.resolvedFunction;
-    bool res = func->isSetter;
-    return res;
 }
 
 Expression* Translator::GenerateDynmaicDispatchFuncCall(const InstInvokeCalleeInfo& funcInfo,
@@ -265,8 +259,7 @@ Value* Translator::GenerateLeftValue(const Translator::LeftValueInfo& leftValInf
     return result;
 }
 
-void Translator::TranslateThisObjectForNonStaticMemberFuncCall(
-    const AST::CallExpr& expr, std::vector<Value*>& args, bool needsMutableThis)
+Value* Translator::TranslateThisObjectForNonStaticMemberFuncCall(const AST::CallExpr& expr, bool needsMutableThis)
 {
     Ptr<AST::FuncDecl> resolved = expr.resolvedFunction;
     CJC_ASSERT(resolved && IsInstanceMember(*resolved));
@@ -337,7 +330,8 @@ void Translator::TranslateThisObjectForNonStaticMemberFuncCall(
         }
     }
 
-    args.insert(args.begin(), thisObj);
+    CJC_NULLPTR_CHECK(thisObj);
+    return thisObj;
 }
 
 void Translator::TranslateTrivialArgsWithSugar(
@@ -715,7 +709,7 @@ Translator::LeftValueInfo Translator::TranslateStructOrClassCtorCallAsLeftValue(
     auto [paramInstTys, retInstTy] = GetMemberFuncParamAndRetInstTypes(expr);
     auto paramInstTysWithoutThis = paramInstTys;
     paramInstTys.insert(paramInstTys.begin(), builder.GetType<RefType>(thisTy));
-    auto instTargetFuncTy = builder.GetType<FuncType>(paramInstTys, builder.GetVoidTy());
+    auto instTargetFuncTy = builder.GetType<FuncType>(paramInstTys, retInstTy);
 
     // Translate arguments
     std::vector<Value*> args;
@@ -774,7 +768,7 @@ Value* Translator::TranslateStructOrClassCtorCall(const AST::CallExpr& expr)
     auto [paramInstTys, retInstTy] = GetMemberFuncParamAndRetInstTypes(expr);
     auto paramInstTysWithoutThis = paramInstTys;
     paramInstTys.insert(paramInstTys.begin(), builder.GetType<RefType>(thisTy));
-    auto instTargetFuncTy = builder.GetType<FuncType>(paramInstTys, builder.GetVoidTy());
+    auto instTargetFuncTy = builder.GetType<FuncType>(paramInstTys, retInstTy);
 
     // Translate arguments
     std::vector<Value*> args;
@@ -864,11 +858,6 @@ Ptr<Value> Translator::TranslateFuncTypeValueCall(const AST::CallExpr& expr)
 }
 
 namespace Cangjie::CHIR {
-std::string GetSplitOperatorName(const std::string& name, OverflowStrategy st)
-{
-    return OverflowStrategyPrefix(st) + name;
-}
-
 /*
 public common interface I { common func foo6(): Unit { println("I::foo6 common") } }
 
@@ -913,144 +902,6 @@ bool Translator::IsOverflowOpCall(const AST::FuncDecl& func)
     return IsOverflowOperator(func.identifier, *StaticCast<FuncType>(TranslateType(*func.ty)));
 }
 
-Value* Translator::TranslateNonStaticMemberFuncCall(const AST::CallExpr& expr)
-{
-    auto resolvedFunction = expr.resolvedFunction;
-    CJC_NULLPTR_CHECK(resolvedFunction);
-    CJC_ASSERT(!resolvedFunction->TestAttr(AST::Attribute::STATIC));
-    bool isMutFunc =
-        (resolvedFunction->TestAttr(AST::Attribute::MUT) || resolvedFunction->isSetter) && !resolvedFunction->isGetter;
-    // Translate code position info
-    const auto& loc = TranslateLocation(expr);
-    const auto& warningLoc = TranslateLocation(*expr.baseFunc);
-
-    // Note that, `thisType` might be different from the parent custom type of the callee func,
-    // since we can call a func inherited from upstream type
-    Type* thisType;
-    if (auto ma = DynamicCast<AST::MemberAccess*>(expr.baseFunc.get())) {
-        // polish here
-        thisType = TranslateType(*ma->baseExpr->ty)->StripAllRefs();
-    } else {
-        // If there is no `this` object, then we must be inside of another non-static memeber func
-        auto currentFunc = currentBlock->GetTopLevelFunc();
-        CJC_NULLPTR_CHECK(currentFunc);
-        auto outerDef = currentFunc->GetParentCustomTypeDef();
-        CJC_NULLPTR_CHECK(outerDef);
-        Type* outerType = nullptr;
-        if (outerDef->IsExtend()) {
-            auto outerExtend = StaticCast<ExtendDef*>(outerDef);
-            outerType = outerExtend->GetExtendedType();
-        } else {
-            outerType = StaticCast<CustomType*>(outerDef->GetType());
-        }
-        thisType = outerType;
-    }
-    CJC_ASSERT(!thisType->IsRef());
-    auto thisRefType = builder.GetType<RefType>(thisType);
-
-    auto funcInstTypeArgs = GetFuncInstArgs(expr);
-    // polish this API
-    auto [paramInstTys, retInstTy] = GetMemberFuncParamAndRetInstTypes(expr);
-    auto paramInstTysWithoutThis = paramInstTys;
-    auto tempParamInstTys = paramInstTys;
-    tempParamInstTys.insert(tempParamInstTys.begin(), thisRefType);
-    auto tempInstTargetFuncTy = builder.GetType<FuncType>(tempParamInstTys, retInstTy);
-
-    // Translate arguments
-    std::vector<Value*> args;
-    TranslateThisObjectForNonStaticMemberFuncCall(expr, args, isMutFunc || IsPropertySetterCall(expr));
-    TranslateTrivialArgs(expr, args, paramInstTysWithoutThis);
-
-    bool calledByInheritableTy = thisType->IsClass() || thisType->IsGeneric();
-    bool isSuperCall = expr.callKind == AST::CallKind::CALL_SUPER_FUNCTION;
-    Expression* funcCall = nullptr;
-    bool mayFuncBeMovedInPlatform = CanActualFuncBeMovedInSpecific(*thisType, builder);
-    // NOTE: Looks like current devirtualization assumptions is quite naive, it can be eager.
-    if ((calledByInheritableTy || mayFuncBeMovedInPlatform) && !isSuperCall && IsVirtualMember(*resolvedFunction)) {
-        CJC_ASSERT(args.size() >= 1);
-        auto obj = args[0];
-        args.erase(args.begin());
-        auto funcName = expr.resolvedFunction->identifier.Val();
-        if (IsOverflowOpCall(*resolvedFunction)) {
-            funcName = GetSplitOperatorName(funcName, expr.overflowStrategy);
-        }
-        auto outerDecl = expr.resolvedFunction->outerDecl;
-        auto genericThisTy = TranslateType(*outerDecl->ty);
-        if (IsStructMutFunction(*expr.resolvedFunction)) {
-            genericThisTy = builder.GetType<RefType>(genericThisTy);
-        }
-        auto instParentCustomTy =
-            GetExactParentType(*thisType, *resolvedFunction, *tempInstTargetFuncTy, funcInstTypeArgs, true);
-        Ptr<Type> instParentTy = instParentCustomTy;
-        if (instParentCustomTy->IsReferenceType()) {
-            instParentTy = builder.GetType<RefType>(instParentCustomTy);
-        } else if (instParentCustomTy->IsStruct() && isMutFunc) {
-            instParentTy = builder.GetType<RefType>(instParentCustomTy);
-        }
-        paramInstTys.insert(paramInstTys.begin(), instParentTy);
-        auto instTargetFuncTy = builder.GetType<FuncType>(paramInstTys, retInstTy);
-        const AST::FuncDecl* originalFuncDecl;
-        if (auto decl = typeManager.GetTopOverriddenFuncDecl(resolvedFunction)) {
-            originalFuncDecl = decl;
-        } else {
-            originalFuncDecl = resolvedFunction;
-        }
-        auto originalFuncType = StaticCast<FuncType*>(TranslateType(*originalFuncDecl->ty));
-        if (!originalFuncDecl->TestAttr(AST::Attribute::STATIC)) {
-            auto originalOuterDecl = originalFuncDecl->outerDecl;
-            CJC_NULLPTR_CHECK(originalOuterDecl);
-            auto objType = GetNominalSymbolTable(*originalOuterDecl)->GetType();
-            if (objType->IsReferenceType() ||
-                (originalFuncDecl->TestAttr(AST::Attribute::MUT) && objType->IsStruct())) {
-                objType = builder.GetType<RefType>(objType);
-            }
-            auto paramTypes = originalFuncType->GetParamTypes();
-            paramTypes.insert(paramTypes.begin(), objType);
-            originalFuncType = builder.GetType<FuncType>(paramTypes, originalFuncType->GetReturnType());
-        }
-        std::vector<GenericType*> genericTypeParams;
-        if (originalFuncDecl->TestAttr(AST::Attribute::GENERIC)) {
-            for (const auto& genericTy : originalFuncDecl->funcBody->generic->typeParameters) {
-                genericTypeParams.emplace_back(StaticCast<GenericType*>(TranslateType(*(genericTy->ty))));
-            }
-        }
-        InstInvokeCalleeInfo dynamicDispatchFuncInfo{funcName, instTargetFuncTy,
-            originalFuncType, funcInstTypeArgs, genericTypeParams, thisRefType};
-
-        funcCall = GenerateDynmaicDispatchFuncCall(dynamicDispatchFuncInfo, args, obj, nullptr, loc);
-        PrintDevirtualizationMessage(expr, "invoke");
-    } else {
-        auto instParentCustomTy =
-            GetExactParentType(*thisType, *resolvedFunction, *tempInstTargetFuncTy, funcInstTypeArgs, false);
-        CJC_NULLPTR_CHECK(instParentCustomTy);
-        Ptr<Type> instParentTy = instParentCustomTy;
-        if (instParentCustomTy->IsReferenceType()) {
-            instParentTy = builder.GetType<RefType>(instParentCustomTy);
-        } else if (instParentCustomTy->IsStruct() && isMutFunc) {
-            instParentTy = builder.GetType<RefType>(instParentCustomTy);
-        }
-        auto callee = GetSymbolTable(*resolvedFunction);
-        CJC_ASSERT(callee != nullptr && "TranslateApply: not supported callee now!");
-        // call a mut func from parent type
-        if (thisType->IsStruct() && instParentCustomTy != thisType && callee->TestAttr(Attribute::MUT)) {
-            paramInstTys.insert(paramInstTys.begin(), thisRefType);
-        } else {
-            paramInstTys.insert(paramInstTys.begin(), instParentTy);
-        }
-        auto instTargetFuncTy = builder.GetType<FuncType>(paramInstTys, retInstTy);
-        funcCall = GenerateFuncCall(*callee, instTargetFuncTy, funcInstTypeArgs, thisRefType, args, loc);
-        PrintDevirtualizationMessage(expr, "apply");
-    }
-    // polish this
-    if (HasNothingTypeArg(args)) {
-        funcCall->Set<DebugLocationInfoForWarning>(warningLoc);
-    }
-
-    auto targetCallResTy = TranslateType(*expr.ty);
-    auto castedCallRes = TypeCastOrBoxIfNeeded(*funcCall->GetResult(), *targetCallResTy, loc);
-    return castedCallRes;
-}
-
 Value* Translator::CreateGetRTTIWrapper(Value* value, Block* bl, const DebugLocation& loc)
 {
     auto type = value->GetType();
@@ -1065,11 +916,12 @@ Value* Translator::CreateGetRTTIWrapper(Value* value, Block* bl, const DebugLoca
     return expr->GetResult();
 }
 
-Value* Translator::TranslateStaticMemberFuncCall(const AST::CallExpr& expr)
+Value* Translator::TranslateMemberFuncCall(const AST::CallExpr& expr)
 {
+    // Static member function, instance member function, global func.
     auto resolvedFunction = expr.resolvedFunction;
     CJC_NULLPTR_CHECK(resolvedFunction);
-    CJC_ASSERT(resolvedFunction->TestAttr(AST::Attribute::STATIC));
+    CJC_ASSERT(!resolvedFunction->TestAttr(AST::Attribute::CONSTRUCTOR));
 
     // Translate code position info
     const auto& loc = TranslateLocation(expr);
@@ -1080,39 +932,59 @@ Value* Translator::TranslateStaticMemberFuncCall(const AST::CallExpr& expr)
         auto funcRef = StaticCast<AST::RefExpr*>(expr.baseFunc.get());
         instCallInfo = GetInstCalleeInfoFromRefExpr(*funcRef);
     }
-    auto paramInstTysWithoutThisTy = instCallInfo.instParamTys;
-    if (!resolvedFunction->TestAttr(AST::Attribute::STATIC)) {
-        paramInstTysWithoutThisTy.erase(paramInstTysWithoutThisTy.begin());
-    }
+
     // Translate arguments
     std::vector<Value*> args;
+    auto calleeIsStatic = resolvedFunction->TestAttr(AST::Attribute::STATIC);
+    if (!calleeIsStatic) {
+        auto thisObj =
+            TranslateThisObjectForNonStaticMemberFuncCall(expr, resolvedFunction->TestAttr(AST::Attribute::MUT));
+        CJC_ASSERT(!instCallInfo.instParamTys.empty());
+        thisObj = TypeCastOrBoxIfNeeded(*thisObj, *instCallInfo.instParamTys[0], loc);
+        args.emplace_back(thisObj);
+    }
+    auto paramInstTysWithoutThisTy = instCallInfo.instParamTys;
+    if (!calleeIsStatic) {
+        paramInstTysWithoutThisTy.erase(paramInstTysWithoutThisTy.begin());
+    }
     TranslateTrivialArgs(expr, args, paramInstTysWithoutThisTy);
     LocalVar* ret = nullptr;
     if (instCallInfo.isVirtualFuncCall) {
-        // InvokeStatic
-        Value* rtti = nullptr;
-        auto topLevelFunc = currentBlock->GetTopLevelFunc();
-        /**
-         *  open class A {
-         *      static func foo() { return 1 }
-         *      func goo() { foo() } // we need to use `GetRTTI`, not `GetRTTIStatic`
-         *  }
-         *  class B <: A {
-         *      static func foo() { return 2 }
-         *  }
-         *  var a: A = B()
-         *  a.goo()  // the return value is 2, if `goo` is inlined here, the CHIR must be like:
-         *           // InvokeStatic(GetRTTI(a))
-         */
-        if (expr.baseFunc->astKind == AST::ASTKind::REF_EXPR && !topLevelFunc->TestAttr(Attribute::STATIC)) {
-            auto thisObj = topLevelFunc->GetParam(0);
-            rtti = CreateAndAppendExpression<GetRTTI>(builder.GetUnitTy(), thisObj, currentBlock)->GetResult();
+        if (calleeIsStatic) {
+            // InvokeStatic
+            Value* rtti = nullptr;
+            auto topLevelFunc = currentBlock->GetTopLevelFunc();
+            /**
+            *  open class A {
+            *      static func foo() { return 1 }
+            *      func goo() { foo() } // we need to use `GetRTTI`, not `GetRTTIStatic`
+            *  }
+            *  class B <: A {
+            *      static func foo() { return 2 }
+            *  }
+            *  var a: A = B()
+            *  a.goo()  // the return value is 2, if `goo` is inlined here, the CHIR must be like:
+            *           // InvokeStatic(GetRTTI(a))
+            */
+            if (expr.baseFunc->astKind == AST::ASTKind::REF_EXPR && !topLevelFunc->TestAttr(Attribute::STATIC)) {
+                auto thisObj = topLevelFunc->GetParam(0);
+                rtti = CreateAndAppendExpression<GetRTTI>(builder.GetUnitTy(), thisObj, currentBlock)->GetResult();
+            } else {
+                rtti = CreateAndAppendExpression<GetRTTIStatic>(
+                    builder.GetUnitTy(), instCallInfo.thisType->StripAllRefs(), currentBlock)->GetResult();
+            }
+            auto invokeInfo =
+                GenerateInvokeCallContext(instCallInfo, *rtti, *resolvedFunction, args, expr.overflowStrategy);
+            ret = TryCreate<InvokeStatic>(currentBlock, loc, instCallInfo.instRetTy, invokeInfo)->GetResult();
         } else {
-            rtti = CreateAndAppendExpression<GetRTTIStatic>(
-                builder.GetUnitTy(), instCallInfo.thisType->StripAllRefs(), currentBlock)->GetResult();
+            // Invoke
+            CJC_ASSERT(!args.empty());
+            auto obj = args[0];
+            args.erase(args.begin());
+            auto invokeInfo =
+                GenerateInvokeCallContext(instCallInfo, *obj, *resolvedFunction, args, expr.overflowStrategy);
+            ret = TryCreate<Invoke>(currentBlock, loc, instCallInfo.instRetTy, invokeInfo)->GetResult();
         }
-        auto invokeInfo = GenerateInvokeCallContext(instCallInfo, *rtti, *resolvedFunction, args);
-        ret = TryCreate<InvokeStatic>(currentBlock, loc, instCallInfo.instRetTy, invokeInfo)->GetResult();
     } else {
         auto callee = GetSymbolTable(*resolvedFunction);
         auto funcCallContext = FuncCallContext {
@@ -1128,19 +1000,6 @@ Value* Translator::TranslateStaticMemberFuncCall(const AST::CallExpr& expr)
     }
 
     return TypeCastOrBoxIfNeeded(*ret, *TranslateType(*expr.ty), loc);
-}
-
-Value* Translator::TranslateMemberFuncCall(const AST::CallExpr& expr)
-{
-    // Instance member function、static member function、global func.
-    auto resolvedFunction = expr.resolvedFunction;
-    CJC_NULLPTR_CHECK(resolvedFunction);
-    CJC_ASSERT(!resolvedFunction->TestAttr(AST::Attribute::CONSTRUCTOR));
-
-    if (resolvedFunction->TestAttr(AST::Attribute::STATIC)) {
-        return TranslateStaticMemberFuncCall(expr);
-    }
-    return TranslateNonStaticMemberFuncCall(expr);
 }
 
 Value* Translator::TranslateTrivialFuncCall(const AST::CallExpr& expr)
@@ -1274,6 +1133,9 @@ std::pair<std::vector<Type*>, Type*> Translator::GetMemberFuncParamAndRetInstTyp
         funcType = StaticCast<FuncType*>(TranslateType(**genericTy->upperBounds.begin()));
     } else {
         funcType = StaticCast<FuncType*>(TranslateType(*expr.baseFunc->ty));
+    }
+    if (expr.resolvedFunction->TestAttr(AST::Attribute::CONSTRUCTOR) || expr.resolvedFunction->IsFinalizer()) {
+        return std::pair<std::vector<Type*>, Type*>{funcType->GetParamTypes(), builder.GetUnitTy()};
     }
     return std::pair<std::vector<Type*>, Type*>{funcType->GetParamTypes(), funcType->GetReturnType()};
 }

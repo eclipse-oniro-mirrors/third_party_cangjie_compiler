@@ -56,7 +56,7 @@ void GenerateInitCJObjectMethods::GenNativeInitMethodForEnumCtor(InteropContext&
 void GenerateInitCJObjectMethods::HandleImpl(InteropContext& ctx)
 {
     auto genNativeInitMethod = [this, &ctx](Decl& decl, bool isGenericGlueCode,
-            const std::vector<Native::FFI::GenericConfigInfo*>& genericConfigsVector) {
+                                   const std::vector<Native::FFI::GenericConfigInfo*>& genericConfigsVector) {
         if (decl.TestAttr(Attribute::IS_BROKEN)) {
             return;
         }
@@ -122,7 +122,8 @@ void GenerateInitCJObjectMethods::HandleImpl(InteropContext& ctx)
         for (auto& cjmapping : ctx.cjMappings) {
             std::vector<Native::FFI::GenericConfigInfo*> genericConfigsVector;
             bool isGenericGlueCode = false;
-            Native::FFI::InitGenericConfigs(*cjmapping->curFile, cjmapping.get(), genericConfigsVector, isGenericGlueCode);
+            Native::FFI::InitGenericConfigs(
+                *cjmapping->curFile, cjmapping.get(), genericConfigsVector, isGenericGlueCode);
             if (auto enumDecl = As<ASTKind::ENUM_DECL>(cjmapping)) {
                 GenNativeInitMethodForEnumCtor(ctx, *enumDecl, isGenericGlueCode, genericConfigsVector);
             } else {

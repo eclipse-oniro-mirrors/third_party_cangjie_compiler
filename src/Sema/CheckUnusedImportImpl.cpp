@@ -14,6 +14,7 @@
 
 #include "TypeCheckerImpl.h"
 #include "cangjie/Utils/Utils.h"
+#include "cangjie/Utils/ProfileRecorder.h"
 
 using namespace Cangjie;
 using namespace AST;
@@ -301,5 +302,6 @@ void CheckUnusedImportImpl::Check()
 
 void TypeChecker::TypeCheckerImpl::CheckUnusedImportSpec(Package& pkg)
 {
+    Utils::ProfileRecorder recorder("Post TypeCheck", "CheckUnusedImportSpec");
     CheckUnusedImportImpl(pkg, diag, importManager).Check();
 }

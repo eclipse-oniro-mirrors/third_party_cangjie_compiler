@@ -287,14 +287,15 @@ public:
 private:
     InteropType interopType{InteropType::NA};
     void GenNativeInitMethodForEnumCtor(InteropContext& ctx, AST::EnumDecl& enumDecl, bool isGenericGlueCode,
-            const std::vector<Native::FFI::GenericConfigInfo*>& genericConfigsVector);
+        const std::vector<Native::FFI::GenericConfigInfo*>& genericConfigsVector);
 };
 
 /**
  * Desugars all members of every @ObjCImpl declaration.
  * Common steps are:
  * 1. All super.* calls are desugared to `objc_msgSendSuper` calls.
- * 2. All `super(...)` and `this(...)` in generated ctors (w/ $obj and ObjCBypassMarker params) are desugared to `super(..., marker, $obj)`
+ * 2. All `super(...)` and `this(...)` in generated ctors (w/ $obj and ObjCBypassMarker params) are desugared to
+ * `super(..., marker, $obj)`
  * 3. All `super(...)` in original ctors are desugared.
  */
 class DesugarImpls : public Handler<DesugarImpls, InteropContext> {
@@ -398,7 +399,6 @@ public:
     void HandleImpl(InteropContext& ctx);
 };
 
-
 /**
  * Drains all declarations generated on the previous step to their corresponding files which finishes the desugaring.
  */
@@ -448,10 +448,10 @@ public:
     OwnedPtr<AST::ClassDecl> InitInterfaceFwdClassDecl(const Ptr<AST::ClassLikeDecl>& interfaceDecl);
     OwnedPtr<AST::FuncDecl> GenerateInterfaceFwdclassMethod(InteropContext& ctx, AST::ClassDecl& fwdclassDecl,
         AST::FuncDecl& interfaceFuncDecl, Native::FFI::GenericConfigInfo* genericConfig = nullptr);
-    OwnedPtr<AST::ClassDecl> GenerateGenericInterfaceFwdclassMethod(InteropContext& ctx, Ptr<AST::ClassLikeDecl>& fwdclassDecl,
-        Native::FFI::GenericConfigInfo* genericConfig);
-    void GenerateInterfaceFwdClassBody(InteropContext& ctx, AST::ClassDecl& fwdclassDecl, AST::ClassLikeDecl& interfaceDecl,
-        Native::FFI::GenericConfigInfo* genericConfig = nullptr);
+    OwnedPtr<AST::ClassDecl> GenerateGenericInterfaceFwdclassMethod(
+        InteropContext& ctx, Ptr<AST::ClassLikeDecl>& fwdclassDecl, Native::FFI::GenericConfigInfo* genericConfig);
+    void GenerateInterfaceFwdClassBody(InteropContext& ctx, AST::ClassDecl& fwdclassDecl,
+        AST::ClassLikeDecl& interfaceDecl, Native::FFI::GenericConfigInfo* genericConfig = nullptr);
 };
 
 /**

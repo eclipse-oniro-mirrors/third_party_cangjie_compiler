@@ -1363,6 +1363,7 @@ OwnedPtr<GenericConstraint> ASTCloner::CloneGenericConstraint(
     ret->operatorPos = gc.operatorPos;
     ret->bitAndPos = gc.bitAndPos;
     ret->commaPos = gc.commaPos;
+    ret->isImplicitlyIntroduced = gc.isImplicitlyIntroduced;
     ret->EnableAttr(Attribute::COMPILER_ADD);
     return ret;
 }

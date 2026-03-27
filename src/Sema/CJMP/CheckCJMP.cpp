@@ -30,6 +30,7 @@
 #include "cangjie/Sema/TypeManager.h"
 #include "cangjie/Utils/CastingTemplate.h"
 #include "cangjie/Utils/CheckUtils.h"
+#include "cangjie/Utils/ProfileRecorder.h"
 #include <algorithm>
 #include <optional>
 
@@ -96,12 +97,22 @@ std::string CalculatedGenericConstraintsStr(const std::vector<OwnedPtr<GenericCo
     const std::unordered_map<Ptr<Ty>, unsigned>& genericIdx)
 {
     std::string ret;
-    if (genericConstraints.empty()) {
+
+    auto&& constraintCount = std::count_if(
+        genericConstraints.begin(),
+        genericConstraints.end(),
+        [](auto&& gc) { return !gc->isImplicitlyIntroduced; }
+    );
+
+    if (constraintCount == 0) {
         return ret;
     }
 
     std::set<std::string> gcStrs;
     for (auto& genericConstraint : genericConstraints) {
+        if (genericConstraint->isImplicitlyIntroduced) { 
+            continue; 
+        }
         std::set<std::string> ubStrs;
         for (auto& upperBound : genericConstraint->upperBounds) {
             ubStrs.emplace(GetTypeNameFromTy(upperBound->ty, true, genericIdx));
@@ -289,6 +300,7 @@ void MergeCommonIntoSpecific(DiagnosticEngine& diag, Decl& commonDecl, Decl& spe
 // PrepareTypeCheck for CJMP
 void MPTypeCheckerImpl::PrepareTypeCheck4CJMP(Package& pkg)
 {
+    Utils::ProfileRecorder recorder("PrepareTypeCheck", "PrepareTypeCheck4CJMP");
     if (!compileSpecific) {
         return;
     }

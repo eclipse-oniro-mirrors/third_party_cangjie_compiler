@@ -30,6 +30,7 @@
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "cangjie/Utils/CheckUtils.h"
 #include "cangjie/Utils/Utils.h"
+#include "cangjie/Utils/ProfileRecorder.h"
 
 using namespace Cangjie;
 using namespace TypeCheckUtil;
@@ -408,16 +409,16 @@ Ptr<Ty> TypeChecker::TypeCheckerImpl::GetTyFromASTType(ASTContext& ctx, RefType&
 
     std::sort(targets.begin(), targets.end(),
         [](Ptr<const Decl> d1, Ptr<const Decl> d2) {
-            if (d1->scopeLevel > d2->scopeLevel) {
+        if (d1->scopeLevel > d2->scopeLevel) {
+            return true;
+        } else if (d1->scopeLevel == d2->scopeLevel) {
+            // Ranking overloads also by specific > common
+            if (d1->TestAttr(Attribute::SPECIFIC)) {
                 return true;
-            } else if (d1->scopeLevel == d2->scopeLevel) {
-                // Ranking overloads also by specific > common
-                if (d1->TestAttr(Attribute::SPECIFIC)) {
-                    return true;
-                }
             }
-            return false;
-        });
+        }
+        return false;
+    });
 
     Ptr<Decl> target{nullptr};
     if (targets.empty()) {
@@ -825,6 +826,7 @@ void TypeChecker::TypeCheckerImpl::ResolveDecls(ASTContext& ctx)
 
 void TypeChecker::TypeCheckerImpl::ResolveTypeAlias(const std::vector<Ptr<ASTContext>>& contexts)
 {
+    Utils::ProfileRecorder recorder("PreCheck", "ResolveTypeAlias");
     auto setTypAliasFunc = [this](ASTContext& ctx, TypeAliasDecl& tad) { return SetTypeAliasDeclTy(ctx, tad); };
     auto substituteFunc = [this](ASTContext&, TypeAliasDecl& tad) { return SubstituteTypeAliasForAlias(tad); };
     // Resolve all targets for typeAlias decls.
@@ -1180,7 +1182,6 @@ void TypeChecker::TypeCheckerImpl::AddSuperClassObjectForClassDecl(ASTContext& c
 
 void TypeChecker::TypeCheckerImpl::AddSuperInterfaceForClassLikeDecl(ASTContext& ctx)
 {
-    // TODO: move it to Interop::ObjC
     std::vector<Symbol*> syms = GetAllDecls(ctx);
     for (auto& sym : syms) {
         CJC_ASSERT(sym && sym->node);
@@ -1467,6 +1468,7 @@ void TypeChecker::TypeCheckerImpl::AddAssumptionForType(ASTContext& ctx, const T
     if (!aliasedTypeTarget || !type.ty || type.ty->typeArgs.empty()) {
         return;
     }
+    size_t originalConstraintCount = generic.genericConstraints.size();
     MultiTypeSubst revTypeMapping;
     TyVarUB allAssumptionMap;
     GetRevTypeMapping(aliasedTypeTarget->ty->typeArgs, type.ty->typeArgs, revTypeMapping);
@@ -1474,6 +1476,9 @@ void TypeChecker::TypeCheckerImpl::AddAssumptionForType(ASTContext& ctx, const T
     AddUpperBoundOnTypeParameters(
         ctx, generic, *aliasedTypeTarget, revTypeMapping, allAssumptionMap, typeArgAppliedMap);
     CreateGenericConstraints(generic);
+    for (size_t i = originalConstraintCount; i < generic.genericConstraints.size(); ++i) {
+        generic.genericConstraints[i]->isImplicitlyIntroduced = true;
+    }
 }
 
 void TypeChecker::TypeCheckerImpl::PreCheckMacroRedefinition(const std::vector<Ptr<FuncDecl>>& funcs) const
@@ -1569,7 +1574,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckFuncStaticConflict(const std::vector<
         for (const auto& func : staticFuncs) {
             DiagStaticAndNonStaticOverload(diag, *func, *firstNonStatic);
         }
-}
+    }
 }
 
 bool TypeChecker::TypeCheckerImpl::PreCheckFuncRedefinitionWithSameSignature(
@@ -1976,16 +1981,21 @@ void TypeChecker::TypeCheckerImpl::CollectDeclsWithMember(Ptr<Package> pkg, ASTC
 
 void TypeChecker::TypeCheckerImpl::PreCheck(const std::vector<Ptr<ASTContext>>& contexts)
 {
+    Utils::ProfileRecorder recorder("Pre TypeCheck", "PreCheck");
     // NOTE: PreCheck should not contains any 'Synthesize' call.
+    Utils::ProfileRecorder::Start("PreCheck", "CheckRedefinition");
     for (auto& ctx : contexts) {
         // Stage 1. Check redefinition except functions and build all pkgs declMap to accelerate look up.
         CheckRedefinition(*ctx);
     }
-
+    Utils::ProfileRecorder::Stop("PreCheck", "CheckRedefinition");
+ 	 
+    Utils::ProfileRecorder::Start("PreCheck", "ResolveDecls");
     for (auto& ctx : contexts) {
         // Stage 2: Set decl sema type without checking inside the decl body.
         ResolveDecls(*ctx);
     }
+    Utils::ProfileRecorder::Stop("PreCheck", "ResolveDecls");
     // Resolve type alias separately after all user-defined type resolved.
     ResolveTypeAlias(contexts);
 
@@ -1994,11 +2004,13 @@ void TypeChecker::TypeCheckerImpl::PreCheck(const std::vector<Ptr<ASTContext>>& 
     // First part does not need sema check.
     // Collect all imported non-source extends before checking each package.
     BuildImportedExtendMap();
+    Utils::ProfileRecorder::Start("PreCheck", "PreCheckUsage");
     for (auto& ctx : contexts) {
         // Phase: check annotation for FFI.
         PreCheckAnnoForFFI(*ctx->curPackage);
         PreCheckUsage(*ctx, *ctx->curPackage);
     }
+    Utils::ProfileRecorder::Stop("PreCheck", "PreCheckUsage");
     PreCheckAllExtendInterface();
     // CHIR's closure conversion cannot be used without 'Object' class.
     // If '-no-prelude' is given, should check dependencies of class.

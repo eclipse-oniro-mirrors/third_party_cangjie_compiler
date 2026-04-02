@@ -37,6 +37,7 @@
 
 #include <vector>
 #include <bitset>
+#include <stdint.h>
 #include <unordered_map>
 #include <cstdint>
 

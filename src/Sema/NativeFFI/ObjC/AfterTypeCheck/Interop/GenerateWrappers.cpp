@@ -22,7 +22,7 @@ using namespace Cangjie::Interop::ObjC;
 void GenerateWrappers::HandleImpl(InteropContext& ctx)
 {
     auto genWrapper = [this, &ctx](Decl& decl, bool isGenericGlueCode,
-            const std::vector<Native::FFI::GenericConfigInfo*>& genericConfigsVector) {
+                          const std::vector<Native::FFI::GenericConfigInfo*>& genericConfigsVector) {
         if (decl.TestAttr(Attribute::IS_BROKEN)) {
             return;
         }
@@ -53,13 +53,16 @@ void GenerateWrappers::HandleImpl(InteropContext& ctx)
 
             switch (memberDecl->astKind) {
                 case ASTKind::FUNC_DECL:
-                    this->GenerateWrapper(ctx, *StaticAs<ASTKind::FUNC_DECL>(memberDecl), isGenericGlueCode, genericConfigsVector);
+                    this->GenerateWrapper(
+                        ctx, *StaticAs<ASTKind::FUNC_DECL>(memberDecl), isGenericGlueCode, genericConfigsVector);
                     break;
                 case ASTKind::PROP_DECL:
-                    this->GenerateWrapper(ctx, *StaticAs<ASTKind::PROP_DECL>(memberDecl), isGenericGlueCode, genericConfigsVector);
+                    this->GenerateWrapper(
+                        ctx, *StaticAs<ASTKind::PROP_DECL>(memberDecl), isGenericGlueCode, genericConfigsVector);
                     break;
                 case ASTKind::VAR_DECL:
-                    this->GenerateWrapper(ctx, *StaticAs<ASTKind::VAR_DECL>(memberDecl), isGenericGlueCode, genericConfigsVector);
+                    this->GenerateWrapper(
+                        ctx, *StaticAs<ASTKind::VAR_DECL>(memberDecl), isGenericGlueCode, genericConfigsVector);
                     break;
                 default:
                     break;
@@ -75,7 +78,8 @@ void GenerateWrappers::HandleImpl(InteropContext& ctx)
         for (auto& cjmapping : ctx.cjMappings) {
             std::vector<Native::FFI::GenericConfigInfo*> genericConfigsVector;
             bool isGenericGlueCode = false;
-            Native::FFI::InitGenericConfigs(*cjmapping->curFile, cjmapping.get(), genericConfigsVector, isGenericGlueCode);
+            Native::FFI::InitGenericConfigs(
+                *cjmapping->curFile, cjmapping.get(), genericConfigsVector, isGenericGlueCode);
             genWrapper(*cjmapping, isGenericGlueCode, genericConfigsVector);
         }
     }
@@ -104,7 +108,7 @@ void GenerateWrappers::GenerateWrapper(InteropContext& ctx, PropDecl& prop, bool
         for (auto genericConfig : genericConfigsVector) {
             const OwnedPtr<FuncDecl>& funcDecl = prop.getters[0];
             if (funcDecl) {
-               auto wrapper = ctx.factory.CreateMethodWrapper(*funcDecl.get(), genericConfig);
+                auto wrapper = ctx.factory.CreateMethodWrapper(*funcDecl.get(), genericConfig);
                 CJC_NULLPTR_CHECK(wrapper);
                 ctx.genDecls.emplace_back(std::move(wrapper));
             }
@@ -114,7 +118,6 @@ void GenerateWrappers::GenerateWrapper(InteropContext& ctx, PropDecl& prop, bool
         CJC_NULLPTR_CHECK(wrapper);
         ctx.genDecls.emplace_back(std::move(wrapper));
     }
-
 
     if (prop.isVar) {
         GenerateSetterWrapper(ctx, prop);

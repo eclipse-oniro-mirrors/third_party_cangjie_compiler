@@ -17,14 +17,14 @@
 
 #include "cangjie/CHIR/AST2CHIR/AST2CHIR.h"
 #include "cangjie/CHIR/Analysis/ValueRangeAnalysis.h"
-#include "cangjie/CHIR/CHIRBuilder.h"
-#include "cangjie/CHIR/DiagAdapter.h"
+#include "cangjie/CHIR/Analysis/ConstAnalysisWrapper.h"
+#include "cangjie/CHIR/IR/CHIRBuilder.h"
+#include "cangjie/CHIR/Utils/DiagAdapter.h"
 
 namespace Cangjie::CHIR {
 class ToCHIR {
 public:
-    ToCHIR(CompilerInstance& ci, AST::Package& pkg, AnalysisWrapper<ConstAnalysis, ConstDomain>& constAnalysisWrapper,
-        CHIRBuilder& builder)
+    ToCHIR(CompilerInstance& ci, AST::Package& pkg, ConstAnalysisWrapper& constAnalysisWrapper, CHIRBuilder& builder)
         : ci(ci),
           opts(ci.invocation.globalOptions),
           typeManager(ci.typeManager),
@@ -117,9 +117,9 @@ public:
     }
 
     enum Phase : uint8_t {
-        RAW, // after translation,
-        OPT, // after compiler optimization,
-        PLUGIN, // after perform pulgin
+        RAW,                 // after translation,
+        OPT,                 // after compiler optimization,
+        PLUGIN,              // after perform pulgin
         ANALYSIS_FOR_CJLINT, // after analysis for cjlint
         PHASE_MIN = RAW,
         PHASE_MAX = ANALYSIS_FOR_CJLINT,
@@ -132,7 +132,7 @@ private:
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     bool PerformPlugin(CHIR::Package& package);
 #endif
-    void DumpCHIRToFile(const std::string& suffix, bool checkFlag = true);
+    void DumpCHIRToFile(const std::string& suffix, bool needCheckFlag = true);
     void DoClosureConversion();
     void ReportUnusedCode();
     void Devirtualization(DevirtualizationInfo& devirtInfo);
@@ -148,22 +148,20 @@ private:
     void RedundantGetOrThrowElimination();
     void FlatForInExpr();
     void RunUnreachableMarkBlockRemoval();
-    void RunMarkClassHasInited();
     void RunMergingBlocks(const std::string& firstName, const std::string& secondName);
     bool RunVarInitChecking();
-    bool RunConstantPropagationAndSafetyCheck();
-    bool RunConstantPropagation();
+    void RunConstantPropagation();
     void RunRangePropagation();
     bool RunNativeFFIChecks();
     void RunArrayListConstStartOpt();
     void RunFunctionInline(DevirtualizationInfo& devirtInfo);
     void RunArrayLambdaOpt();
     void RunRedundantFutureOpt();
-    void RunNoSideEffectMarkerOpt();
     void RunSanitizerCoverage();
-    bool RunOptimizationPassAndRulesChecking();
-    void MarkNoSideEffect();
+    bool RulesChecking();
+    void RunOptimizationPass();
     void RunUnitUnify();
+    void OptimizeFuncReturnType();
     DevirtualizationInfo CollectDevirtualizationInfo();
     bool RunConstantEvaluation();
     bool RunIRChecker(const Phase& phase);
@@ -178,8 +176,7 @@ private:
     void EraseDebugExpr();
     void CFFIFuncWrapper();
     void ReplaceSrcCodeImportedValueWithSymbol();
-    void CreateBoxTypeForRecursionValueType();
-    void CreateVTableAndUpdateFuncCall();
+    void Canonicalization();
     void UpdateMemberVarPath();
 
     template <typename T>
@@ -208,7 +205,7 @@ private:
     bool needToOptGenericDecl = false;
     CHIRBuilder& builder;
     uint64_t debugFileIndex{0};
-    AnalysisWrapper<ConstAnalysis, ConstDomain>& constAnalysisWrapper;
+    ConstAnalysisWrapper& constAnalysisWrapper;
     OptEffectCHIRMap effectMap;
     OptEffectStrMap strEffectMap;
     VirtualWrapperDepMap curVirtFuncWrapDep;

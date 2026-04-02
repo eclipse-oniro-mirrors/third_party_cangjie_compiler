@@ -13,16 +13,16 @@
 
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 #include "cangjie/CHIR/AST2CHIR/Utils.h"
-#include "cangjie/CHIR/CHIRCasting.h"
-#include "cangjie/CHIR/ConstantUtils.h"
-#include "cangjie/CHIR/Type/CustomTypeDef.h"
-#include "cangjie/CHIR/Type/ExtendDef.h"
-#include "cangjie/CHIR/Utils.h"
-#include "cangjie/CHIR/Visitor/Visitor.h"
+#include "cangjie/CHIR/Utils/CHIRCasting.h"
+#include "cangjie/CHIR/Utils/ConstantUtils.h"
+#include "cangjie/CHIR/IR/Type/CustomTypeDef.h"
+#include "cangjie/CHIR/IR/Type/ExtendDef.h"
+#include "cangjie/CHIR/Utils/Utils.h"
+#include "cangjie/CHIR/Utils/Visitor/Visitor.h"
 #include "cangjie/Mangle/CHIRManglingUtils.h"
 #include "cangjie/Utils/CastingTemplate.h"
 #include "cangjie/Utils/CheckUtils.h"
-#include "cangjie/CHIR/Type/PrivateTypeConverter.h"
+#include "cangjie/CHIR/IR/Type/PrivateTypeConverter.h"
 
 namespace Cangjie::CHIR {
 namespace {
@@ -1454,7 +1454,7 @@ void ConvertSpecificMemberMethods(
     Package* package, CHIRBuilder& builder, const std::function<Type*(Type&)>& replaceGenericFunc)
 {
     PrivateTypeConverter converter(replaceGenericFunc, builder);
-    auto postVisit = [&converter](Expression& e) {
+    auto preVisit = [&converter](Expression& e) {
         converter.VisitExpr(e);
         return VisitResult::CONTINUE;
     };
@@ -1478,7 +1478,7 @@ void ConvertSpecificMemberMethods(
 
             bool hasBodyFromCommonPart = f->GetBody();
             if (hasBodyFromCommonPart) {
-                Visitor::Visit(*f, [](Expression&) { return VisitResult::CONTINUE; }, postVisit);
+                Visitor::Visit(*f, preVisit);
             }
             converter.VisitValue(*f);
         }

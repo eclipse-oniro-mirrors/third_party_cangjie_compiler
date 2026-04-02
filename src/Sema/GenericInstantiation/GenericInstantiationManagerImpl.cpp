@@ -284,9 +284,11 @@ Ptr<Decl> GetMemberByOffset(const Decl& decl, size_t offset)
 void GIM::GenericInstantiationManagerImpl::GenericInstantiatePackage(Package& pkg)
 {
     this->curPkg = &pkg;
-    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "instantiate");
+    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "RecordExtend");
     // Collect extend decls by usage.
     RecordExtend(*curPkg);
+    Utils::ProfileRecorder::Stop("GenericInstantiatePackage", "RecordExtend");
+    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "instantiate");
     if (curPkg->TestAttr(Attribute::INCRE_COMPILE)) {
         InstantiateForIncrementalPackage();
     } else {
@@ -296,10 +298,9 @@ void GIM::GenericInstantiationManagerImpl::GenericInstantiatePackage(Package& pk
         Walker(curPkg, instantiationWalkerID, instantiator, contextReset).Walk();
     }
     Utils::ProfileRecorder::Stop("GenericInstantiatePackage", "instantiate");
-    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "testManager");
+    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "testManager::PreparePackageForTestIfNeeded");
     testManager->PreparePackageForTestIfNeeded(*curPkg);
-    Utils::ProfileRecorder::Stop("GenericInstantiatePackage", "testManager");
-
+    Utils::ProfileRecorder::Stop("GenericInstantiatePackage", "testManager::PreparePackageForTestIfNeeded");
     // Do not perform rearrange, validation and deletion if errors generated.
     if (diag.GetErrorCount() != 0) {
         return;
@@ -318,12 +319,21 @@ void GIM::GenericInstantiationManagerImpl::GenericInstantiatePackage(Package& pk
     if (diag.GetErrorCount() != 0) {
         return;
     }
-    Utils::ProfileRecorder recorder("GenericInstantiatePackage", "cleanup");
+    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "UpdateInstantiatedExtendMap");
     UpdateInstantiatedExtendMap();
+    Utils::ProfileRecorder::Stop("GenericInstantiatePackage", "UpdateInstantiatedExtendMap");
+    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "UpdateInstantiatedDeclsLinkage");
     UpdateInstantiatedDeclsLinkage(pkg);
+    Utils::ProfileRecorder::Stop("GenericInstantiatePackage", "UpdateInstantiatedDeclsLinkage");
+    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "ClearImportedUnusedInstantiatedDecls");
     ClearImportedUnusedInstantiatedDecls();
+    Utils::ProfileRecorder::Stop("GenericInstantiatePackage", "ClearImportedUnusedInstantiatedDecls");
+    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "ValidateUsedNodes");
     ValidateUsedNodes(diag, pkg);
+    Utils::ProfileRecorder::Stop("GenericInstantiatePackage", "ValidateUsedNodes");
+    Utils::ProfileRecorder::Start("GenericInstantiatePackage", "UnsetBoxStatus");
     UnsetBoxStatus(pkg);
+    Utils::ProfileRecorder::Stop("GenericInstantiatePackage", "UnsetBoxStatus");
 }
 
 void GIM::GenericInstantiationManagerImpl::RecordExtend(AST::Node& node)
@@ -801,10 +811,10 @@ Ptr<FuncDecl> GIM::GenericInstantiationManagerImpl::FindImplFuncForAbstractFunc(
     // Rearrange for interface or open class call. Ignore function with following conditions:
     // 1. non-member function;
     // 2. non-static function which is accessed with interface type.
-    // 3. Neither interface member nor open class's static member.
+    // 3. member function accessed by class type which function belongs to.
+    auto baseTyDecl = Ty::GetDeclPtrOfTy<InheritableDecl>(&ty);
     bool shouldIgnore = !fd.outerDecl || (ty.IsInterface() && !fd.TestAttr(Attribute::STATIC)) ||
-        (fd.outerDecl->astKind != ASTKind::INTERFACE_DECL &&
-        (!IsInheritableClass(*fd.outerDecl) || !fd.TestAttr(Attribute::STATIC)));
+        (ty.IsClass() && baseTyDecl == Ty::GetDeclPtrOfTy<InheritableDecl>(fd.outerDecl->ty));
     if (shouldIgnore) {
         return &fd;
     }

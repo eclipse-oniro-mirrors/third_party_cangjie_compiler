@@ -26,8 +26,8 @@
 #include "IRGenerator.h"
 #include "Utils/CGCommonDef.h"
 #include "Utils/CGUtils.h"
-#include "cangjie/CHIR/Package.h"
-#include "cangjie/CHIR/Value.h"
+#include "cangjie/CHIR/IR/Package.h"
+#include "cangjie/CHIR/IR/Value/Value.h"
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "cangjie/FrontendTool/IncrementalCompilerInstance.h"
 #include "cangjie/Utils/ProfileRecorder.h"
@@ -313,9 +313,15 @@ void EmitTIOrTTForCustomDefs(CGModule& cgMod)
         switch (customDef->GetCustomKind()) {
             case CHIR::CustomDefKind::TYPE_ENUM: {
                 auto chirEnumType = StaticCast<CHIR::EnumDef*>(customDef)->GetType();
-                const auto& ctors = chirEnumType->GetConstructorInfos(cgMod.GetCGContext().GetCHIRBuilder());
-                for (auto ctorIndex = 0U; ctorIndex < ctors.size(); ++ctorIndex) {
-                    EnumCtorTIOrTTGenerator(cgMod, *chirEnumType, ctorIndex).Emit();
+                auto* cgEnumType = StaticCast<const CGEnumType*>(CGType::GetOrCreate(cgMod, chirEnumType));
+                bool needEmit = (!cgEnumType->IsTrivial() && !cgEnumType->IsZeroSizeEnum()) ||
+                    (!cgMod.GetCGContext().GetCompileOptions().disableReflection &&
+                        cgMod.GetCGContext().GetCompileOptions().target.env != Triple::Environment::OHOS);
+                if (needEmit) {
+                    const auto& ctors = chirEnumType->GetConstructorInfos(cgMod.GetCGContext().GetCHIRBuilder());
+                    for (auto ctorIndex = 0U; ctorIndex < ctors.size(); ++ctorIndex) {
+                        EnumCtorTIOrTTGenerator(cgMod, *chirEnumType, ctorIndex).Emit();
+                    }
                 }
                 break;
             }

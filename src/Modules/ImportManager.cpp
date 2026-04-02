@@ -32,6 +32,7 @@
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "cangjie/Modules/ASTSerialization.h"
 #include "cangjie/Modules/ModulesUtils.h"
+#include "cangjie/Utils/ProfileRecorder.h"
 
 using namespace Cangjie;
 using namespace AST;
@@ -540,7 +541,9 @@ void ImportManager::UpdateMacroPackageUsage(const AST::Package& pkg)
 
 bool ImportManager::ResolveImportedPackages(const std::vector<Ptr<Package>>& packages)
 {
+    Utils::ProfileRecorder recorder("BuildIndex", "ResolveImportedPackages");
     bool success = true;
+    Utils::ProfileRecorder::Start("ResolveImportedPackages", "ResolveImportedPackageHeaders");
     for (auto pkg : packages) {
         curPackage = pkg;
         // Files of common part need to be loaded in advance,
@@ -552,12 +555,15 @@ bool ImportManager::ResolveImportedPackages(const std::vector<Ptr<Package>>& pac
             curPackage->AddDependentStdPkg(typeWithFullPkgName.second);
         }
     }
+    Utils::ProfileRecorder::Stop("ResolveImportedPackages", "ResolveImportedPackageHeaders");
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     cjoManager->LoadPackageDeclsOnDemand(packages);
 #endif
+    Utils::ProfileRecorder::Start("ResolveImportedPackages", "AddPackageDeclMap");
     for (auto pkg : packages) {
         cjoManager->AddPackageDeclMap(pkg->fullPackageName);
     }
+    Utils::ProfileRecorder::Stop("ResolveImportedPackages", "AddPackageDeclMap");
     return success;
 }
 
@@ -909,6 +915,7 @@ static void CheckPackageSpecsIdentical(DiagnosticEngine& diag, const Package& pk
 bool ImportManager::BuildIndex(
     const std::string& cangjieModules, const GlobalOptions& globalOptions, std::vector<Ptr<Package>>& packages)
 {
+    Utils::ProfileRecorder recorder("ImportPackages", "BuildIndex");
     bool incrBuildIndex = HasBuildIndex();
     CJC_ASSERT(!packages.empty());
     if (!incrBuildIndex) {
@@ -916,6 +923,7 @@ bool ImportManager::BuildIndex(
     } else {
         ClearCachesForRebuild();
     }
+    Utils::ProfileRecorder::Start("BuildIndex", "AddImplicitImports");
     for (auto pkg : packages) {
         if (pkg->HasFtrDirective()) {
             CheckPackageFeatureSpec(diag, *pkg);
@@ -927,17 +935,23 @@ bool ImportManager::BuildIndex(
         AddImplicitImports(*pkg, globalOptions);
         cjoManager->AddSourcePackage(*pkg);
     }
+    Utils::ProfileRecorder::Stop("BuildIndex", "AddImplicitImports");
     ResolveImportedPackages(packages);
     ClearPackageCjoCache();
 
+    Utils::ProfileRecorder::Start("BuildIndex", "AddDependencies");
     for (auto pkg : packages) {
         dependencyGraph->AddDependenciesForPackage(*pkg);
     }
+    Utils::ProfileRecorder::Stop("BuildIndex", "AddDependencies");
 
+    Utils::ProfileRecorder::Start("BuildIndex", "AddImportedDeclsForSourcePackage");
     for (auto pkg : packages) {
         AddImportedDeclsForSourcePackage(*pkg);
     }
+    Utils::ProfileRecorder::Stop("BuildIndex", "AddImportedDeclsForSourcePackage");
 
+    Utils::ProfileRecorder::Start("BuildIndex", "ResolveImports");
     for (auto pkg : packages) {
         ResolveImports(*pkg);
     }
@@ -946,6 +960,7 @@ bool ImportManager::BuildIndex(
             packages.push_back(pd->srcPackage);
         }
     }
+    Utils::ProfileRecorder::Stop("BuildIndex", "ResolveImports");
     curPackage = packages.front();
     // Set BuildIndex flag
     cjoManager->SetHasBuildIndex(true);
@@ -1302,7 +1317,17 @@ bool ImportManager::IsTestPackage(const std::string& pkgName)
 
 bool ImportManager::IsTypeAccessible(const File& file, const Type& type) const
 {
-    auto decl = type.GetTarget();
+    std::function<Ptr<Decl>(Ptr<Decl>)> getRealTarget = [&getRealTarget](Ptr<Decl> decl) -> Ptr<Decl> {
+        auto target = decl;
+        if (auto tad = DynamicCast<TypeAliasDecl>(target);
+            tad && tad->type && !tad->TestAttr(Attribute::IN_REFERENCE_CYCLE)) {
+            auto realTarget = tad->type->GetTarget();
+            target = realTarget ? getRealTarget(realTarget) : target;
+        }
+        return target;
+    };
+    // NOTE: For compatibility reason, extension declaration's visibility does not depend on alias declarations.
+    auto decl = getRealTarget(type.GetTarget());
     if (!decl) {
         // Builtin type and primitive type is always accessible.
         return true;

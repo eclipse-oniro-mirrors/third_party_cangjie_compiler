@@ -6,7 +6,7 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "cangjie/CHIR/IntrinsicKind.h"
+#include "cangjie/CHIR/IR/IntrinsicKind.h"
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
 
 using namespace Cangjie::CHIR;

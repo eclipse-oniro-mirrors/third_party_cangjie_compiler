@@ -15,8 +15,9 @@
 #include "Base/CHIRExprWrapper.h"
 #include "CGModule.h"
 #include "IRBuilder.h"
-#include "cangjie/CHIR/Type/ClassDef.h"
-#include "cangjie/CHIR/Value.h"
+#include "cangjie/CHIR/IR/Annotation.h"
+#include "cangjie/CHIR/IR/Type/ClassDef.h"
+#include "cangjie/CHIR/IR/Value/Value.h"
 
 namespace Cangjie::CodeGen {
 llvm::Value* HandleLoadExpr(IRBuilder2& irBuilder, const CHIR::Load& load)
@@ -64,6 +65,41 @@ llvm::Value* HandleStoreExpr(IRBuilder2& irBuilder, const CHIR::Store& store)
         llvm::dyn_cast<llvm::Function>(valueVal.GetRawValue())
             ->addAttributeAtIndex(static_cast<unsigned>(llvm::AttributeList::FunctionIndex),
                 llvm::Attribute::get(cgMod.GetLLVMContext(), CJ2C_ATTR));
+    }
+    // When storing to a Box-type [ret] address, check the OverrideSrcFuncType to optimize boxing.
+    // The OverrideSrcFuncType represents the overridden parent method's signature, where the return
+    // type may be a generic template. When instantiated with concrete types:
+    // - For non-generic types with known size: unbox and store directly
+    // - For generic types or unknown size types: keep the box
+    //
+    // Example: Struct-_CNat5ArrayIG_E<UInt8> override Struct-_CNat5ArrayIG_E<T>
+    // IR Before:
+    //   [ret] %1: Box<Struct-_CNat5ArrayIG_E<UInt8>>&& = Allocate(Box<Struct-_CNat5ArrayIG_E<UInt8>>&)
+    //   %3: Struct-_CNat5ArrayIG_E<UInt8> = Apply(...)
+    //   %4: Box<Struct-_CNat5ArrayIG_E<UInt8>>& = Box(%3)
+    //   Store(%4, %1)
+    // IR After:
+    //   Store(%3, %1)  -- skip %4's box, use %3 directly
+    if (auto var = DynamicCast<CHIR::LocalVar*>(addr); var && var->IsRetValue() &&
+        store.GetTopLevelFunc()->Get<CHIR::OverrideSrcFuncType>() && DeRef(*addr->GetType())->IsBox()) {
+        auto overrideSrcRetType = store.GetTopLevelFunc()->Get<CHIR::OverrideSrcFuncType>()->GetReturnType();
+        auto ptrCGType = CGType::GetOrCreate(
+            cgMod, CGType::GetRefTypeOf(cgMod.GetCGContext().GetCHIRBuilder(), *overrideSrcRetType));
+        auto valueCGType = CGType::GetOrCreate(cgMod, overrideSrcRetType);
+        auto valCGType = !overrideSrcRetType->IsGeneric() ? ptrCGType : valueCGType;
+        bool needBoxExpr = overrideSrcRetType->IsGeneric() || !valueCGType->GetSize();
+        auto valueToStore = valueVal.GetRawValue();
+        if (!needBoxExpr) {
+            if (auto valueVar = DynamicCast<CHIR::LocalVar*>(value);
+                valueVar && valueVar->GetExpr() && valueVar->GetExpr()->GetExprKind() == CHIR::ExprKind::BOX) {
+                auto& boxExpr = StaticCast<const CHIR::Box&>(*valueVar->GetExpr());
+                valueToStore = (cgMod | boxExpr.GetSourceValue())->GetRawValue();
+            }
+        }
+
+        return irBuilder.CreateStore(CGValue(valueToStore, valCGType, valueVal.IsSRetArg()),
+            CGValue((cgMod | addr)->GetRawValue(), ptrCGType, (cgMod | addr)->IsSRetArg()),
+            DeRef(*addr->GetType())->GetTypeArgs()[0]);
     }
     return irBuilder.CreateStore(valueVal, *(cgMod | addr));
 }

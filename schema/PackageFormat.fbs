@@ -105,7 +105,6 @@ table Type {
   kind: CHIRTypeKind;
   typeID: uint32; // current id in types
   argTys: [uint32]; // use types id
-  refDims: uint8 = 0;
 }
 
 table RuneType {
@@ -163,16 +162,11 @@ table FuncType {
 
 table CustomType {
   base: Type;
-  implementedInterfaceTys: [uint32]; // use types id
-  instantiatedMemberTys: [uint32]; // use types id
   customTypeDef: uint32; // use defs id
-  hasSetSuperInterface: bool = false;
-  hasSetInstMemberTy: bool = false;
 }
 
 table EnumType {
   base: CustomType;
-  isBoxed: bool = false;
 }
 
 table StructType {
@@ -181,8 +175,6 @@ table StructType {
 
 table ClassType {
   base: CustomType;
-  superClassTy: uint32; // use type id
-  hasSetSuperClass: bool = false;
 }
 
 table CStringType {
@@ -197,8 +189,6 @@ table CPointerType {
 
 table GenericType {
   base: Type;
-  orphanFlag: bool = false;
-  skipCheck: bool = false;
   identifier: string(shared);
   srcCodeIdentifier: string(shared);
   upperBounds: [uint32]; // use types id
@@ -300,8 +290,8 @@ table WrappedRawMethod {
   rawMethod: uint32; // use values id
 }
 
-table VariantTypeCastWrapper {
-  lambdaCache: [uint32]; // use exprs id
+table OverrideSrcFuncType {
+  type: uint32;  // use types id
 }
 
 union Annotation {
@@ -318,7 +308,7 @@ union Annotation {
   enumCaseIndex: EnumCaseIndex,
   virMethodOffset: VirMethodOffset,
   wrappedRawMethod: WrappedRawMethod,
-  variantTypeCastWrapper : VariantTypeCastWrapper
+  overrideSrcFuncType : OverrideSrcFuncType
 }
 
 table Base {
@@ -473,6 +463,7 @@ table ImportedVar {
   packageName: string(shared);
   srcCodeIdentifier: string(shared);
   rawMangledName: string(shared);
+  declaredParent: uint32; // use defs id
 }
 
 table Block {
@@ -522,7 +513,6 @@ table Func {
   params: [uint32]; // use values id
   retVal: uint32; // use values id
 
-  parentName: string(shared);
   propLoc: DebugLocation;
 
   localId: uint64;
@@ -552,25 +542,24 @@ table MemberVarInfo {
   outerDef: uint32; // use defs id
 }
 
-
-table VirtualFuncTypeInfo {
+table VirtualMethodInfo {
+  // condition
+  funcName : string(shared);
   sigType : uint32; // use types id
+  methodGenericTypeParams : [uint32]; // use types id
+  // result
+  instance : uint32; // used value Id
+  attributes: uint64;
   originalType : uint32; // use types id
   parentType : uint32; // use types id
   returnType : uint32; // use types id
-  methodGenericTypeParams : [uint32]; // use types id
 }
 
-table VirtualFuncInfo {
-  srcCodeIdentifier : string(shared);
-  instance : uint32; // used value Id
-  attributes: uint64;
-  typeInfo : VirtualFuncTypeInfo;
-}
-
-table VTableElement {
-  ty : uint32; // use types id
-  info : [VirtualFuncInfo];
+table VTableInType {
+  // the first level
+  srcParentType : uint32; // use types id
+  // the second level
+  virtualMethods : [VirtualMethodInfo];
 }
 
 table CustomTypeDef {
@@ -588,7 +577,7 @@ table CustomTypeDef {
   staticMemberVars: [uint32]; // use values id
   attributes: uint64;
   annoInfo: AnnoInfo;
-  vtable: [VTableElement];
+  vtable: [VTableInType];
   extends: [uint32]; // use defs id
   varInitializationFunc: uint32;
 }
@@ -1006,6 +995,7 @@ enum IntrinsicKind: uint16 {
   CREATE_EXPORT_HANDLE,
   GET_EXPORTED_REF,
   REMOVE_EXPORTED_REF,
+  GET_JSLAMBDA_ADDR,
   // ============================ cjnative only end =================
 
   // Syscall

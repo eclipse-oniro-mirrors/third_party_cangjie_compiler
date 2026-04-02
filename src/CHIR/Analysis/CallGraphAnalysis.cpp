@@ -23,9 +23,9 @@
 
 #include "cangjie/CHIR/Analysis/CallGraphAnalysis.h"
 
-#include "cangjie/CHIR/Transformation/Devirtualization.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
-#include "cangjie/CHIR/Visitor/Visitor.h"
+#include "cangjie/CHIR/Optimization/Devirtualization.h"
+#include "cangjie/CHIR/IR/Expression/Terminator.h"
+#include "cangjie/CHIR/Utils/Visitor/Visitor.h"
 
 namespace Cangjie::CHIR {
 
@@ -143,13 +143,11 @@ void CallGraph::PopulateCallGraphNode(Node& node, BlockGroup& funcBlockGroup)
             AddVirtualEdgeToNode(node, expr);
         } else if (expr.GetExprKind() == ExprKind::APPLY || expr.GetExprKind() == ExprKind::APPLY_WITH_EXCEPTION) {
             AddDirectEdgeToNode(node, expr);
-        } else if (expr.GetExprKind() == ExprKind::LAMBDA) {
-            PopulateCallGraphNode(node, *(StaticCast<const Lambda*>(&expr)->GetBody()));
         }
         return VisitResult::CONTINUE;
     };
 
-    Visitor::Visit(funcBlockGroup, preVisit, []([[maybe_unused]] Expression& e) { return VisitResult::CONTINUE; });
+    Visitor::Visit(funcBlockGroup, preVisit);
 }
 
 void CallGraph::AddVirtualEdgeToNode(Node& node, const Expression& expression)

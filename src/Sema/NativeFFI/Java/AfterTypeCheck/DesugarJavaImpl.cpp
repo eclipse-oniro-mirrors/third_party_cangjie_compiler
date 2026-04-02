@@ -21,7 +21,7 @@ using namespace Cangjie::Native::FFI;
 
 namespace {
 // Some helper functions.
-inline Ptr<CallExpr> TryGetSuperCall(const FuncDecl& ctor)
+Ptr<CallExpr> TryGetSuperCall(const FuncDecl& ctor)
 {
     if (!ctor.funcBody) {
         return nullptr;
@@ -41,7 +41,7 @@ inline Ptr<CallExpr> TryGetSuperCall(const FuncDecl& ctor)
     return nullptr;
 }
 
-inline Ptr<FuncTy> GetNativeFuncTy(const std::vector<OwnedPtr<FuncParam>>& params,
+Ptr<FuncTy> GetNativeFuncTy(const std::vector<OwnedPtr<FuncParam>>& params,
     const std::function<Ptr<Ty>(const FuncParam&)>& toJni, Ptr<Ty> jniRet, TypeManager& typeManager)
 {
     std::vector<Ptr<Ty>> funcTyParams;
@@ -458,13 +458,12 @@ OwnedPtr<FuncDecl> JavaDesugarManager::GenerateJavaImplConstructor(FuncDecl& sam
     auto& block = ctor->funcBody->body;
 
     block->body.erase(std::remove_if(block->body.begin(), block->body.end(),
-                          [](auto& node) {
-                              if (auto call = As<ASTKind::CALL_EXPR>(node.get())) {
-                                  return IsSuperConstructorCall(*call);
-                              }
-                              return false;
-                          }),
-        block->body.end());
+        [](auto& node) {
+            if (auto call = As<ASTKind::CALL_EXPR>(node.get())) {
+                return IsSuperConstructorCall(*call);
+            }
+            return false;
+        }), block->body.end());
 
     block->body.insert(block->body.begin(), std::move(superCall));
     ctor->funcBody->ty = ctorTy;

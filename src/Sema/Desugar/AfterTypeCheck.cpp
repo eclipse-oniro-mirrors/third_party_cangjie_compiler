@@ -39,6 +39,7 @@
 #include "cangjie/Sema/TypeManager.h"
 #include "cangjie/Utils/CheckUtils.h"
 #include "cangjie/Utils/Utils.h"
+#include "cangjie/Utils/ProfileRecorder.h"
 
 using namespace Cangjie;
 using namespace AST;
@@ -316,24 +317,26 @@ void TypeChecker::TypeCheckerImpl::ParsePackageConfigFile(
                 if (pkg->interopCJApiStrategy == InteropCJStrategy::NONE) {
                     bool isMemberExposed = false;
                     for (const auto& element : pkg->interopCJIncludedApis) {
-                        if (decl->symbol) {
-                            if (element == decl->symbol->name) {
-                                decl->symbol->isNeedExposedToInterop = true;
+                        if (!decl->symbol) {
+                            continue;
+                        }
+                        if (element == decl->symbol->name) {
+                            decl->symbol->isNeedExposedToInterop = true;
+                        }
+                        for (auto& member : decl->GetMemberDecls()) {
+                            if (!member->symbol) {
+                                continue;
                             }
-                            for (auto& member : decl->GetMemberDecls()) {
-                                if (member->symbol &&
-                                    ((!decl->symbol->isNeedExposedToInterop &&
-                                         element == (decl->symbol->name + "." + member->symbol->name)) ||
-                                        decl->symbol->isNeedExposedToInterop)) {
+                            if (decl->symbol->isNeedExposedToInterop ||
+                                element == (decl->symbol->name + "." + member->symbol->name)) {
                                     member->symbol->isNeedExposedToInterop = true;
                                     isMemberExposed = true;
-                                }
-                                // For default constructor function exposed because of part of
-                                // memberfunction need exposed.
-                                if (isMemberExposed && member->TestAttr(Attribute::CONSTRUCTOR) &&
-                                    !member->symbol->isNeedExposedToInterop) {
+                            }
+                            // For default constructor function exposed because of part of
+                            // memberfunction need exposed.
+                            if (isMemberExposed && member->TestAttr(Attribute::CONSTRUCTOR) &&
+                                !member->symbol->isNeedExposedToInterop) {
                                     member->symbol->isNeedExposedToInterop = true;
-                                }
                             }
                         }
                     }
@@ -344,16 +347,19 @@ void TypeChecker::TypeCheckerImpl::ParsePackageConfigFile(
                 // For hiddened symbol
                 if (pkg->interopCJApiStrategy == InteropCJStrategy::FULL) {
                     for (const auto& element : pkg->interopCJExcludedApis) {
-                        if (decl->symbol) {
-                            if (element == decl->symbol->name) {
-                                decl->symbol->isNeedExposedToInterop = false;
+                        if (!decl->symbol) {
+                            continue;
+                        }
+                        if (element == decl->symbol->name) {
+                            decl->symbol->isNeedExposedToInterop = false;
+                        }
+                        for (auto& member : decl->GetMemberDecls()) {
+                            if (!member->symbol) {
+                                continue;
                             }
-                            for (auto& member : decl->GetMemberDecls()) {
-                                if (member->symbol &&
-                                    (!decl->symbol->isNeedExposedToInterop &&
-                                        (element == (decl->symbol->name + "." + member->symbol->name)))) {
+                            if (!decl->symbol->isNeedExposedToInterop &&
+                                (element == (decl->symbol->name + "." + member->symbol->name))) {
                                     member->symbol->isNeedExposedToInterop = false;
-                                }
                             }
                         }
                     }
@@ -519,6 +525,7 @@ void TypeChecker::TypeCheckerImpl::GenerateMainInvoke()
 // Perform desugar after typecheck before generic instantiation.
 void TypeChecker::TypeCheckerImpl::DesugarForPropDecl(Node& pkg)
 {
+    Utils::ProfileRecorder recorder("Post TypeCheck", "DesugarForPropDecl");
     Walker(&pkg, [this](Ptr<Node> node) -> VisitAction {
         if (node->TestAnyAttr(Attribute::HAS_BROKEN, Attribute::IS_BROKEN)) {
             return VisitAction::SKIP_CHILDREN;

@@ -11,7 +11,7 @@
 
 #include "cangjie/CHIR/Analysis/Analysis.h"
 #include "cangjie/CHIR/Analysis/FlatSet.h"
-#include "cangjie/CHIR/Value.h"
+#include "cangjie/CHIR/IR/Value/Value.h"
 
 namespace Cangjie::CHIR {
 /**

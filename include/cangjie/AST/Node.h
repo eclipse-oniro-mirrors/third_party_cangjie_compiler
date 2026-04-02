@@ -897,6 +897,7 @@ struct GenericConstraint : public Node {
     std::vector<Position> bitAndPos;         /**< The position of '&'. */
     std::vector<OwnedPtr<Type>> upperBounds; /**< Upper bounds, class, interface */
     Position commaPos;                       /**< The position of where. */
+    bool isImplicitlyIntroduced{false};      /**< Whether this constraint was inherited from extended type. */
     GenericConstraint() : Node(ASTKind::GENERIC_CONSTRAINT)
     {
     }
@@ -2765,8 +2766,8 @@ struct FeatureId : Node {
 
 /**
  * FeaturesSet
- *     : LCURL NL* 
- *     FeatureId NL* (COMMA NL* FeatureId NL*)* 
+ *     : LCURL NL*
+ *     FeatureId NL* (COMMA NL* FeatureId NL*)*
  *     RCURL
  *     ;
  */
@@ -2782,7 +2783,7 @@ struct FeaturesSet: Node {
 
 /**
  * featuresDirective
- *     : annotationList? FEATURES NL* 
+ *     : annotationList? FEATURES NL*
  *     FeaturesSet
  *     end+
  *     ;
@@ -3023,7 +3024,8 @@ public:
         return allDependentStdPkgs;
     }
 
-    const std::vector<LambdaPattern>& GetLambdaPatterns() const {
+    const std::vector<LambdaPattern>& GetLambdaPatterns() const
+    {
         return lambdaPatterns;
     }
 };

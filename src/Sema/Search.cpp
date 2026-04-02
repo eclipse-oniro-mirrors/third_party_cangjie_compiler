@@ -22,6 +22,7 @@
 #include "cangjie/AST/Searcher.h"
 #include "cangjie/AST/Symbol.h"
 #include "cangjie/Utils/Utils.h"
+#include "cangjie/Utils/ProfileRecorder.h"
 
 using namespace Cangjie;
 using namespace AST;
@@ -32,6 +33,7 @@ constexpr unsigned int CORES_REQUIRED_WARMUP = 8;
 
 void TypeChecker::TypeCheckerImpl::WarmupCache(const ASTContext& ctx) const
 {
+    Utils::ProfileRecorder recorder("PrepareTypeCheck", "WarmupCache");
     auto numProcessors = std::thread::hardware_concurrency();
     if (numProcessors < CORES_REQUIRED_WARMUP) {
         return;

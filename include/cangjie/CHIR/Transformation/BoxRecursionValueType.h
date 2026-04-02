@@ -9,7 +9,7 @@
 #ifndef CANGJIE_CHIR_TRANSFORMATION_BOX_RECURSION_VALUE_TYPE_H
 #define CANGJIE_CHIR_TRANSFORMATION_BOX_RECURSION_VALUE_TYPE_H
 
-#include "cangjie/CHIR/CHIRBuilder.h"
+#include "cangjie/CHIR/IR/CHIRBuilder.h"
 
 namespace Cangjie::CHIR {
 /**
@@ -27,7 +27,7 @@ public:
     /**
      * @brief main process to add box and unbox expressions.
      */
-    void CreateBoxTypeForRecursionValueType();
+    void Run();
 
 private:
     void CreateBoxTypeForRecursionEnum();

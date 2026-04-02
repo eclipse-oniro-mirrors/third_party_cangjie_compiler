@@ -15,11 +15,11 @@
 
 #include "cangjie/Basic/Print.h"
 #include "cangjie/CHIR/CHIR.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
-#include "cangjie/CHIR/IntrinsicKind.h"
+#include "cangjie/CHIR/IR/Expression/Terminator.h"
+#include "cangjie/CHIR/IR/IntrinsicKind.h"
 #include "cangjie/CHIR/Serializer/CHIRSerializer.h"
-#include "cangjie/CHIR/Type/CustomTypeDef.h"
-#include "cangjie/CHIR/Type/Type.h"
+#include "cangjie/CHIR/IR/Type/CustomTypeDef.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
 
 using namespace Cangjie::CHIR;
 
@@ -1743,6 +1743,8 @@ PackageFormat::IntrinsicKind Serialize(const IntrinsicKind& kind)
         case EXCLUSIVE_SCOPE:
             ret = IntrinsicKind_EXCLUSIVE_SCOPE;
             break;
+        case GET_JSLAMBDA_ADDR:
+            ret = IntrinsicKind_GET_JSLAMBDA_ADDR;
             // no defalut here, due to we need use compiler to check all value be handled.
     }
     return ret;

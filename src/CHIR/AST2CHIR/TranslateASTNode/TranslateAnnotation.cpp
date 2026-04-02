@@ -7,12 +7,10 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "cangjie/CHIR/AST2CHIR/TranslateASTNode/Translator.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
 
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-#include "AnnoFactoryInfo.h"
+#include "cangjie/CHIR/IR/Annotation.h"
+#include "cangjie/CHIR/IR/Expression/Terminator.h"
 #include "cangjie/Mangle/CHIRManglingUtils.h"
-#endif
 
 using namespace Cangjie::CHIR;
 using namespace Cangjie;
@@ -49,7 +47,7 @@ GlobalVar* Translator::TranslateCustomAnnoInstanceSig(const Expr& expr, const Fu
     gv->EnableAttr(Attribute::CONST);
     gv->Set<LinkTypeInfo>(Linkage::INTERNAL);
     auto initName = std::move(name) + "iiHv";
-    auto ty = builder.GetType<FuncType>(std::vector<Type*>{}, builder.GetVoidTy());
+    auto ty = builder.GetType<FuncType>(std::vector<Type*>{}, builder.GetUnitTy());
     auto init = builder.CreateFunc(INVALID_LOCATION, ty, initName, initName, "", func.GetPackageName());
     init->SetFuncKind(FuncKind::GLOBALVAR_INIT);
     init->Set<LinkTypeInfo>(Linkage::INTERNAL);
@@ -64,6 +62,9 @@ GlobalVar* Translator::TranslateCustomAnnoInstanceSig(const Expr& expr, const Fu
     auto bl = builder.CreateBlock(bg);
     bg->SetEntryBlock(bl);
     gv->SetInitFunc(*init);
+    auto unitTyRef = builder.GetType<RefType>(builder.GetUnitTy());
+    auto retVal = CreateAndAppendExpression<Allocate>(unitTyRef, builder.GetUnitTy(), bl);
+    init->SetReturnValue(*retVal->GetResult());
     return gv;
 }
 
@@ -149,7 +150,7 @@ void Translator::TranslateAnnotationsArrayBody(const Decl& decl, Func& func)
     currentBlock->GetTerminator()->RemoveSelfFromBlock();
     for (size_t i{0}; i < annoInsts.size(); ++i) {
         CreateAndAppendExpression<Apply>(
-            builder.GetVoidTy(), annoInsts[i]->GetInitFunc(), FuncCallContext{}, currentBlock);
+            builder.GetUnitTy(), annoInsts[i]->GetInitFunc(), FuncCallContext{}, currentBlock);
     }
     CreateAndAppendTerminator<Exit>(currentBlock);
     blockGroupStack.pop_back();
@@ -178,7 +179,13 @@ AnnoInfo Translator::CreateAnnoFactoryFuncSig(const AST::Decl& decl, CustomTypeD
     // the specific side can directly use the serialized annotations.
     auto annosArray = decl.annotationsArray.get();
     if (decl.TestAttr(AST::Attribute::IMPORTED) || !annosArray || annosArray->children.empty() ||
-        decl.TestAttr(AST::Attribute::SPECIFIC)) {
+        decl.TestAttr(AST::Attribute::SPECIFIC) || opts.disableReflection) {
+        return {"none"};
+    }
+
+    // In OHOS environment, disable annotations for enum types
+    if (opts.target.env == Triple::Environment::OHOS && parent &&
+        parent->GetCustomKind() == CustomDefKind::TYPE_ENUM) {
         return {"none"};
     }
     auto found = annotationFuncMap.find(&decl);

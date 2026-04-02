@@ -11,8 +11,8 @@
 #include <mutex>
 #include <queue>
 
-#include "cangjie/CHIR/CHIRCasting.h"
-#include "cangjie/CHIR/Utils.h"
+#include "cangjie/CHIR/Utils/CHIRCasting.h"
+#include "cangjie/CHIR/Utils/Utils.h"
 
 namespace Cangjie::CHIR {
 namespace {
@@ -206,8 +206,6 @@ std::unordered_set<Value*> GetLambdaCapturedVarsRecursively(const Lambda& lambda
                         collectRecursively(*child, visited);
                     }
                 }
-            } else if (expr.IsLambda()) {
-                collectRecursively(StaticCast<const Lambda&>(expr), visited);
             }
             return VisitResult::CONTINUE;
         };

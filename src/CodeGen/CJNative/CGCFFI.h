@@ -18,7 +18,7 @@
 #include <unordered_map>
 
 #include "IRBuilder.h"
-#include "cangjie/CHIR/Type/Type.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
 
 namespace Cangjie {
 namespace CodeGen {

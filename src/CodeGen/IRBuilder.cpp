@@ -140,20 +140,25 @@ llvm::Value* IRBuilder2::CreateLoad(const CGValue& cgVal, const llvm::Twine& nam
 {
     auto elementCGType = cgVal.GetCGType()->GetPointerElementType();
     auto elementType = elementCGType->GetLLVMType();
-    if (cgMod.GetCGContext().GetCompileOptions().disableInstantiation) {
-        if (auto& ori = elementCGType->GetOriginal(); !elementCGType->GetSize() && !ori.IsGeneric()) {
-            auto ti = CreateTypeInfo(ori);
-            auto payloadSize = GetLayoutSize_32(ori);
-            auto tmp = CallIntrinsicAllocaGeneric({ti, payloadSize});
-            if (GetCGContext().GetBasePtrOf(cgVal.GetRawValue()) ||
-                cgVal.GetRawValue()->getType()->getPointerAddressSpace() == 0U) {
-                CreateMemCpy(GetPayloadFromObject(tmp), llvm::MaybeAlign(), *cgVal, llvm::MaybeAlign(), payloadSize);
-            } else {
+    if (auto& ori = elementCGType->GetOriginal(); !elementCGType->GetSize() && !ori.IsGeneric()) {
+        auto ti = CreateTypeInfo(ori);
+        auto payloadSize = GetLayoutSize_32(ori);
+        auto tmp = CallIntrinsicAllocaGeneric({ti, payloadSize});
+        auto basePtr = GetCGContext().GetBasePtrOf(cgVal.GetRawValue());
+        auto addrSpace = cgVal.GetRawValue()->getType()->getPointerAddressSpace();
+        if (basePtr == nullptr) {
+            if (addrSpace == 1U) {
                 CallIntrinsicAssignGeneric({tmp, *cgVal, ti});
+            } else {
+                CallGCWriteGenericPayload({tmp, *cgVal, payloadSize});
             }
-            return tmp;
+        } else {
+            CJC_ASSERT(addrSpace == 1U);
+            CallGCReadGeneric({tmp, basePtr, *cgVal, payloadSize});
         }
+        return tmp;
     }
+
     auto* loadInst = CreateLoad(elementType, cgVal.GetRawValue(), name);
     if (auto& ori = elementCGType->GetOriginal(); ori.IsEnum()) {
         llvm::cast<llvm::Instruction>(loadInst)->setMetadata(
@@ -458,6 +463,9 @@ void IRBuilder2::CreateLoadInstForParameter(const CHIR::Expression& chirExpressi
 void IRBuilder2::CreateGenericParaDeclare(const CGFunction& cgFunc)
 {
     if (!cgMod.GetCGContext().GetCompileOptions().enableCompileDebug) {
+        return;
+    }
+    if (cgFunc.chirFunc.TestAttr(CHIR::Attribute::NO_DEBUG_INFO)) {
         return;
     }
     auto chirFunc = dynamic_cast<const CHIR::Func*>(&cgFunc.GetOriginal());

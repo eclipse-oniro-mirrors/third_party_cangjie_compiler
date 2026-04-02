@@ -15,8 +15,8 @@
 #include "CJNative/CGCFFI.h"
 #endif
 #include "Utils/CGUtils.h"
-#include "cangjie/CHIR/CHIRCasting.h"
-#include "cangjie/CHIR/Value.h"
+#include "cangjie/CHIR/Utils/CHIRCasting.h"
+#include "cangjie/CHIR/IR/Value/Value.h"
 
 namespace Cangjie::CodeGen {
 CGFunctionType::CGFunctionType(
@@ -32,7 +32,9 @@ CGFunctionType::CGFunctionType(
 
 CGFunctionType::CGFunctionType(
     CGModule& cgMod, CGContext& cgCtx, const CHIR::FuncBase& chirFunc, const TypeExtraInfo& extraInfo)
-    : CGType(cgMod, cgCtx, *chirFunc.GetType(), CGTypeKind::CG_FUNCTION)
+    : CGType(cgMod, cgCtx,
+          chirFunc.Get<CHIR::OverrideSrcFuncType>() ? *chirFunc.Get<CHIR::OverrideSrcFuncType>() : *chirFunc.GetType(),
+          CGTypeKind::CG_FUNCTION)
 {
     this->chirFunc = &chirFunc;
     this->isStaticMethod = chirFunc.TestAttr(CHIR::Attribute::STATIC);

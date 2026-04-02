@@ -14,11 +14,11 @@
 #include "gtest/gtest.h"
 
 #include "cangjie/Basic/Print.h"
-#include "cangjie/CHIR/Expression/Terminator.h"
-#include "cangjie/CHIR/IntrinsicKind.h"
+#include "cangjie/CHIR/IR/Expression/Terminator.h"
+#include "cangjie/CHIR/IR/IntrinsicKind.h"
 #include "cangjie/CHIR/Serializer/CHIRDeserializer.h"
-#include "cangjie/CHIR/Type/CustomTypeDef.h"
-#include "cangjie/CHIR/Type/Type.h"
+#include "cangjie/CHIR/IR/Type/CustomTypeDef.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
 
 using namespace Cangjie::CHIR;
 
@@ -1754,6 +1754,9 @@ IntrinsicKind DeSerialize(const PackageFormat::IntrinsicKind& kind)
             break;
         case IntrinsicKind_EXCLUSIVE_SCOPE:
             ret = EXCLUSIVE_SCOPE;
+            break;
+        case IntrinsicKind_GET_JSLAMBDA_ADDR:
+            ret = GET_JSLAMBDA_ADDR;
             break;
     }
     return ret;

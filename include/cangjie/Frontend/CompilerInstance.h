@@ -22,10 +22,9 @@
 #include "cangjie/AST/ASTContext.h"
 #include "cangjie/AST/Node.h"
 #include "cangjie/Basic/DiagnosticEngine.h"
-#include "cangjie/CHIR/Analysis/AnalysisWrapper.h"
-#include "cangjie/CHIR/Analysis/ConstAnalysis.h"
+#include "cangjie/CHIR/Analysis/ConstAnalysisWrapper.h"
 #include "cangjie/CHIR/Analysis/TypeAnalysis.h"
-#include "cangjie/CHIR/CHIRBuilder.h"
+#include "cangjie/CHIR/IR/CHIRBuilder.h"
 #include "cangjie/Frontend/CompileStrategy.h"
 #include "cangjie/Frontend/CompilerInvocation.h"
 #include "cangjie/IncrementalCompilation/IncrementalScopeAnalysis.h"
@@ -84,8 +83,8 @@ public:
     void SetConstVarInitFuncs(const std::vector<CHIR::FuncBase*>& funcs);
     std::vector<CHIR::FuncBase*> GetConstVarInitFuncs() const;
 
-    CHIR::AnalysisWrapper<CHIR::ConstAnalysis, CHIR::ConstDomain>& GetConstAnalysisResultRef();
-    const CHIR::AnalysisWrapper<CHIR::ConstAnalysis, CHIR::ConstDomain>& GetConstAnalysisResult() const;
+    CHIR::ConstAnalysisWrapper& GetConstAnalysisResultRef();
+    const CHIR::ConstAnalysisWrapper& GetConstAnalysisResult() const;
 
 private:
     CHIR::CHIRContext cctx;
@@ -97,7 +96,7 @@ private:
     // only for AnalysisWrapper
     CHIR::CHIRBuilder builder{cctx, 0};
     // provide the capability and results of constant analysis, used by cjlint
-    CHIR::AnalysisWrapper<CHIR::ConstAnalysis, CHIR::ConstDomain> constAnalysisWrapper{builder};
+    CHIR::ConstAnalysisWrapper constAnalysisWrapper{builder};
 };
 #endif
 
@@ -470,7 +469,7 @@ public:
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     // used only by cjlint
-    const CHIR::AnalysisWrapper<CHIR::ConstAnalysis, CHIR::ConstDomain>& GetConstAnalysisWrapper() const;
+    const CHIR::ConstAnalysisWrapper& GetConstAnalysisWrapper() const;
 
     std::vector<CHIR::Package*> GetAllCHIRPackages() const;
 #else

@@ -11,9 +11,9 @@
 
 #include "cangjie/AST/Node.h"
 #include "cangjie/Basic/Position.h"
-#include "cangjie/CHIR/CHIRContext.h"
-#include "cangjie/CHIR/Type/CHIRType.h"
-#include "cangjie/CHIR/Type/Type.h"
+#include "cangjie/CHIR/IR/CHIRContext.h"
+#include "cangjie/CHIR/IR/Type/CHIRType.h"
+#include "cangjie/CHIR/IR/Type/Type.h"
 #include "cangjie/Option/Option.h"
 
 namespace Cangjie {
@@ -221,6 +221,8 @@ std::pair<Type*, bool> GetInstMemberTypeByNameCheckingReadOnly(
     const CustomType& rootType, const std::vector<std::string>& names, CHIRBuilder& builder);
 std::pair<Type*, bool> GetInstMemberTypeByNameCheckingReadOnly(
     const GenericType& rootType, const std::vector<std::string>& names, CHIRBuilder& builder);
+
+Type* AddRefIfFuncIsMutOrClass(Type& thisType, const AST::FuncDecl& funcDecl, CHIRBuilder& builder);
 } // namespace CHIR
 } // namespace Cangjie
 

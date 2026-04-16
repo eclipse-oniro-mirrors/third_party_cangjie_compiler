@@ -41,6 +41,7 @@ void GIM::GenericInstantiationManagerImpl::ClearCache()
     declInstantiationByTypeMap.clear();
     instantiatedDeclsMap.clear();
     membersIndexMap.clear();
+    skippedMemberOffsets.clear();
 }
 
 void GIM::GenericInstantiationManagerImpl::WalkImportedInstantiations(

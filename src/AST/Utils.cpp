@@ -57,7 +57,7 @@ void AddCurFile(Node& root, Ptr<File> file)
                     node->curFile = curFile;
                 }
                 // For diag after macro expansion.
-                if (node->TestAttr(Attribute::MACRO_EXPANDED_NODE) && node->curMacroCall) {
+                if (node->curMacroCall) {
                     AddMacroAttr(*node);
                     return VisitAction::SKIP_CHILDREN;
                 }
@@ -72,7 +72,7 @@ void AddCurFile(Node& root, Ptr<File> file)
  */
 void AddMacroAttr(AST::Node& node)
 {
-    if (!node.TestAttr(Attribute::MACRO_EXPANDED_NODE) || !node.curMacroCall) {
+    if (!node.curMacroCall) {
         return;
     }
     auto macroCall = node.curMacroCall;
@@ -90,7 +90,6 @@ void AddMacroAttr(AST::Node& node)
         return;
     }
     Walker walker(&node, [macroCall, curFile](Ptr<Node> curNode) -> VisitAction {
-        curNode->EnableAttr(Attribute::MACRO_EXPANDED_NODE);
         curNode->curMacroCall = macroCall;
         curNode->curFile = curFile;
         return VisitAction::WALK_CHILDREN;

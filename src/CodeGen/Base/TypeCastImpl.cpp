@@ -14,8 +14,6 @@
 
 #include "Base/TypeCastImpl.h"
 
-#include <optional>
-
 #include "Base/CGTypes/CGEnumType.h"
 #include "CGModule.h"
 #include "IRBuilder.h"
@@ -246,7 +244,7 @@ llvm::Value* GenerateCondCheckLowerBound(
         if (lowerBound == 0) {
             return irBuilder.getTrue();
         }
-        auto lowerBoundValue = llvm::ConstantFP::get(srcValue.getType(), *reinterpret_cast<double*>(&lowerBound));
+        auto lowerBoundValue = llvm::ConstantFP::get(srcValue.getType(), llvm::APInt(64, lowerBound).bitsToDouble());
         return irBuilder.CreateFCmpOLT(lowerBoundValue, &srcValue, "f2i.lt.min");
     }
 }
@@ -299,7 +297,7 @@ llvm::Value* GenerateCondCheckUpperBound(
         if (upperBound == 0) {
             return irBuilder.getTrue();
         }
-        auto upperBoundValue = llvm::ConstantFP::get(srcValue.getType(), *reinterpret_cast<double*>(&upperBound));
+        auto upperBoundValue = llvm::ConstantFP::get(srcValue.getType(), llvm::APInt(64, upperBound).bitsToDouble());
         return irBuilder.CreateFCmpOLT(&srcValue, upperBoundValue, "f2i.gt.max");
     }
 }

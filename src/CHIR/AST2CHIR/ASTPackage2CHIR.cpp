@@ -1538,7 +1538,7 @@ static std::vector<ExtendDef*> ProcessExtends(std::vector<ExtendDef*>&& extends)
         });
     extends.erase(it, extends.end());
 
-    return extends;
+    return std::move(extends);
 }
 
 static std::vector<ExtendDef*> ProcessExtendsByCommonDecl(
@@ -1557,7 +1557,7 @@ static std::vector<ExtendDef*> ProcessExtendsByCommonDecl(
         });
     extends.erase(it, extends.end());
 
-    return extends;
+    return std::move(extends);
 }
 
 void RemoveUnusedCJMPExtends(CHIR::Package& chirPkg, const std::vector<Ptr<const AST::Decl>>& commonDecls)

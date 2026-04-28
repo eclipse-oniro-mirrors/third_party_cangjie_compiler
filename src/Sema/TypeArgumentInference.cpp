@@ -65,6 +65,9 @@ std::string MakeOneBlameHint(const Blame& blame)
                 "', should match expected type '" + ub->String() + "'";
         case BlameStyle::CONSTRAINT:
             return "";
+        default:
+            CJC_ABORT();
+            return "";
     }
 }
 
@@ -147,6 +150,9 @@ void MakeBlameMsg(DiagnosticBuilder& builder, const SolvingErrInfo& diagInfo)
                 break;
             }
         case SolvingErrStyle::DEFAULT:
+            break;
+        default:
+            CJC_ABORT();
             break;
     }
 }

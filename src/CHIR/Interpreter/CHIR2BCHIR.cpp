@@ -454,6 +454,8 @@ void CHIR2BCHIR::TranslateExpression(Context& ctx, const Expression& expr)
             CJC_ASSERT(expr.GetResult());
             TranslateOthersExpression(ctx, expr);
             break;
+        default:
+            CJC_ABORT();
     }
 }
 

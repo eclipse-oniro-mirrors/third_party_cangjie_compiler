@@ -18,11 +18,6 @@ class CGClassType : public CGCustomType {
     friend class CGTypeMgr;
 
 public:
-    llvm::StructType* GetLayoutType() const
-    {
-        return layoutType;
-    }
-
     size_t GetNumOfAllFields() const
     {
         return numOfAllFields;

@@ -168,6 +168,9 @@ void UpdateMacroInfo(const Ptr<AST::Node> node, MacroCollector& collector)
     }
 #include "cangjie/AST/ASTKind.inc"
 #undef ASTKIND
+        default:
+            CJC_ABORT();
+            break;
     }
 }
 

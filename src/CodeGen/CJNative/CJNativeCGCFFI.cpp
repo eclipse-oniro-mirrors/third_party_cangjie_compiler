@@ -347,7 +347,7 @@ ProcessKind LinuxAmd64CJNativeCGCFFI::GetParamType(
         }
     }
     llvm::Type* paramType = GetLLVMType(chirTy);
-    // VArray as CFunc parament pass by a i8*.
+    // VArray as CFunc parameter pass by a i8*.
     if (chirTy.IsVArray()) {
         paramType = llvm::Type::getInt8PtrTy(ctx.GetLLVMContext());
     }
@@ -893,7 +893,7 @@ ProcessKind LinuxAarch64CJNativeCGCFFI::GetParamType(CHIR::Type& chirTy, std::ve
         }
     }
     llvm::Type* paramType = GetLLVMType(chirTy);
-    // VArray as CFunc parament pass by a i8*.
+    // VArray as CFunc parameter pass by a i8*.
     if (chirTy.IsVArray()) {
         paramType = llvm::Type::getInt8PtrTy(ctx.GetLLVMContext());
     }
@@ -966,23 +966,38 @@ bool LinuxAarch64CJNativeCGCFFI::IsHomogeneousAggregate(llvm::Type& type, llvm::
 #ifdef __APPLE__
 void MacAArch64CJNativeCGCFFI::AddFunctionAttr(const CHIR::FuncType& chirFuncTy, llvm::Function& llvmFunc)
 {
-    LinuxAarch64CJNativeCGCFFI::AddFunctionAttr(chirFuncTy, llvmFunc);
-    CJC_ASSERT(chirFuncTy.GetNumOfParams() == llvmFunc.arg_size());
+    CJC_ASSERT(chirFuncTy.IsCFunc());
+    auto found = cfuncMap.find(&chirFuncTy);
+    if (found == cfuncMap.end()) {
+        return;
+    }
+    auto found1 = typeMap.find(chirFuncTy.GetReturnType());
+    unsigned argIdx = 0;
+    if (found1 != typeMap.end() && found1->second.IsIndirect()) {
+        AddSRetAttribute(llvmFunc.arg_begin());
+        argIdx++;
+    }
+    auto& kinds = found->second.second;
     const unsigned int SMALL_INT_THRESHOLD = 32;
-    for (unsigned i = 0; i < llvmFunc.arg_size(); ++i) {
-        if (auto argType = chirFuncTy.GetParamType(i); argType->IsBoolean() || argType->IsInteger()) {
-            AddParamAttr(&llvmFunc, i, llvm::Attribute::NoUndef);
-            auto intArgType = llvm::dyn_cast<llvm::IntegerType>(llvmFunc.getArg(i)->getType());
+    for (auto it = kinds.begin(); it != kinds.end(); ++it, ++argIdx) {
+        it = std::find_if(it, kinds.end(), [](auto kind) { return kind != ProcessKind::SKIP; });
+        if (it == kinds.end()) {
+            break;
+        }
+        if (auto argType = chirFuncTy.GetParamType(it - kinds.begin()); argType->IsBoolean() || argType->IsInteger()) {
+            AddParamAttr(&llvmFunc, argIdx, llvm::Attribute::NoUndef);
+            auto intArgType = llvm::dyn_cast<llvm::IntegerType>(llvmFunc.getArg(argIdx)->getType());
             if (!intArgType || intArgType->getBitWidth() >= SMALL_INT_THRESHOLD) {
                 continue;
             }
             if (argType->IsSignedInteger()) {  // Signed integers use sign extension.
-                AddParamAttr(&llvmFunc, i, llvm::Attribute::SExt);
+                AddParamAttr(&llvmFunc, argIdx, llvm::Attribute::SExt);
             } else {
-                AddParamAttr(&llvmFunc, i, llvm::Attribute::ZExt);
+                AddParamAttr(&llvmFunc, argIdx, llvm::Attribute::ZExt);
             }
         }
     }
+    CJC_ASSERT(argIdx == llvmFunc.arg_size());
     if (auto retType = chirFuncTy.GetReturnType(); retType->IsBoolean() || retType->IsInteger()) {
         auto intRetType = llvm::dyn_cast<llvm::IntegerType>(llvmFunc.getReturnType());
         if (!intRetType || intRetType->getBitWidth() >= SMALL_INT_THRESHOLD) {
@@ -994,6 +1009,7 @@ void MacAArch64CJNativeCGCFFI::AddFunctionAttr(const CHIR::FuncType& chirFuncTy,
             AddRetAttr(&llvmFunc, llvm::Attribute::ZExt);
         }
     }
+    AddFnAttr(&llvmFunc, llvm::Attribute::get(llvmFunc.getContext(), CodeGen::CFUNC_ATTR));
 }
 
 llvm::FunctionType* MacAArch64CJNativeCGCFFI::GetCFuncType(const CHIR::FuncType& chirFuncTy)
@@ -1131,7 +1147,7 @@ ProcessKind MacAArch64CJNativeCGCFFI::GetParamType(CHIR::Type& chirTy, std::vect
         }
     }
     llvm::Type* paramType = GetLLVMType(chirTy);
-    // VArray as CFunc parament pass by a i8*.
+    // VArray as CFunc parameter pass by a i8*.
     if (chirTy.IsVArray()) {
         paramType = llvm::Type::getInt8PtrTy(ctx.GetLLVMContext());
     }
@@ -1314,7 +1330,7 @@ ProcessKind WindowsAmd64CJNativeCGCFFI::GetParamType(CHIR::Type& chirTy, std::ve
         return ProcessKind::DIRECT;
     }
     llvm::Type* paramType = GetLLVMType(chirTy);
-    // VArray as CFunc parament pass by a i8*.
+    // VArray as CFunc parameter pass by a i8*.
     if (chirTy.IsVArray()) {
         paramType = llvm::Type::getInt8PtrTy(ctx.GetLLVMContext());
     }
@@ -1467,7 +1483,7 @@ ProcessKind LinuxOhosArm32CJNativeCGCFFI::GetParamType(CHIR::Type& chirTy, std::
         }
     }
     llvm::Type* paramType = GetLLVMType(chirTy);
-    // VArray as CFunc parament pass by a i8*.
+    // VArray as CFunc parameter pass by a i8*.
     if (chirTy.IsVArray()) {
         paramType = llvm::Type::getInt8PtrTy(ctx.GetLLVMContext());
     }

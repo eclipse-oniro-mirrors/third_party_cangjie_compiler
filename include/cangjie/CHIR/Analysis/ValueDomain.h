@@ -309,6 +309,9 @@ public:
                 return absVal->ToString();
             case ValueKind::TOP:
                 return "TOP";
+            default:
+                CJC_ABORT();
+                break;
         }
     }
 

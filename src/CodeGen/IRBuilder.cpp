@@ -15,7 +15,7 @@
 
 namespace Cangjie {
 namespace CodeGen {
-
+static constexpr uint64_t MIN_ANDROID_ARM32_ENUM_ALIGN = 4;
 IRBuilder2::IRBuilder2(CGModule& cgMod) : LLVMIRBuilder2(cgMod.GetLLVMContext()), cgMod(cgMod)
 {
     if (cgMod.GetCGContext().GetCompileOptions().fastMathMode) {
@@ -114,7 +114,9 @@ llvm::Instruction* IRBuilder2::CreateEntryAlloca(const CGType& cgType, const llv
             : cgType.GetLLVMType();
         auto allocaInst = CreateEntryAlloca(allocatedType, nullptr, name);
         auto& options = cgMod.GetCGContext().GetCompileOptions();
-        auto isOptionLikeNonRef = cgType.IsCGEnum() && StaticCast<const CGEnumType*>(&cgType)->IsOptionLikeNonRef();
+        auto cgEnumType = cgType.IsCGEnum() ? StaticCast<const CGEnumType*>(&cgType) : nullptr;
+        auto isOptionLikeNonRef = cgEnumType && cgEnumType->IsOptionLikeNonRef();
+        auto isAllAssociatedValuesAreNonRef = cgEnumType && cgEnumType->IsAllAssociatedValuesAreNonRef();
         // Zero-initialize memory if:
         // 1. It is a struct in O0 debug builds.
         // 2. It is an OptionLikeNonRef type in CJDB mode.
@@ -122,6 +124,11 @@ llvm::Instruction* IRBuilder2::CreateEntryAlloca(const CGType& cgType, const llv
         options.optimizationLevel == GlobalOptions::OptimizationLevel::O0) ||
         (options.cjdbMode && isOptionLikeNonRef)) {
             (void)CreateMemsetStructWith0(allocaInst);
+        }
+        auto& target = GetCGContext().GetCompileOptions().target;
+        if (CGEnumType::NeedAndroidArm32AlignedEnumLayout(target) && cgEnumType &&
+            isAllAssociatedValuesAreNonRef) {
+            allocaInst->setAlignment(llvm::Align(MIN_ANDROID_ARM32_ENUM_ALIGN));
         }
         return allocaInst;
     }

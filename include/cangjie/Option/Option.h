@@ -208,6 +208,11 @@ struct Info {
         return vendor == Vendor::APPLE && (os == OSType::DARWIN || os == OSType::IOS);
     }
 
+    inline bool IsArm32() const
+    {
+        return arch == ArchType::ARM32;
+    }
+
     /**
      * @brief Get Arch type.
      *
@@ -319,7 +324,7 @@ public:
     Triple::Info host = {
 #ifdef __aarch64__
         Triple::ArchType::AARCH64,
-#elif __x86_64__
+#elif defined(__x86_64__)
         Triple::ArchType::X86_64,
 #else
         Triple::ArchType::UNKNOWN,

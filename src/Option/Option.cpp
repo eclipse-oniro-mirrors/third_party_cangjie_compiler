@@ -14,11 +14,11 @@
 
 #include "cangjie/Option/Option.h"
 
+#include <cctype>
 #include <numeric>
 #include <regex>
 #include <string>
 #include <unordered_map>
-#include <cctype>
 
 #include "cangjie/Basic/DiagnosticEngine.h"
 #include "cangjie/Basic/Print.h"
@@ -26,8 +26,8 @@
 #include "cangjie/Utils/FileUtil.h"
 #include "cangjie/Utils/Semaphore.h"
 #include "cangjie/Utils/SipHash.h"
-#include "cangjie/Utils/Utils.h"
 #include "cangjie/Utils/Unicode.h"
+#include "cangjie/Utils/Utils.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -68,13 +68,9 @@ std::string BoolToSerializedString(bool val)
     return val ? "t" : "f";
 }
 
-const std::unordered_map<ArchType, std::string> ARCH_STRING_MAP = {
-    {ArchType::X86_64, "x86_64"},
-    {ArchType::AARCH64, "aarch64"},
-    {ArchType::ARM32, "arm"},
-    {ArchType::ARM64, "arm64"},
-    {ArchType::UNKNOWN, "unknown"},
-};
+const std::unordered_map<ArchType, std::string> ARCH_STRING_MAP = {{ArchType::X86_64, "x86_64"},
+    {ArchType::AARCH64, "aarch64"}, {ArchType::ARM64, "arm64"}, {ArchType::ARM32, "arm"},
+    {ArchType::UNKNOWN, "unknown"}};
 
 const std::unordered_map<OSType, std::string> OS_STRING_MAP = {
     {OSType::WINDOWS, "windows"},
@@ -188,6 +184,20 @@ std::string Triple::Info::GetEffectiveTripleString() const
     if (tripleString == "aarch64-ios-simulator") {
         return "arm64-apple-ios17.5-simulator";
     }
+    constexpr std::string_view androidPrefix = "arm-linux-android";
+    constexpr std::string_view androidBackendPrefix = "armv7a-linux-androideabi";
+    constexpr size_t androidBackendPrefixExtraSize = androidBackendPrefix.size() - androidPrefix.size();
+    if (tripleString.size() >= androidPrefix.size() &&
+        tripleString.compare(0, androidPrefix.size(), androidPrefix.data()) == 0) {
+        std::string result;
+        result.reserve(tripleString.size() + androidBackendPrefixExtraSize);
+        // The mtriple passed to the backend llc must be armv7a-xx, otherwise Core compilation will fail with missing
+        // _sync_val_compare. It needs to be properly lowered to atomic.
+        result = androidBackendPrefix;
+        result.append(tripleString, androidPrefix.size(), std::string::npos);
+        return result;
+    }
+
     return tripleString;
 }
 
@@ -296,6 +306,9 @@ void GlobalOptions::SetupCompileTargetOptions()
 bool GlobalOptions::ReprocessReflectionOption()
 {
     if (target.IsMacOS()) {
+        disableReflection = true;
+    }
+    if (target.IsArm32()) {
         disableReflection = true;
     }
     return true;
@@ -676,7 +689,7 @@ void GlobalOptions::DisableStaticStdForOhos()
     if (target.env == Triple::Environment::OHOS) {
         if (linkStaticStd.has_value() && linkStaticStd.value()) {
             DiagnosticEngine diag;
-            (void) diag.DiagnoseRefactor(DiagKindRefactor::driver_static_std_for_ohos, DEFAULT_POSITION);
+            (void)diag.DiagnoseRefactor(DiagKindRefactor::driver_static_std_for_ohos, DEFAULT_POSITION);
         }
         linkStaticStd = false;
     }
@@ -1215,7 +1228,9 @@ std::string GlobalOptions::GetCangjieLibTargetPathName() const
         std::string envName = target.EnvironmentToString();
         if (target.env == Triple::Environment::ANDROID) {
             auto envNameLen = envName.size();
-            envName.erase(envNameLen - target.apiLevel.size());
+            if (target.ArchToString() != "arm") {
+                envName.erase(envNameLen - target.apiLevel.size());
+            }
         }
         name += "_" + envName;
     }

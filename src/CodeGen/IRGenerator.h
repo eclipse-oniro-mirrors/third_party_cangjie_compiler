@@ -15,7 +15,7 @@
 namespace Cangjie {
 namespace CHIR {
 class Package;
-class Func;
+class Function;
 class BasicBlock;
 class Expression;
 } // namespace CHIR

@@ -27,9 +27,9 @@ public:
     void RunOnPackage();
 
 private:
-    void RunOnFunc(const Func& func);
+    void RunOnFunc(const Function& func);
 
-    FuncBase* GetExecureClosureFunc() const;
+    Function* GetExecureClosureFunc() const;
 
     std::pair<LocalVar*, Apply*> CheckSpawnWithFuture(Expression& expr) const;
 
@@ -38,7 +38,7 @@ private:
     const Package& package;
     bool isDebug{false};
 
-    FuncBase* executeClosure{nullptr};
+    Function* executeClosure{nullptr};
 };
 
 }

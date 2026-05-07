@@ -15,6 +15,7 @@
 #include "cangjie/CHIR/IR/Type/Type.h"
 
 #include <iostream>
+#include <optional>
 
 #include "cangjie/CHIR/Utils/CHIRCasting.h"
 #include "cangjie/CHIR/IR/Type/ClassDef.h"
@@ -205,7 +206,7 @@ bool Type::IsCType() const
     return CheckCustomTypeDefIsExpected(*def, CORE_PACKAGE_NAME, CTYPE_NAME);
 }
 
-std::vector<FuncBase*> Type::GetDeclareAndExtendMethods([[maybe_unused]] CHIRBuilder& builder) const
+std::vector<Function*> Type::GetDeclareAndExtendMethods([[maybe_unused]] CHIRBuilder& builder) const
 {
 #ifdef NDEBUG
     return {};
@@ -492,25 +493,7 @@ std::vector<Type*> CustomType::GetInstantiatedMemberTys(CHIRBuilder& builder)
     }
 }
 
-std::vector<FuncType*> CustomType::GetInstMethodTypes(CHIRBuilder& builder) const
-{
-    std::vector<FuncType*> instFuncTypes;
-    auto typeArgs = GetGenericArgs();
-    auto paramArgs = def->GetGenericTypeParams();
-    std::unordered_map<const GenericType*, Type*> instMap;
-    CJC_ASSERT(typeArgs.size() == paramArgs.size());
-    for (size_t i = 0; i < typeArgs.size(); ++i) {
-        instMap.emplace(paramArgs[i], typeArgs[i]);
-    }
-    auto methods = def->GetMethods();
-    for (auto method : methods) {
-        instFuncTypes.emplace_back(
-            StaticCast<FuncType*>(ReplaceRawGenericArgType(*method->GetType(), instMap, builder)));
-    }
-    return instFuncTypes;
-}
-
-std::vector<FuncBase*> CustomType::GetDeclareAndExtendMethods(CHIRBuilder& builder) const
+std::vector<Function*> CustomType::GetDeclareAndExtendMethods(CHIRBuilder& builder) const
 {
     auto allMethods = def->GetMethods();
     for (auto extendDef : def->GetExtends()) {
@@ -594,26 +577,6 @@ ClassType* ClassType::GetSuperClassTy(CHIRBuilder* builder)
         hasSetSuperClass = true;
         return superClassTy;
     }
-}
-
-std::vector<AbstractMethodInfo> ClassType::GetInstAbstractMethodTypes(CHIRBuilder& builder) const
-{
-    std::vector<AbstractMethodInfo> instMethodInfos;
-    auto typeArgs = GetGenericArgs();
-    auto paramArgs = def->GetGenericTypeParams();
-    std::unordered_map<const GenericType*, Type*> instMap;
-    CJC_ASSERT(typeArgs.size() == paramArgs.size());
-    for (size_t i = 0; i < typeArgs.size(); ++i) {
-        instMap.emplace(paramArgs[i], typeArgs[i]);
-    }
-    auto methods = StaticCast<const ClassDef*>(def)->GetAbstractMethods();
-    for (auto& method : methods) {
-        method.methodTy = ReplaceRawGenericArgType(*method.methodTy, instMap, builder);
-        for (auto& paramInfo : method.paramInfos) {
-            paramInfo.type = ReplaceRawGenericArgType(*paramInfo.type, instMap, builder);
-        }
-    }
-    return methods;
 }
 
 bool ClassType::IsDirectSuperTypeOf(Type& subType, CHIRBuilder& builder) const
@@ -709,7 +672,7 @@ static bool CollectReplaceTableForExtendedType(Type& extendedType, Type& instCus
     return true;
 }
 
-std::pair<FuncBase*, bool> CustomType::GetExpectedFunc(const std::string& funcName, FuncType& funcType, bool isStatic,
+Function* CustomType::GetExpectedFunc(const std::string& funcName, FuncType& funcType, bool isStatic,
     std::vector<Type*>& funcInstTypeArgs, CHIR::CHIRBuilder& builder, bool checkAbstractMethod)
 {
     std::unordered_map<const GenericType*, Type*> replaceTable;
@@ -729,9 +692,9 @@ std::pair<FuncBase*, bool> CustomType::GetExpectedFunc(const std::string& funcNa
 
     // current def
     
-    if (auto [func, done] = GetCustomTypeDef()->GetExpectedFunc(
-        funcName, funcType, isStatic, replaceTable, funcInstTypeArgs, builder, checkAbstractMethod); done) {
-        return {func, done};
+    if (auto func = GetCustomTypeDef()->GetExpectedFunc(
+        funcName, funcType, isStatic, replaceTable, funcInstTypeArgs, builder, checkAbstractMethod)) {
+        return func;
     }
 
     // extend def
@@ -740,10 +703,10 @@ std::pair<FuncBase*, bool> CustomType::GetExpectedFunc(const std::string& funcNa
         if (!match) {
             continue;
         }
-        auto [func, done] = ex->GetExpectedFunc(
+        auto func = ex->GetExpectedFunc(
             funcName, funcType, isStatic, replaceTable, funcInstTypeArgs, builder, checkAbstractMethod);
-        if (done) {
-            return {func, done};
+        if (func != nullptr) {
+            return func;
         }
     }
 
@@ -751,19 +714,19 @@ std::pair<FuncBase*, bool> CustomType::GetExpectedFunc(const std::string& funcNa
     if (auto classTy = DynamicCast<ClassType*>(this); classTy &&
         classTy->GetClassDef()->GetSuperClassDef() != nullptr) {
         auto superClassTy = classTy->GetSuperClassTy(&builder);
-        auto [func, done] = superClassTy->GetExpectedFunc(
+        auto func = superClassTy->GetExpectedFunc(
             funcName, funcType, isStatic, funcInstTypeArgs, builder, checkAbstractMethod);
-        if (done) {
-            return {func, done};
+        if (func != nullptr) {
+            return func;
         }
     }
 
     // super interface
     for (auto superInterfaceTy : this->GetImplementedInterfaceTys(&builder)) {
-        auto [func, done] = superInterfaceTy->GetExpectedFunc(
+        auto func = superInterfaceTy->GetExpectedFunc(
             funcName, funcType, isStatic, funcInstTypeArgs, builder, checkAbstractMethod);
-        if (done) {
-            return {func, done};
+        if (func != nullptr) {
+            return func;
         }
     }
 
@@ -771,14 +734,14 @@ std::pair<FuncBase*, bool> CustomType::GetExpectedFunc(const std::string& funcNa
     for (auto ex : GetCustomTypeDef()->GetExtends()) {
         for (auto ty : ex->GetImplementedInterfaceTys()) {
             auto superInterfaceTy = ReplaceRawGenericArgType(*ty, replaceTable, builder);
-            auto [func, done] = StaticCast<ClassType*>(superInterfaceTy)->GetExpectedFunc(
+            auto func = StaticCast<ClassType*>(superInterfaceTy)->GetExpectedFunc(
                 funcName, funcType, isStatic, funcInstTypeArgs, builder, checkAbstractMethod);
-            if (done) {
-                return {func, done};
+            if (func != nullptr) {
+                return func;
             }
         }
     }
-    return {nullptr, false};
+    return nullptr;
 }
 
 Type* CustomType::GetExactParentType(
@@ -801,10 +764,8 @@ Type* CustomType::GetExactParentType(
     // 3. func declared in super interface, including extend def's super interface
     
     // current def
-    // when it's an abstract method, `func` is nullptr
-    if (auto [func, done] = GetCustomTypeDef()->GetExpectedFunc(
-        funcName, funcType, isStatic, replaceTable, funcInstTypeArgs, builder, checkAbstractMethod);
-        done && (func == nullptr || func->Get<WrappedRawMethod>() == nullptr)) {
+    if (auto func = GetCustomTypeDef()->GetExpectedFunc(
+        funcName, funcType, isStatic, replaceTable, funcInstTypeArgs, builder, checkAbstractMethod)) {
         return this;
     }
 
@@ -814,10 +775,8 @@ Type* CustomType::GetExactParentType(
         if (!match) {
             continue;
         }
-        auto [func, done] = ex->GetExpectedFunc(
-            funcName, funcType, isStatic, replaceTable, funcInstTypeArgs, builder, checkAbstractMethod);
-        // when it's an abstract method, `func` is nullptr
-        if (done && (func == nullptr || func->Get<WrappedRawMethod>() == nullptr)) {
+        if (auto func = ex->GetExpectedFunc(
+            funcName, funcType, isStatic, replaceTable, funcInstTypeArgs, builder, checkAbstractMethod)) {
             return ReplaceRawGenericArgType(*ex->GetExtendedType(), replaceTable, builder);
         }
     }
@@ -859,7 +818,7 @@ Type* CustomType::GetExactParentType(
     return nullptr;
 }
 
-std::vector<VTableSearchRes> CustomType::GetFuncIndexInVTable(
+std::optional<VTableSearchRes> CustomType::GetFuncIndexInVTable(
     const FuncCallType& funcCallType, CHIRBuilder& builder) const
 {
     std::unordered_map<const GenericType*, Type*> replaceTable;
@@ -873,8 +832,8 @@ std::vector<VTableSearchRes> CustomType::GetFuncIndexInVTable(
     }
 
     auto result = GetCustomTypeDef()->GetFuncIndexInVTable(funcCallType, replaceTable, builder);
-    if (!result.empty()) {
-        return result;
+    if (result.has_value()) {
+        return result.value();
     }
 
     for (auto ex : GetCustomTypeDef()->GetExtends()) {
@@ -885,11 +844,11 @@ std::vector<VTableSearchRes> CustomType::GetFuncIndexInVTable(
             CollectGenericReplaceTable(*extendedTyGenericArgs[i], *classInstArgs[i], replaceTable);
         }
         result = ex->GetFuncIndexInVTable(funcCallType, replaceTable, builder);
-        if (!result.empty()) {
-            return result;
+        if (result.has_value()) {
+            return result.value();
         }
     }
-    return result;
+    return std::nullopt;
 }
 
 std::vector<ClassType*> CustomType::CalculateExtendImplementedInterfaceTys(CHIRBuilder& builder,
@@ -1416,9 +1375,9 @@ void BuiltinType::AddExtend(ExtendDef& extend)
     extends.emplace_back(&extend);
 }
 
-std::vector<FuncBase*> BuiltinType::GetExtendMethods() const
+std::vector<Function*> BuiltinType::GetExtendMethods() const
 {
-    std::vector<FuncBase*> methods;
+    std::vector<Function*> methods;
     for (auto def : extends) {
         auto funcs = def->GetMethods();
         methods.insert(methods.end(), funcs.begin(), funcs.end());
@@ -1426,7 +1385,7 @@ std::vector<FuncBase*> BuiltinType::GetExtendMethods() const
     return methods;
 }
 
-std::vector<FuncBase*> BuiltinType::GetDeclareAndExtendMethods([[maybe_unused]] CHIRBuilder& builder) const
+std::vector<Function*> BuiltinType::GetDeclareAndExtendMethods([[maybe_unused]] CHIRBuilder& builder) const
 {
     return GetExtendMethods();
 }

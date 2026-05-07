@@ -26,7 +26,7 @@ void DevirtualizationInfo::CollectInfo()
 {
     // Function that collect all global function which has more concrete type than
     // explicit return type in order to infer devirtualization more precise.
-    for (auto func : package->GetGlobalFuncs()) {
+    for (auto func : package->GetGlobalFuncsWithBody()) {
         CollectReturnTypeMap(*func);
     }
 
@@ -66,7 +66,7 @@ const DevirtualizationInfo::SubTypeMap& DevirtualizationInfo::GetSubtypeMap() co
     return subtypeMap;
 }
 
-const std::unordered_map<Func*, Type*>& DevirtualizationInfo::GetReturnTypeMap() const
+const std::unordered_map<Function*, Type*>& DevirtualizationInfo::GetReturnTypeMap() const
 {
     return realRuntimeRetTyMap;
 }
@@ -129,7 +129,7 @@ static Type* GetRuntimeTypeFromFunc(const Value* retVal, bool isInLambda = false
 
 // Function that collect all global function which has more concrete runtime type
 // than explicit return type in order to infer devirtualization more precise.
-void DevirtualizationInfo::CollectReturnTypeMap(Func& func)
+void DevirtualizationInfo::CollectReturnTypeMap(Function& func)
 {
     auto res = GetRuntimeTypeFromFunc(func.GetReturnValue());
     if (res != nullptr) {
@@ -140,7 +140,7 @@ void DevirtualizationInfo::CollectReturnTypeMap(Func& func)
 // after inline, the result type is more accuracy than before, refresh it
 void DevirtualizationInfo::FreshRetMap()
 {
-    for (auto func : package->GetGlobalFuncs()) {
+    for (auto func : package->GetGlobalFuncsWithBody()) {
         auto res = GetRuntimeTypeFromFunc(func->GetReturnValue());
         if (res != nullptr) {
             realRuntimeRetTyMap[func] = res;

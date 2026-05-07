@@ -21,12 +21,12 @@ RedundantFutureRemoval::RedundantFutureRemoval(const Package& pkg, bool isDebug)
 
 void RedundantFutureRemoval::RunOnPackage()
 {
-    for (auto func : package.GetGlobalFuncs()) {
+    for (auto func : package.GetGlobalFuncsWithBody()) {
         RunOnFunc(*func);
     }
 }
 
-void RedundantFutureRemoval::RunOnFunc(const Func& func)
+void RedundantFutureRemoval::RunOnFunc(const Function& func)
 {
     auto visitExitAction = [this](Expression& expr) {
         auto [future, apply] = CheckSpawnWithFuture(expr);
@@ -45,7 +45,7 @@ void RedundantFutureRemoval::RunOnFunc(const Func& func)
     Visitor::Visit(func, visitExitAction);
 }
 
-FuncBase* RedundantFutureRemoval::GetExecureClosureFunc() const
+Function* RedundantFutureRemoval::GetExecureClosureFunc() const
 {
     for (auto def : package.GetAllCustomTypeDef()) {
         if (!IsCoreFuture(*def)) {

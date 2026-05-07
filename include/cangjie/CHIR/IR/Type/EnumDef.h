@@ -38,8 +38,6 @@ public:
     */
     bool IsExhaustive() const;
 
-    std::string ToString() const override;
-
     void AddCtor(EnumCtorInfo ctor);
     EnumCtorInfo GetCtor(size_t index) const;
     std::vector<EnumCtorInfo> GetCtors() const;
@@ -52,9 +50,6 @@ public:
     */
     bool IsAllCtorsTrivial() const;
 
-protected:
-    void PrintAttrAndTitle(std::stringstream& ss) const override;
-
 private:
     explicit EnumDef(std::string srcCodeIdentifier, std::string identifier, std::string pkgName, bool isNonExhaustive)
         : CustomTypeDef(srcCodeIdentifier, identifier, pkgName, CustomDefKind::TYPE_ENUM),
@@ -63,7 +58,7 @@ private:
     }
     ~EnumDef() override = default;
 
-    void PrintConstructor(std::stringstream& ss) const;
+    std::string LocalVarToString() const override;
     friend class CHIRContext;
     friend class CHIRBuilder;
 

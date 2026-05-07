@@ -84,7 +84,7 @@ public:
      * @param func function to analyse.
      * @param ctorInitInfo extra info for init function check.
      */
-    MaybeInitAnalysis(const Func* func, const ConstructorInitInfo* ctorInitInfo);
+    MaybeInitAnalysis(const Function* func, const ConstructorInitInfo* ctorInitInfo);
 
     /// may be init analysis destructor.
     ~MaybeInitAnalysis() final

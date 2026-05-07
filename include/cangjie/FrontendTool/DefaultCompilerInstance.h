@@ -44,7 +44,7 @@ public:
 protected:
     bool SaveCjo(const AST::Package& pkg) const;
     void RearrangeImportedPackageDependence() const;
-    bool CodegenOnePackage(AST::Package& pkg, bool enableIncrement) const;
+    bool CodegenOnePackage(bool enableIncrement) const;
 
 private:
     class DefaultCIImpl* impl;

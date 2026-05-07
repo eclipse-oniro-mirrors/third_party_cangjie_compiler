@@ -21,8 +21,8 @@ TypeCastCheck::TypeCastCheck(DiagAdapter& diag) : diag(diag)
 
 void TypeCastCheck::RunOnPackage(const Package& package, size_t threadNum)
 {
-    std::vector<Func*> funcs;
-    for (auto func : package.GetGlobalFuncs()) {
+    std::vector<Function*> funcs;
+    for (auto func : package.GetGlobalFuncsWithBody()) {
         if (!func->TestAttr(Attribute::UNSAFE)) {
             funcs.emplace_back(func);
         }
@@ -85,7 +85,7 @@ std::optional<std::tuple<Type*, Type*>> TryExtractTypeCast(Expression& expr)
 }
 } // namespace
 
-void TypeCastCheck::RunOnFunc(const Func& func)
+void TypeCastCheck::RunOnFunc(const Function& func)
 {
     auto visitor = [this, &func](Expression& expr) {
         auto typeCast = TryExtractTypeCast(expr);

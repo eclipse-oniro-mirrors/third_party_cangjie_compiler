@@ -78,7 +78,7 @@ std::string TypeValue::GetKindString(DevirtualTyKind clsTyKind) const
 }
 
 namespace {
-Type* GetRealGenericRetType(const Apply& apply, Type& genericType, const Func* calleeFunc, CHIRBuilder& builder)
+Type* GetRealGenericRetType(const Apply& apply, Type& genericType, const Function* calleeFunc, CHIRBuilder& builder)
 {
     auto instTypes = apply.GetInstantiatedTypeArgs();
     auto genericTypes = calleeFunc->GetGenericTypeParams();
@@ -127,7 +127,7 @@ template <> bool IsTrackedGV<ValueDomain<TypeValue>>(const GlobalVar& gv)
 }
 
 TypeAnalysis::TypeAnalysis(
-    const Func* func, CHIRBuilder& builder, bool isDebug, const DevirtualizationInfo& devirtInfo)
+    const Function* func, CHIRBuilder& builder, bool isDebug, const DevirtualizationInfo& devirtInfo)
     : ValueAnalysis(func, builder, isDebug), realRetTyMap(devirtInfo.GetReturnTypeMap()),
       constMemberTypeMap(devirtInfo.GetConstMemberMap())
 {
@@ -152,7 +152,7 @@ bool TypeAnalysis::CheckFuncHasInvoke(const BlockGroup& body)
     return false;
 }
 
-bool TypeAnalysis::Filter(const Func& method)
+bool TypeAnalysis::Filter(const Function& method)
 {
     if (!CheckFuncHasInvoke(*method.GetBody())) {
         return false;
@@ -166,7 +166,7 @@ bool TypeAnalysis::Filter(const Func& method)
 
 void TypeAnalysis::PrintDebugMessage(const Expression* expr, const TypeValue* absVal) const
 {
-    std::string message = "The value of " + expr->GetResult()->GetIdentifier() + " = " + expr->ToString() +
+    std::string message = "The value of " + expr->GetResult()->GetIdentifier() + " = " + expr->ToString(0) +
         " has been set to " + absVal->ToString();
     std::cout << message << std::endl;
 }
@@ -260,7 +260,7 @@ void TypeAnalysis::HandleApplyExpr(TypeDomain& state, const Apply* apply, Value*
         return;
     }
 
-    auto calleeFunc = VirtualCast<Func*>(callee);
+    auto calleeFunc = StaticCast<Function*>(callee);
     auto it = realRetTyMap.find(calleeFunc);
     if (it == realRetTyMap.end()) {
         HandleDefaultExpr(state, apply);

@@ -28,7 +28,7 @@ static const std::vector<FuncInfo> ARRAYLIST_ITERATOR_FUNC_LIST = {
 };
 
 namespace {
-bool InWhiteList(const Func& func, const std::vector<FuncInfo>& whiteList)
+bool InWhiteList(const Function& func, const std::vector<FuncInfo>& whiteList)
 {
     for (auto element : whiteList) {
         if (IsExpectedFunction(func, element)) {
@@ -49,8 +49,7 @@ bool ArrayListConstStartOpt::CheckNeedRewrite(const Apply& apply) const
     if (!apply.GetCallee()->IsFuncWithBody()) {
         return false;
     }
-    auto callee = DynamicCast<Func*>(apply.GetCallee());
-    CJC_NULLPTR_CHECK(callee);
+    auto callee = StaticCast<Function*>(apply.GetCallee());
     return InWhiteList(*callee, ARRAY_FUNC_INLINE_WHITE_LIST);
 }
 
@@ -98,7 +97,7 @@ bool ArrayListConstStartOpt::IsStartAddIndexExpression(const Field& field, bool 
     auto location = getElementRef->GetLocation();
     if (!isIteratorFunc && location->IsParameter()) {
         auto param = StaticCast<Parameter*>(location);
-        // the index 0 or 1 parameter of ArrayList Func is class ArrayList
+        // the index 0 or 1 parameter of ArrayList Function is class ArrayList
         if (param == field.GetTopLevelFunc()->GetParam(0) ||
             param == field.GetTopLevelFunc()->GetParam(1)) {
             return true;
@@ -135,7 +134,7 @@ bool ArrayListConstStartOpt::IsStartAddIndexExpression(const Field& field, bool 
         if (!location->IsParameter()) {
             return false;
         }
-        // the index 0 or 1 parameter of ArrayListIterator Func is class ArrayListIterator
+        // the index 0 or 1 parameter of ArrayListIterator Function is class ArrayListIterator
         return StaticCast<Parameter*>(location) == field.GetTopLevelFunc()->GetParam(0) ||
             StaticCast<Parameter*>(location) == field.GetTopLevelFunc()->GetParam(1);
     }
@@ -163,7 +162,7 @@ void ArrayListConstStartOpt::RewriteStartWithConstZero(Expression& oldExpr) cons
 
 void ArrayListConstStartOpt::RunOnPackage(const Ptr<const Package>& package)
 {
-    for (auto func : package->GetGlobalFuncs()) {
+    for (auto func : package->GetGlobalFuncsWithBody()) {
         bool isArrayListIteratorFunc = InWhiteList(*func, ARRAYLIST_ITERATOR_FUNC_LIST);
         // only inline array func into arrayList and arrayListIterator func
         if (!isArrayListIteratorFunc && !InWhiteList(*func, ARRAYLIST_FUNC_LIST)) {

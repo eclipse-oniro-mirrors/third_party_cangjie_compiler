@@ -78,7 +78,7 @@ public:
      * @param func the function to analyse.
      * @param analysis_ analysis pass.
      */
-    Engine(const Func* func, std::unique_ptr<Analysis<Domain>> analysis_)
+    Engine(const Function* func, std::unique_ptr<Analysis<Domain>> analysis_)
         : func(func), analysis(std::move(analysis_)), entrySets(std::make_unique<std::unordered_map<Block*, Domain>>())
     {
     }
@@ -265,7 +265,7 @@ private:
         return func->GetBody()->GetBlocks().size() > analysis->GetBlockLimit().value();
     }
 
-    const Func* func;
+    const Function* func;
     std::unique_ptr<Analysis<Domain>> analysis;
     std::unique_ptr<std::unordered_map<Block*, Domain>> entrySets;
 

@@ -98,7 +98,7 @@ protected:
         instance->invocation.globalOptions.implicitPrelude = false;
         instance->Compile(CompileStage::DESUGAR_AFTER_SEMA);
         std::vector<uint8_t> astData;
-        instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+        instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
 
         std::string coreCjo = FileUtil::JoinPath(cangjieModules, "std.core.cjo");
         if (FileUtil::FileExist(coreCjo)) {
@@ -118,7 +118,7 @@ protected:
             instance->code = std::move(content.value());
             instance->Compile();
             std::vector<uint8_t> astData;
-            instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+            instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
             allAstData[fileNames[i]] = astData;
             std::string astFile = packagePath + fileNames[i] + ".cjo";
             ASSERT_TRUE(FileUtil::WriteBufferToASTFile(astFile, astData));
@@ -157,7 +157,7 @@ TEST_F(PackageTest, SingleFile_Package)
         instance->code = "import " + fileNames[i] + ".*";
         instance->Compile();
         Package* pkg = nullptr;
-        for (auto pd : instance->importManager.GetAllImportedPackages()) {
+        for (auto pd : instance->importManager->GetAllImportedPackages()) {
             if (pd->fullPackageName != CORE_PACKAGE_NAME) {
                 pkg = pd->srcPackage;
                 break;
@@ -194,12 +194,12 @@ TEST_F(PackageTest, SingleFile_LoadCache_Package)
 
     for (unsigned int i = 0; i < fileNames.size(); i++) {
         instance = std::make_unique<TestCompilerInstance>(invocation, diag);
-        instance->importManager.SetPackageCjoCache(fileNames[i], allAstData[fileNames[i]]);
+        instance->importManager->SetPackageCjoCache(fileNames[i], allAstData[fileNames[i]]);
         instance->code = "import " + fileNames[i] + ".*";
         instance->Compile();
 
         Package* pkg = nullptr;
-        for (auto pd : instance->importManager.GetAllImportedPackages()) {
+        for (auto pd : instance->importManager->GetAllImportedPackages()) {
             if (pd->fullPackageName != CORE_PACKAGE_NAME) {
                 pkg = pd->srcPackage;
                 break;
@@ -239,7 +239,7 @@ TEST_F(PackageTest, MultiFile_Package)
     diag.Reset();
 
     std::vector<uint8_t> astData;
-    instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+    instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
     std::string astFile = packagePath + "MultiFile.cjo";
     ASSERT_TRUE(FileUtil::WriteBufferToASTFile(astFile, astData));
 
@@ -252,7 +252,7 @@ TEST_F(PackageTest, MultiFile_Package)
     std::unordered_map<std::string, bool> expectClassDecls{{"Base2", true}, {"Derive1", true}, {"Base3", true}};
 
     Package* pkg = nullptr;
-    for (auto pd : instance->importManager.GetAllImportedPackages()) {
+    for (auto pd : instance->importManager->GetAllImportedPackages()) {
         if (pd->fullPackageName != CORE_PACKAGE_NAME) {
             pkg = pd->srcPackage;
             break;
@@ -295,7 +295,7 @@ TEST_F(PackageTest, ImportPackage)
     instance = std::make_unique<TestCompilerInstance>(invocation, diag);
     instance->srcDirs = {srcPath};
     for (unsigned int i = 0; i < fileNames.size(); i++) {
-        instance->importManager.SetPackageCjoCache(fileNames[i], allAstData[fileNames[i]]);
+        instance->importManager->SetPackageCjoCache(fileNames[i], allAstData[fileNames[i]]);
     }
     instance->Compile();
 
@@ -306,12 +306,12 @@ TEST_F(PackageTest, ImportPackage)
     std::set<std::string> importSet;
     auto pkg = instance->GetSourcePackages()[0];
     for (auto& file : pkg->files) {
-        for (auto& [name, _] : instance->importManager.GetImportedDecls(*file)) {
+        for (auto& [name, _] : instance->importManager->GetImportedDecls(*file)) {
             importSet.emplace(name);
         }
     }
 
-    for (auto pd : instance->importManager.GetCurImportedPackages(instance->GetSourcePackages()[0]->fullPackageName)) {
+    for (auto pd : instance->importManager->GetCurImportedPackages(instance->GetSourcePackages()[0]->fullPackageName)) {
         importSet.insert(pd->srcPackage->fullPackageName);
     }
 
@@ -360,7 +360,7 @@ TEST_F(PackageTest, LSPBasicCompileCost)
             var c : (UInt8)->Unit = test
         }
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     auto start = std::chrono::high_resolution_clock::now();
     instance->Compile(CompileStage::SEMA);
     auto end = std::chrono::high_resolution_clock::now();
@@ -393,7 +393,7 @@ TEST_F(PackageTest, DISABLED_LSPImportLotPkgsCompileCost)
             }
         }
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     auto start = std::chrono::high_resolution_clock::now();
     instance->Compile(CompileStage::SEMA);
     auto end = std::chrono::high_resolution_clock::now();
@@ -419,7 +419,7 @@ TEST_F(PackageTest, LSPCompileComposition)
         let fg = f ~> g
         main() :Unit {}
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::SEMA);
     EXPECT_TRUE(diag.GetErrorCount() == 0);
     auto pkgs = instance->GetSourcePackages();
@@ -443,11 +443,11 @@ TEST_F(PackageTest, LSPCompileWithConstraint)
             0
         }
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::SEMA);
     EXPECT_EQ(diag.GetErrorCount(), 0);
     EXPECT_EQ(diag.GetWarningCount(), 1);
-    auto enumDecl = instance->importManager.GetImportedDecl<EnumDecl>("extenddecl", "EnumExtend");
+    auto enumDecl = instance->importManager->GetImportedDecl<EnumDecl>("extenddecl", "EnumExtend");
     ASSERT_TRUE(enumDecl != nullptr);
     ASSERT_TRUE(instance->typeManager != nullptr);
     auto extends = instance->typeManager->GetDeclExtends(*enumDecl);
@@ -480,13 +480,13 @@ TEST_F(PackageTest, LSPImportFunctionWithNamedParam)
         package pkg
         public func name(a_123!:Int64) {}
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::SEMA);
     std::vector<uint8_t> astData;
-    instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+    instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
 
     instance = std::make_unique<TestCompilerInstance>(invocation, diag);
-    instance->importManager.SetPackageCjoCache("pkg", astData);
+    instance->importManager->SetPackageCjoCache("pkg", astData);
     instance->invocation.globalOptions.implicitPrelude = true;
     instance->code = R"(
         import pkg.*
@@ -494,7 +494,7 @@ TEST_F(PackageTest, LSPImportFunctionWithNamedParam)
             var xx = name(a_123: 5)
         }
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::SEMA);
     auto pkgs = instance->GetSourcePackages();
     ASSERT_EQ(pkgs.size(), 1);
@@ -528,21 +528,21 @@ TEST_F(PackageTest, ExportVisibleMembersForLSP)
             private let d = 1
         }
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::SEMA);
     std::vector<uint8_t> astData;
-    instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+    instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
 
     instance = std::make_unique<TestCompilerInstance>(invocation, diag);
-    instance->importManager.SetPackageCjoCache("pkg", astData);
+    instance->importManager->SetPackageCjoCache("pkg", astData);
     instance->invocation.globalOptions.implicitPrelude = true;
     instance->code = R"(
         import pkg.*
         main() {}
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::IMPORT_PACKAGE);
-    auto pd = instance->importManager.GetPackageDecl("pkg");
+    auto pd = instance->importManager->GetPackageDecl("pkg");
     ASSERT_TRUE(pd != nullptr && !pd->srcPackage->files.empty() && !pd->srcPackage->files[0]->decls.empty());
     std::vector<std::string> expected{"a", "b", "c"};
     std::vector<std::string> res;
@@ -568,21 +568,21 @@ TEST_F(PackageTest, ConstNotExportInitializerForLSP)
             private const init() {}
         }
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::SEMA);
     std::vector<uint8_t> astData;
-    instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+    instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
 
     instance = std::make_unique<TestCompilerInstance>(invocation, diag);
-    instance->importManager.SetPackageCjoCache("initializer", astData);
+    instance->importManager->SetPackageCjoCache("initializer", astData);
     instance->invocation.globalOptions.implicitPrelude = true;
     instance->code = R"(
         import initializer.*
         main() {}
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::IMPORT_PACKAGE);
-    auto pd = instance->importManager.GetPackageDecl("initializer");
+    auto pd = instance->importManager->GetPackageDecl("initializer");
     ASSERT_TRUE(pd != nullptr && !pd->srcPackage->files.empty() && !pd->srcPackage->files[0]->decls.empty());
 
     for (auto it : pd->srcPackage->files[0]->decls[0]->GetMemberDeclPtrs()) {
@@ -600,7 +600,7 @@ TEST_F(PackageTest, ForbiddenRunInstantiation)
     instance->code = R"(
         main() {}
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     auto start = std::chrono::high_resolution_clock::now();
     bool res = instance->Compile(CompileStage::GENERIC_INSTANTIATION);
     auto end = std::chrono::high_resolution_clock::now();
@@ -623,7 +623,7 @@ TEST_F(PackageTest, LoadBuiltInDecl)
     )";
     bool res = instance->Compile(CompileStage::IMPORT_PACKAGE);
     EXPECT_TRUE(res);
-    auto pkgs = instance->importManager.GetAllImportedPackages();
+    auto pkgs = instance->importManager->GetAllImportedPackages();
     Utils::EraseIf(pkgs, [](auto it) { return !it->TestAttr(Attribute::IMPORTED); });
     EXPECT_EQ(pkgs.size(), 1);
     if (!pkgs.empty()) {
@@ -685,7 +685,7 @@ public func test() {
     auto pkg = instance->GetSourcePackages()[0];
     ASSERT_TRUE(pkg != nullptr);
     std::vector<uint8_t> astData;
-    instance->importManager.ExportAST(false, astData, *pkg); // ExportId will be updated during serialization.
+    instance->importManager->ExportAST(false, astData, *pkg); // ExportId will be updated during serialization.
     // Expect all generic decls of instantiated decls have valid exportId.
     std::unordered_set<std::string> exportIds;
     std::unordered_set<Ptr<Decl>> genericDecls;
@@ -724,7 +724,7 @@ TEST_F(PackageTest, LSPExportInterfaceFuncFromMacro)
         }
     }
     std::vector<uint8_t> astData;
-    instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+    instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
 
     EXPECT_EQ(diag.GetErrorCount(), 0);
 }
@@ -737,12 +737,12 @@ TEST_F(PackageTest, ImportManager_API)
     main() { }
     )";
     instance->Compile(CompileStage::IMPORT_PACKAGE);
-    auto members = instance->importManager.GetPackageMembers("default", "std.core");
+    auto members = instance->importManager->GetPackageMembers("default", "std.core");
     EXPECT_TRUE(!members.empty());
-    auto obj = instance->importManager.GetImportedDecl<ClassDecl>(CORE_PACKAGE_NAME, OBJECT_NAME);
+    auto obj = instance->importManager->GetImportedDecl<ClassDecl>(CORE_PACKAGE_NAME, OBJECT_NAME);
     EXPECT_TRUE(obj != nullptr);
     auto pkg = instance->GetSourcePackages()[0];
-    auto importPkgs = instance->importManager.GetCurImportedPackages(pkg->fullPackageName);
+    auto importPkgs = instance->importManager->GetCurImportedPackages(pkg->fullPackageName);
     EXPECT_FALSE(importPkgs.empty()); // default 'core'.
 }
 
@@ -758,10 +758,10 @@ TEST_F(PackageTest, LSPExportInvalidVpd)
             public var (a, b) : (Int64, Int64) // This is an invalid member.
         }
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::SEMA);
     std::vector<uint8_t> astData;
-    instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+    instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
     EXPECT_NE(diag.GetErrorCount(), 0);
 }
 
@@ -782,10 +782,10 @@ TEST_F(PackageTest, LSPExportInvisibleMembers)
             func f2(v: B) {}
         }
     )";
-    instance->importManager.SetSourceCodeImportStatus(false);
+    instance->importManager->SetSourceCodeImportStatus(false);
     instance->Compile(CompileStage::SEMA);
     std::vector<uint8_t> astData;
-    instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+    instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
     EXPECT_NE(diag.GetErrorCount(), 0);
 }
 
@@ -795,7 +795,7 @@ TEST_F(PackageTest, CheckCjoPathLegality)
     instance = std::make_unique<TestCompilerInstance>(invocation, diag);
     auto import = MakeOwned<ImportSpec>();
     import->EnableAttr(Attribute::IMPLICIT_ADD);
-    bool ret = instance->importManager.CheckCjoPathLegality(import, "", "not found package name", false, false);
+    bool ret = instance->importManager->CheckCjoPathLegality(import, "", "not found package name", false, false);
     ASSERT_EQ(ret, false);
     EXPECT_TRUE(diag.GetErrorCount() == 1);
 }
@@ -1153,7 +1153,7 @@ TEST_F(PackageTest, LoadAnnotationTarget)
     for (auto [ident, decl] : instance->rawMangleName2DeclMap) {
         mangledName2DeclMap.emplace(ident, const_cast<Decl*>(decl.get()));
     }
-    auto data = instance->importManager.ExportASTSignature(*pkg);
+    auto data = instance->importManager->ExportASTSignature(*pkg);
     // Unset annotation status.
     classA->DisableAttr(Attribute::IS_ANNOTATION);
     found->get()->target = 0;
@@ -1161,7 +1161,7 @@ TEST_F(PackageTest, LoadAnnotationTarget)
     // Test for loading annotation status.
     pkg->EnableAttr(Attribute::INCRE_COMPILE);
     auto loader = std::make_unique<ASTLoader>(std::move(data), pkg->fullPackageName, *instance->typeManager,
-        *instance->importManager.cjoManager, instance->invocation.globalOptions);
+        *instance->importManager->cjoManager, instance->invocation.globalOptions);
     (void)loader->LoadCachedTypeForPackage(*pkg, mangledName2DeclMap);
     EXPECT_TRUE(classA->TestAttr(Attribute::IS_ANNOTATION));
     EXPECT_EQ(found->get()->target, 3);
@@ -1197,7 +1197,7 @@ TEST_F(PackageTest, LoadPackageFromCjo)
     std::unordered_map<std::string, Ptr<Package>> pkgName2PkgNodeMap;
 
     auto checkPkg = [this, &testIns, &pkgName2PkgNodeMap](const std::string& pkgName, const std::string& cjoFileName) {
-        auto pkg = testIns->importManager.LoadPackageFromCjo(pkgName, FileUtil::JoinPath(packagePath, cjoFileName));
+        auto pkg = testIns->importManager->LoadPackageFromCjo(pkgName, FileUtil::JoinPath(packagePath, cjoFileName));
         EXPECT_NE(pkg, nullptr);
         auto found = std::as_const(pkgName2PkgNodeMap).find(pkgName);
         if (found == pkgName2PkgNodeMap.cend()) {
@@ -1241,7 +1241,7 @@ TEST_F(PackageTest, ImportOptFlag)
         instance->Compile();
         instance->PerformDesugarAfterSema();
         std::vector<uint8_t> astData;
-        instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+        instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
         std::string astFile = packagePath + fileName + ".cjo";
         FileUtil::WriteBufferToASTFile(astFile, astData);
         diag.Reset();
@@ -1253,7 +1253,7 @@ TEST_F(PackageTest, ImportOptFlag)
     )";
     bool ret = instance->Compile(CompileStage::IMPORT_PACKAGE);
     EXPECT_TRUE(ret);
-    auto depPkgs = instance->importManager.GetAllImportedPackages();
+    auto depPkgs = instance->importManager->GetAllImportedPackages();
     EXPECT_EQ(depPkgs.size(), 8); // 8 is size of {a, c, d, e, f, middle, core, default}
     auto found = std::find_if(
         depPkgs.begin(), depPkgs.end(), [](Ptr<PackageDecl>& pkg) { return pkg->GetFullPackageName() == "b"; });
@@ -1274,7 +1274,7 @@ TEST_F(PackageTest, TypeAliasRefExport)
     instance->Compile();
     instance->PerformDesugarAfterSema();
     std::vector<uint8_t> astData;
-    instance->importManager.ExportAST(false, astData, *instance->GetSourcePackages()[0]);
+    instance->importManager->ExportAST(false, astData, *instance->GetSourcePackages()[0]);
     std::string astFile = FileUtil::JoinPath(packagePath, "dep.cjo");
     FileUtil::WriteBufferToASTFile(astFile, astData);
     diag.Reset();
@@ -1289,7 +1289,7 @@ TEST_F(PackageTest, TypeAliasRefExport)
     )";
     bool ret = instance->Compile(CompileStage::IMPORT_PACKAGE);
     EXPECT_TRUE(ret);
-    auto depPkg = instance->importManager.GetPackage("dep");
+    auto depPkg = instance->importManager->GetPackage("dep");
     ASSERT_TRUE(depPkg != nullptr);
     const std::vector<std::string> orginNames{"A", "A_G", "B", "C", "C_1", "D", "D_G"};
     std::function<void(Ptr<Type>)> visitType = [&orginNames, &visitType](Ptr<Type> type) {

@@ -38,6 +38,7 @@ namespace {
 
 const std::string MACRO_SRV_NAME = "LSPMacroServer";
 
+#ifndef _WIN32
 void SignalHandler(int)
 {
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
@@ -51,6 +52,7 @@ void SetExitSignal(void)
     std::signal(SIGTERM, SignalHandler);
     std::signal(SIGSEGV, SignalHandler);
 }
+#endif
 
 inline bool IsResultForMacCall(const std::string& id, const Position& pos, const MacroInvocation& mi)
 {
@@ -154,7 +156,7 @@ void MacroProcMsger::CloseMacroSrv()
 bool MacroProcMsger::WriteToSrvPipe(const uint8_t* buf, size_t size) const
 {
 #ifdef _WIN32
-    return WriteFile(hParentWrite, buf, size, nullptr, 0) == TRUE;
+    return WriteFile(hParentWrite, buf, static_cast<DWORD>(size), nullptr, 0) == TRUE;
 #else
     ssize_t res = write(pipefdP2C[1], buf, size);
     while (res >= 0 && res < static_cast<ssize_t>(size)) {
@@ -169,7 +171,7 @@ bool MacroProcMsger::WriteToSrvPipe(const uint8_t* buf, size_t size) const
 bool MacroProcMsger::ReadFromSrvPipe(uint8_t* buf, size_t size) const
 {
 #ifdef _WIN32
-    return ReadFile(hParentRead, buf, size, nullptr, nullptr) == TRUE;
+    return ReadFile(hParentRead, buf, static_cast<DWORD>(size), nullptr, nullptr) == TRUE;
 #else
     ssize_t res = read(pipefdC2P[0], buf, size);
     // res == 0, means end of file; res == -1, indicates error accurred
@@ -578,7 +580,7 @@ void CreateJobObjectForMacroSrv()
         Errorln("Create job object for macro srv fail!");
         return;
     } else {
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {0};
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {{}};
         // Configure all child processes associated with the job to terminate when the job end
         jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         if (0 == SetInformationJobObject(ghJob, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli))) {

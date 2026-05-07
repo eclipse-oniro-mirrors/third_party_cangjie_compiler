@@ -24,7 +24,7 @@ class CGModule;
 template <typename ObjectType> class ObjectLocker {
 public:
     // Locks the associated object and calls the given function.
-    template <typename Func> decltype(auto) Do(Func&& func)
+    template <typename Function> decltype(auto) Do(Function&& func)
     {
         std::unique_lock<std::mutex> lock(this->locker);
         return func(object);
@@ -37,12 +37,12 @@ private:
 
 class CGPkgContext {
 public:
-    CGPkgContext(CHIR::CHIRBuilder& chirBuilder, const CHIRData& chirData, const GlobalOptions& options,
+    CGPkgContext(CHIRData& chirData, const GlobalOptions& options,
         bool enableIncrement, const CachedMangleMap& cachedMangleMap);
     ~CGPkgContext();
     void Clear();
 
-    CHIR::CHIRBuilder& GetCHIRBuilder() const
+    CHIR::CHIRBuilder& GetCHIRBuilder()
     {
         return chirBuilder;
     }
@@ -56,7 +56,7 @@ public:
         return options;
     }
 
-    CHIR::FuncBase* GetImplicitUsedFunc(const std::string& funcMangledName);
+    CHIR::Function* GetImplicitUsedFunc(const std::string& funcMangledName);
 
     const CachedMangleMap& GetCachedMangleMap() const
     {
@@ -92,11 +92,10 @@ public:
 
     CHIR::Value* FindCHIRGlobalValue(const std::string& mangledName);
 
-    CHIR::CHIRBuilder& chirBuilder;
-
 private:
-    const CHIRData& chirData;
+    CHIRData& chirData;
     const GlobalOptions& options;
+    CHIR::CHIRBuilder chirBuilder;
     const bool enableIncrement;
     CachedMangleMap correctedCachedMangleMap;
 

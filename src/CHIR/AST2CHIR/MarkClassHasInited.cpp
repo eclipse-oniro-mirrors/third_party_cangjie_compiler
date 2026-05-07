@@ -11,6 +11,7 @@
 #include "cangjie/CHIR/Utils/CHIRCasting.h"
 #include "cangjie/CHIR/IR/Expression/Terminator.h"
 #include "cangjie/CHIR/IR/Type/ClassDef.h"
+#include "cangjie/Utils/ProfileRecorder.h"
 
 using namespace Cangjie::CHIR;
 
@@ -58,9 +59,9 @@ void MarkClassHasInited::AddHasInitedFlagToClassDef(ClassDef& classDef)
 
 void MarkClassHasInited::AddGuardToFinalizer(ClassDef& classDef)
 {
-    auto finalizer = Cangjie::DynamicCast<Cangjie::CHIR::Func*>(classDef.GetFinalizer());
-    if (!finalizer) {
-        // the finalizer may be an ImportedFunc when:
+    auto finalizer = classDef.GetFinalizer();
+    if (!finalizer || !finalizer->IsFuncWithBody()) {
+        // the finalizer may be an imported function when:
         // 1. incremental compilation
         // 2. class is imported
         return;
@@ -92,7 +93,7 @@ void MarkClassHasInited::AddGuardToFinalizer(ClassDef& classDef)
     finalizer->GetBody()->SetEntryBlock(block);
 }
 
-void MarkClassHasInited::AssignHasInitedFlagToFalseInConstructorHead(Func& constructor)
+void MarkClassHasInited::AssignHasInitedFlagToFalseInConstructorHead(Function& constructor)
 {
     /*
         class CA {
@@ -115,7 +116,7 @@ void MarkClassHasInited::AssignHasInitedFlagToFalseInConstructorHead(Func& const
     entry->InsertExprIntoHead(*falseVal);
 }
 
-void MarkClassHasInited::AssignHasInitedFlagToTrueInConstructorExit(Func& constructor)
+void MarkClassHasInited::AssignHasInitedFlagToTrueInConstructorExit(Function& constructor)
 {
     /*
         class CA {
@@ -168,19 +169,18 @@ void MarkClassHasInited::RunOnPackage(const Package& package)
      *                                              }
      */
 
+    Utils::ProfileRecorder recorder("Canonicalization", "MarkClassHasInited");
     for (auto classDef : package.GetAllClassDef()) {
         if (classDef->GetFinalizer() == nullptr) {
             continue;
         }
         AddHasInitedFlagToClassDef(*classDef);
-        for (auto funcBase : classDef->GetMethods()) {
-            if (!funcBase->IsConstructor()) {
+        for (auto func : classDef->GetMethods()) {
+            if (!func->IsConstructor() || !func->IsFuncWithBody()) {
                 continue;
             }
-            if (auto func = DynamicCast<Func*>(funcBase)) {
-                AssignHasInitedFlagToFalseInConstructorHead(*func);
-                AssignHasInitedFlagToTrueInConstructorExit(*func);
-            }
+            AssignHasInitedFlagToFalseInConstructorHead(*func);
+            AssignHasInitedFlagToTrueInConstructorExit(*func);
         }
 
         AddGuardToFinalizer(*classDef);

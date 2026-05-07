@@ -22,7 +22,7 @@ namespace Cangjie::CHIR {
 class FuncType;
 class Type;
 class GenericType;
-class FuncBase;
+class Function;
 class AttributeInfo;
 class ClassType;
 class Translator;
@@ -37,6 +37,8 @@ struct FuncSigInfo {
     FuncType* funcType{nullptr};  // declared type, including `this` type and return type
                                   // there may be generic type in it
     std::vector<GenericType*> genericTypeParams;
+
+    std::string ToString() const;
 };
 
 struct FuncCallType {
@@ -55,7 +57,7 @@ public:
      *  @param p Instantiated parent type
      *  @param r Instantiated return type
      */
-    VirtualMethodInfo(FuncSigInfo&& c, FuncBase* func, const AttributeInfo& a, FuncType& o, Type& p, Type& r);
+    VirtualMethodInfo(FuncSigInfo&& c, Function* func, const AttributeInfo& a, FuncType& o, Type& p, Type& r);
 
     // ===--------------------------------------------------------------------===//
     // Get
@@ -79,7 +81,7 @@ public:
     /** @brief Get original function type (from parent definition, including generic parameters) */
     FuncType* GetOriginalFuncType() const;
     /** @brief Get virtual method function instance */
-    FuncBase* GetVirtualMethod() const;
+    Function* GetVirtualMethod() const;
 
     // ===--------------------------------------------------------------------===//
     // Set
@@ -99,7 +101,7 @@ public:
     /** @brief Set virtual method function instance
      *  @param newFunc New function instance
      */
-    void SetVirtualMethod(FuncBase* newFunc);
+    void SetVirtualMethod(Function* newFunc);
     /** @brief Update method information (copy information from another VirtualMethodInfo)
      *  @param newInfo New method information to copy from
      */
@@ -121,13 +123,14 @@ public:
      */
     bool FuncSigIsMatched(const FuncSigInfo& other, CHIRBuilder& builder) const;
     /** @brief Check if function signature matches (compare with FuncCallType, supports generic substitution)
+     *         `replaceTable` is a copy, we don't want generic type defined in func decl to be emplaced in
      *  @param other Function call type to compare
      *  @param replaceTable Generic type replacement table (output parameter)
      *  @param builder CHIR builder
      *  @return true if signatures match, false otherwise
      */
     bool FuncSigIsMatched(const FuncCallType& other,
-        std::unordered_map<const GenericType*, Type*>& replaceTable, CHIRBuilder& builder) const;
+        std::unordered_map<const GenericType*, Type*> replaceTable, CHIRBuilder& builder) const;
     /** @brief Test if the method has the specified attribute
      *  @param a Attribute to test
      *  @return true if the method has the attribute, false otherwise
@@ -138,7 +141,7 @@ private:
     // condition
     FuncSigInfo condition;
     // result
-    FuncBase* instance{nullptr};
+    Function* instance{nullptr};
     AttributeInfo attr;
     FuncType* originalType{nullptr}; // virtual func's original func type from parent def, (param types)->retType,
                                      // param types include `this` type
@@ -239,7 +242,7 @@ public:
      *  @param newName New function name (empty string means no update)
      */
     void UpdateItemInTypeVTable(
-        ClassType& srcClassTy, size_t index, FuncBase* newFunc, Type* newParentTy, const std::string& newName);
+        ClassType& srcClassTy, size_t index, Function* newFunc, Type* newParentTy, const std::string& newName);
     /** @brief Convert private types (used in type conversion scenarios)
      *  @param convertFuncParamsAndRetType Conversion function for function parameters and return type
      *  @param convertType Conversion function for types
@@ -258,7 +261,7 @@ struct VTableSearchRes {
     ClassType* instSrcParentType{nullptr};     // instantiated by instantiate func type
     ClassType* halfInstSrcParentType{nullptr}; // instantiated by current def
     FuncType* originalFuncType{nullptr};       // a generic func type, from current def, not parent def
-    FuncBase* instance{nullptr};
+    Function* instance{nullptr};
     CustomTypeDef* originalDef{nullptr};       // this virtual func belongs to a vtable,
                                                // and this vtable belongs to a CustomTypeDef
     std::vector<GenericType*> genericTypeParams;

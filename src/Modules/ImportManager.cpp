@@ -778,8 +778,8 @@ std::set<std::string> ImportManager::CollectDirectDepPkg(const Package& package)
 
 namespace {
 
-void ValidateFileFeatureSpec(DiagnosticEngine &diag, const Package& pkg,
-    std::unordered_map<std::string, bool>& refMap, Ptr<File>& refFile, bool& anno)
+void ValidateFileFeatureSpec(DiagnosticEngine& diag, const Package& pkg, std::unordered_map<std::string, bool>& refMap,
+    Ptr<File>& refFile, bool& anno)
 {
     size_t refSize = 0;
     std::unordered_map<std::string, Range> rangeMap;
@@ -812,7 +812,7 @@ void ValidateFileFeatureSpec(DiagnosticEngine &diag, const Package& pkg,
         refMap.emplace(ftr.ToString(), false);
     }
 }
- 
+
 void CollectInvalidFeatureFiles(const Package& pkg, std::vector<Ptr<File>>& invalidFeatures,
     std::unordered_map<std::string, bool>& refMap, bool hasAnno)
 {
@@ -910,7 +910,6 @@ static void CheckPackageSpecsIdentical(DiagnosticEngine& diag, const Package& pk
     }
 }
 } // namespace
-
 
 bool ImportManager::BuildIndex(
     const std::string& cangjieModules, const GlobalOptions& globalOptions, std::vector<Ptr<Package>>& packages)
@@ -1183,7 +1182,7 @@ std::vector<std::pair<std::string, std::vector<Ptr<Decl>>>> ImportManager::GetIm
         std::vector<Ptr<Decl>> decls(declSet.cbegin(), declSet.cend());
         res.emplace_back(name, std::move(decls));
     }
-    
+
     if (iter != fileImportedDeclsMap.cend()) {
         for (const auto& [name, declSet] : iter->second) {
             std::vector<Ptr<Decl>> decls(declSet.cbegin(), declSet.cend());

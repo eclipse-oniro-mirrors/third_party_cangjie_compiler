@@ -12,6 +12,7 @@
 #include "cangjie/CHIR/IR/Type/EnumDef.h"
 #include "cangjie/CHIR/IR/Type/StructDef.h"
 #include "cangjie/CHIR/Utils/Visitor/Visitor.h"
+#include "cangjie/Utils/ProfileRecorder.h"
 
 using namespace Cangjie;
 using namespace Cangjie::CHIR;
@@ -360,6 +361,7 @@ void BoxRecursionValueType::CreateBoxTypeForRecursionStruct()
 
 void BoxRecursionValueType::Run()
 {
+    Utils::ProfileRecorder recorder("Canonicalization", "BoxRecursionValueType");
     CreateBoxTypeForRecursionEnum();
     CreateBoxTypeForRecursionStruct();
     for (auto type : builder.GetAllCustomTypes()) {
@@ -390,7 +392,7 @@ void BoxRecursionValueType::InsertBoxAndUnboxExprForRecursionValueType()
         }
         return VisitResult::CONTINUE;
     };
-    for (auto func : pkg.GetGlobalFuncs()) {
+    for (auto func : pkg.GetGlobalFuncsWithBody()) {
         Visitor::Visit(*func, visitor);
     }
 }

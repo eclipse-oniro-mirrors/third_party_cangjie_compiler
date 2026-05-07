@@ -146,7 +146,7 @@ public:
     }
 
     /// abstract function
-    static bool Filter(const Func& method)
+    static bool Filter(const Function& method)
     {
         (void)method;
         return true;
@@ -179,12 +179,12 @@ public:
     }
 
 protected:
-    explicit Analysis(const Func* func, bool isDebug = false) : func(func), isDebug(isDebug)
+    explicit Analysis(const Function* func, bool isDebug = false) : func(func), isDebug(isDebug)
     {
     }
 
     /// The function that will be analysed.
-    const Func* func;
+    const Function* func;
 
     /// Will print the debug message if it's true.
     bool isDebug;

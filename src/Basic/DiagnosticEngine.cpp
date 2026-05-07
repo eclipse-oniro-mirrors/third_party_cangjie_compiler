@@ -13,7 +13,6 @@
  */
 #include "DiagnosticEngineImpl.h"
 
-#include <cstddef>
 #include <set>
 #include <sstream>
 #include <string>
@@ -27,11 +26,106 @@
 #include "cangjie/Utils/CheckUtils.h"
 #include "cangjie/Utils/Unicode.h"
 
+#include "cangjie/AST/PrintNode.h"
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
 
 namespace Cangjie {
+// Define the errorData array (declaration is in DiagnosticEngine.h)
+const std::vector<ErrorData> errorData = {
+#if defined(ERROR)
+#undef ERROR
+#endif
+#define ERROR(Kind, ...) {__VA_ARGS__},
+#define WARNING(Kind, Group, ...) {__VA_ARGS__},
+#include "cangjie/Basic/DiagRefactor/DiagnosticAll.def"
+#undef WARNING
+#undef ERROR
+};
+
+// Define DIAG_KIND_STR array (declaration is in DiagnosticEngine.h)
+const std::vector<std::string_view> DIAG_KIND_STR = {
+#define NOTE(Kind, Info) #Kind,
+#define ERROR(Kind, Info) #Kind,
+#define WARNING(Kind, Group, Info) #Kind,
+#include "cangjie/Basic/DiagnosticsAll.def"
+#undef ERROR
+#undef WARNING
+#undef NOTE
+};
+const size_t DIAG_KIND_STR_SIZE = DIAG_KIND_STR.size();
+
+// Define DiagSeveritys array (declaration is in DiagnosticEngine.h)
+const std::vector<DiagSeverity> DiagSeveritys = {
+#define ERROR(Kind, Info) DiagSeverity::DS_ERROR,
+#define NOTE(Kind, Info) DiagSeverity::DS_NOTE,
+#define WARNING(Kind, Group, Info) DiagSeverity::DS_WARNING,
+#include "cangjie/Basic/DiagnosticsAll.def"
+#undef ERROR
+#undef WARNING
+#undef NOTE
+};
+
+// Define DiagMessages array (declaration is in DiagnosticEngine.h)
+const std::vector<std::string_view> DiagMessages = {
+#define ERROR(Kind, Info) Info,
+#define WARNING(Kind, Group, Info) Info,
+#define NOTE(Kind, Info) Info,
+#include "cangjie/Basic/DiagnosticsAll.def"
+#undef ERROR
+#undef WARNING
+#undef NOTE
+};
+
+// Define warnGroups array (declaration is in DiagnosticEngine.h)
+const std::vector<WarnGroup> warnGroups = {
+#define ERROR(Kind, ...) WarnGroup::NONE,
+#define WARNING(Kind, Group, ...) WarnGroup::Group,
+#define NOTE(Kind, Info) WarnGroup::NONE,
+#include "cangjie/Basic/DiagnosticsAll.def"
+#undef WARNING
+#undef ERROR
+#undef NOTE
+};
+
+// Define rDiagSeveritys array (declaration is in DiagnosticEngine.h)
+const std::vector<DiagSeverity> rDiagSeveritys = {
+#define ERROR(Kind, ...) DiagSeverity::DS_ERROR,
+#define WARNING(Kind, ...) DiagSeverity::DS_WARNING,
+#include "cangjie/Basic/DiagRefactor/DiagnosticAll.def"
+#undef WARNING
+#undef ERROR
+};
+
+// Define rWarnGroups array (declaration is in DiagnosticEngine.h)
+const std::vector<WarnGroup> rWarnGroups = {
+#define ERROR(Kind, ...) WarnGroup::NONE,
+#define WARNING(Kind, Group, ...) WarnGroup::Group,
+#include "cangjie/Basic/DiagRefactor/DiagnosticAll.def"
+#undef WARNING
+#undef ERROR
+};
+
+// Define warnGroupDescrs array (declaration is in DiagnosticEngine.h)
+const std::vector<std::string_view> warnGroupDescrs = {
+#define WARN_GROUP(DESCR, KIND) DESCR,
+#include "cangjie/Basic/DiagRefactor/DiagnosticWarnGroupKind.def"
+#undef WARN_GROUP
+};
+const size_t WARN_GROUP_DESCRS_SIZE = warnGroupDescrs.size();
+
+// Define RE_DIAG_KIND_STR array (declaration is in DiagnosticEngine.h)
+const std::vector<std::string_view> RE_DIAG_KIND_STR = {
+#define ERROR(Kind, ...) #Kind,
+#define WARNING(Kind, ...) #Kind,
+#include "cangjie/Basic/DiagRefactor/DiagnosticAll.def"
+#undef WARNING
+#undef ERROR
+};
+const size_t RE_DIAG_KIND_STR_SIZE = RE_DIAG_KIND_STR.size();
+
 
 size_t HashForPosition(const Position& pos)
 {
@@ -250,7 +344,7 @@ void DiagnosticBuilder::AddHint(const Range& range, std::vector<std::string>& ar
     diag.CheckRange(diagnostic.GetDiagCategory(), range);
 
     auto errData = errorData[static_cast<unsigned>(diagnostic.rKind)];
-
+    
     if (diagnostic.otherHints.size() >= errData.otherHints.size()) {
         CJC_ASSERT(arguments.size() <= 1);
         auto str = arguments.empty() ? "" : arguments.front();
@@ -426,7 +520,7 @@ void DiagnosticEngineImpl::HandleDiagnostic(Diagnostic& diagnostic) noexcept
             IsSupressedUnusedMain(diagnostic)) {
             return;
         } else if (diagnostic.warnGroup != WarnGroup::UNGROUPED) {
-            std::string warnGroupName = warnGroupDescrs[static_cast<unsigned>(diagnostic.warnGroup)];
+            std::string warnGroupName = std::string(warnGroupDescrs[static_cast<unsigned>(diagnostic.warnGroup)]);
             auto msg = "this warning can be suppressed by setting the compiler option `-Woff " + warnGroupName + "`";
             auto note = SubDiagnostic(msg);
             diagnostic.subDiags.push_back(note);
@@ -523,7 +617,7 @@ std::string DiagnosticEngineImpl::GetArgStr(
 
 void DiagnosticEngineImpl::ConvertArgsToDiagMessage(Diagnostic& diagnostic) noexcept
 {
-    std::string formatStr = DiagMessages[static_cast<int>(diagnostic.kind)];
+    std::string formatStr = std::string(DiagMessages[static_cast<size_t>(diagnostic.kind)]);
     // C string format length, like length of '%f', '%d'.
     const static size_t formatLens = 2;
     uint8_t index = 0;
@@ -707,49 +801,46 @@ void DiagnosticEngineImpl::AddMacroCallNote(Diagnostic& diagnostic, const AST::N
         return;
     }
     diagnostic.curMacroCall = node.curMacroCall;
-    // Refactor the Diagnose of the node after the macro expansion.
+    // Check pure annotation
     auto pInvocation = node.curMacroCall->GetInvocation();
     if (!pInvocation || IsPureAnnotation(*pInvocation)) {
         return;
     }
 
-    // For cjc, display a hint message on the source code if the corresponding source code exists.
-    if (!pInvocation->isForLSP) {
-        Position originPos;
-        auto key = pInvocation->isCurFile ? pos.Hash32() : static_cast<const uint32_t>(pos.column);
-        if (pInvocation->isCurFile && pInvocation->originPosMap.find(key) != pInvocation->originPosMap.end()) {
-            originPos = pInvocation->originPosMap.at(key);
-        } else if (pInvocation->new2originPosMap.find(pos.Hash32()) != pInvocation->new2originPosMap.end()) {
-            originPos = pInvocation->new2originPosMap.at(pos.Hash32());
-            if (!originPos.isCurFile) {
-                originPos = INVALID_POSITION;
-            }
-        }
-        if (originPos != INVALID_POSITION && originPos != diagnostic.start &&
-            originPos != diagnostic.mainHint.range.begin) {
-            if (diagnostic.errorMessage.empty()) {
-                ConvertArgsToDiagMessage(diagnostic);
-                auto range = MakeRange(diagnostic.start, diagnostic.end);
-                (void)diagnostic.subDiags.emplace_back(range, "which is expanded as follows");
-                diagnostic.start = originPos;
-                diagnostic.end = originPos + 1;
-            } else {
-                (void)diagnostic.subDiags.emplace_back(diagnostic.mainHint.range, "which is expanded as follows");
-            }
-            diagnostic.mainHint.range = MakeRange(originPos, originPos + 1);
-        }
-    }
     auto mcBegin = node.curMacroCall->begin;
-    auto idPosEnd = pInvocation->identifierPos + pInvocation->identifier.size();
-    // For lsp, the error range includes only identifier.
-    // Otherwise, the error range includes the entire macrocall node.
-    auto mcEnd = pInvocation->isForLSP ? idPosEnd : node.curMacroCall->end;
     std::string sevInfo = (diagnostic.diagSeverity == DiagSeverity::DS_ERROR) ? "the error" : "the warning";
-    (void)diagnostic.subDiags.emplace_back(MakeRange(mcBegin, mcEnd), sevInfo + " occurs after the macro is expanded");
-    if (!pInvocation->isForLSP) {
-        auto codeRange = MakeRange(pInvocation->mcBegin, pInvocation->mcEnd);
-        (void)diagnostic.subDiags.emplace_back(codeRange, MACROCALL_CODE);
+    // For lsp, the error range includes only identifier.
+    if (pInvocation->isForLSP) {
+        auto idPosEnd = pInvocation->identifierPos + pInvocation->identifier.size();
+        auto message = sevInfo + " occurs after the macro is expanded";
+        (void)diagnostic.subDiags.emplace_back(MakeRange(mcBegin, idPosEnd), message);
+        return;
     }
+
+    // For cjc, display a hint message on the source code if the corresponding source code exists.
+    Position originPos;
+    auto key = pInvocation->isCurFile ? pos.Hash32() : static_cast<const uint32_t>(pos.column);
+    if (pInvocation->isCurFile && pInvocation->originPosMap.find(key) != pInvocation->originPosMap.end()) {
+        originPos = pInvocation->originPosMap.at(key);
+    } else if (pInvocation->new2originPosMap.find(pos.Hash32()) != pInvocation->new2originPosMap.end()) {
+        originPos = pInvocation->new2originPosMap.at(pos.Hash32());
+        if (!originPos.isCurFile) {
+            originPos = INVALID_POSITION;
+        }
+    }
+    if (originPos != INVALID_POSITION && originPos != diagnostic.start &&
+        originPos != diagnostic.mainHint.range.begin) {
+        if (diagnostic.errorMessage.empty()) {
+            diagnostic.start = originPos;
+            diagnostic.end = originPos + 1;
+        }
+        diagnostic.mainHint.range = MakeRange(originPos, originPos + 1);
+    }
+    // Add macro note.
+    auto message = sevInfo + " originates in the macro `" + pInvocation->fullName +
+        "` (consider using `--debug-macro` for more info)";
+    auto range = MakeRange(mcBegin, node.curMacroCall->end);
+    (void)diagnostic.subDiags.insert(diagnostic.subDiags.begin(), SubDiagnostic(range, message));
 }
 
 void DiagnosticHandler::SetPrevDiag(Position pos, std::string str)

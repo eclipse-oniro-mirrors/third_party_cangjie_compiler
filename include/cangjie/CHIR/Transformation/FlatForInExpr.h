@@ -34,7 +34,7 @@ public:
 private:
     CHIRBuilder& builder;
 
-    void RunOnFunc(Func& func);
+    void RunOnFunc(Function& func);
 
     void RunOnBlockGroup(BlockGroup& blockGroup);
 

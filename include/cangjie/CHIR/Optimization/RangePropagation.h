@@ -50,7 +50,7 @@ public:
      * @param func func to do optimization.
      * @param isDebug flag whether print debug log.
      */
-    void RunOnFunc(const Ptr<const Func>& func, bool isDebug);
+    void RunOnFunc(const Ptr<const Function>& func, bool isDebug);
 
     /**
      * @brief Get effect map after this pass.
@@ -62,7 +62,7 @@ public:
      * @brief Get all funcs need to remove unreachable blocks.
      * @return functions
      */
-    const std::vector<const Func*>& GetFuncsNeedRemoveBlocks() const;
+    const std::vector<const Function*>& GetFuncsNeedRemoveBlocks() const;
 private:
     struct RewriteInfo {
         Expression* oldExpr;
@@ -97,7 +97,7 @@ private:
      */
     void RewriteBranchTerminator(const Ptr<Terminator>& branch, const Ptr<Block>& targetSucc, bool isDebug);
 
-    void RecordEffectMap(const Expression* expr, const Func* func) const;
+    void RecordEffectMap(const Expression* expr, const Function* func) const;
 
     void CheckVarrayIndex(const Ptr<Intrinsic>& intrin, const RangeDomain& state) const;
 
@@ -106,7 +106,7 @@ private:
     DiagAdapter* diag;
     bool enIncre;
     static OptEffectCHIRMap effectMap;
-    std::vector<const Func*> funcsNeedRemoveBlocks;
+    std::vector<const Function*> funcsNeedRemoveBlocks;
 };
 
 } // namespace Cangjie::CHIR

@@ -200,7 +200,6 @@ static size_t SkipBracketedTokens(const TokenVector& tokens, size_t idx,
 // Skip the annotation's own tokens: @AnnotationName[args] and trailing newlines.
 // This is needed when re-evaluating a custom annotation to avoid scanning the
 // annotation itself (which would cause duplicate tokens in RefreshMacroCallArgs).
-//
 // Example: For "@BeanMeta[args]\n@Bean@Pointcut", returns index pointing to "@Bean"
 static size_t SkipAnnotationTokens(const TokenVector& tokens)
 {
@@ -745,7 +744,7 @@ void MacroEvaluation::SaveUsedMacros(MacroCall& macCall)
     if (!node || !node->curFile || !decl) {
         return;
     }
-    ci->importManager.AddUsedMacroDecls(macCall.GetNode()->curFile, decl);
+    ci->importManager->AddUsedMacroDecls(macCall.GetNode()->curFile, decl);
 }
 
 void MacroEvaluation::SaveUsedMacroPkgs(const std::string packageName)
@@ -1114,7 +1113,7 @@ std::unordered_set<std::string> MacroEvaluation::GetMacroDefDynamicFiles()
 {
     std::unordered_set<std::string> macroDynFiles;
     // For built-in macro packages the corresponding dynamic library needs to be added.
-    for (auto& packageName : ci->importManager.GetImportedStdMacroPackages()) {
+    for (auto& packageName : ci->importManager->GetImportedStdMacroPackages()) {
         auto basePath =
             FileUtil::JoinPath(FileUtil::GetDirPath(ci->invocation.globalOptions.executablePath), "../runtime/lib");
         auto libName = "lib" + FileUtil::ConvertPackageNameToLibCangjieBaseFormat(packageName) + LIB_SUFFIX;

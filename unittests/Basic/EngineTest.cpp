@@ -290,7 +290,8 @@ TEST(EngineTest, ShowColorTest)
     EXPECT_EQ(disableColorOut2.str().find("\x1b[31m"), std::string::npos);
 }
 
-#elif _WIN32
+#else
+#ifdef _WIN32
 TEST(EngineTest, ShowColorTest)
 {
     DiagnosticEngine diag;
@@ -313,6 +314,7 @@ TEST(EngineTest, ShowColorTest)
         EXPECT_EQ(disableColorOut2.str().find("\x1b[31m"), std::string::npos);
     }
 }
+#endif
 #endif
 
 TEST(EngineTest, OldDiagKindDefGuard)

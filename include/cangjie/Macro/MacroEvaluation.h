@@ -37,8 +37,12 @@
 #if defined(FASTCALL)
 #undef FASTCALL
 #endif
-#elif defined(__linux__) || defined(__APPLE__)
+#else
+#if defined(__linux__)
 #include <dlfcn.h>
+#elif defined(__APPLE__)
+#include <dlfcn.h>
+#endif
 #endif
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "cangjie/Macro/MacroCommon.h"
@@ -123,7 +127,10 @@ private:
     void DeSerializeMacroCall(const MacroMsgFormat::MacroCall& callFmt);
     bool SerializeAndNotifyResult(MacroCall& macCall) const;
     bool EvalMacroCallsAndWaitResult();
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__linux__)
+    void RunMacroSrv();
+    void ExecMacroSrv(pid_t pid) const;
+#elif defined(__APPLE__)
     void RunMacroSrv();
     void ExecMacroSrv(pid_t pid) const;
 #endif
@@ -183,6 +190,8 @@ private:
         TokenVector& inputTokens, size_t& startIndex, size_t& curIndex, MacroCall& macCall, bool reEval = false);
     void CheckDeprecatedMacrosUsage(MacroCall& macCall) const;
     bool NeedCreateMacroCallTree(MacroCall& macCall, bool reEval);
+    bool NeedCreateMacroCallTreeForReEval(MacroCall& macCall, AST::MacroInvocation* pInvocation);
+    bool NeedCreateMacroCallTreeForFirstEval(MacroCall& macCall, AST::MacroInvocation* pInvocation);
     void CreateMacroCallTree(MacroCall& macCall, bool reEval = false);
     void CreateMacroCallsTree(bool reEval = false);
     void EvalOneMacroCall(MacroCall& macCall);

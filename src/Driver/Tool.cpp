@@ -19,9 +19,11 @@
 #include <iomanip>
 #else
 #include <spawn.h>
+#include <cstring>
 #include <sys/wait.h>
 #endif
 #include <fstream>
+#include <type_traits>
 
 #include "cangjie/Utils/FileUtil.h"
 #include "cangjie/Utils/Semaphore.h"
@@ -29,11 +31,64 @@
 #include "cangjie/Driver/Utils.h"
 
 using namespace Cangjie;
+namespace {
+#ifdef _WIN32
+std::string GetSystemErrorMessage(DWORD errCode)
+{
+    if (errCode == 0) {
+        return "";
+    }
+    LPWSTR wMsgBuf = nullptr;
+    DWORD size =
+        FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL, errCode, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), (LPWSTR)&wMsgBuf, 0, NULL);
+    if (size == 0 || wMsgBuf == nullptr) {
+        return "Unknown system error code: " + std::to_string(errCode);
+    }
 
+    std::wstring wmessage(wMsgBuf, size);
+
+    LocalFree(wMsgBuf);
+
+    while (!wmessage.empty() && (wmessage.back() == L'\r' || wmessage.back() == L'\n')) {
+        wmessage.pop_back();
+    }
+
+    if (wmessage.empty()) {
+        return "";
+    }
+    int utf8_size = WideCharToMultiByte(CP_UTF8, 0, wmessage.c_str(), (int)wmessage.length(), NULL, 0, NULL, NULL);
+    std::string result(utf8_size, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wmessage.c_str(), (int)wmessage.length(), &result[0], utf8_size, NULL, NULL);
+
+    return result;
+}
+#else
+std::string GetSystemErrorMessage(int error)
+{
+    constexpr size_t buffSize = 512;
+    char buf[buffSize] = {0};
+    auto handleError = [&buf](auto res) -> std::string {
+        using T = decltype(res);
+        if constexpr (std::is_integral_v<T>) {
+            // POSIX
+            return res != 0 ? "" : std::string(buf);
+        } else {
+            // GNU
+            return res ? std::string(res) : "";
+        }
+    };
+    // Generic lambda defers semantic checks until instantiation.
+    return handleError(strerror_r(error, buf, buffSize));
+}
+#endif
+} // namespace
 #ifdef __APPLE__
 const static std::string LD_LIBRARY_PATH = "DYLD_LIBRARY_PATH";
+const static std::string LD_PRELOAD = "DYLD_INSERT_LIBRARIES";
 #elif !defined(_WIN32)
 const static std::string LD_LIBRARY_PATH = "LD_LIBRARY_PATH";
+const static std::string LD_PRELOAD = "LD_PRELOAD";
 #endif
 
 void Tool::AppendMultiArgs(const std::string& argStr)
@@ -141,7 +196,7 @@ std::unique_ptr<ToolFuture> Tool::Run() const
     if (!CreateProcessA(
         name.c_str(), const_cast<char*>(commandLine.c_str()), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
         Utils::Semaphore::Get().Release();
-        return nullptr;
+        return std::make_unique<ErrorFuture>(GetSystemErrorMessage(GetLastError()));
     }
 
     return std::make_unique<WindowsProcessFuture>(pi);
@@ -157,7 +212,7 @@ std::unique_ptr<ToolFuture> Tool::Run() const
 
     // Convert arguments to char * array for argv argument.
     std::vector<char*> rawArgumentArray = {};
-    rawArgumentArray.reserve(arguments.size() + 1);
+    rawArgumentArray.resize(arguments.size() + 1);
     size_t index = 0;
     while (index < arguments.size()) {
         rawArgumentArray[index] = const_cast<char*>(arguments[index].c_str());
@@ -191,7 +246,7 @@ std::unique_ptr<ToolFuture> Tool::Run() const
     // Failed to start the child process
     if (status != 0) {
         Utils::Semaphore::Get().Release();
-        return nullptr;
+        return std::make_unique<ErrorFuture>(GetSystemErrorMessage(status));
     }
 
     return std::make_unique<LinuxProcessFuture>(pid);
@@ -215,8 +270,42 @@ std::list<std::string> Tool::BuildEnvironmentVector() const
         }
         environment.emplace_back(LD_LIBRARY_PATH + "=" + newLdLibraryPath);
     }
+
+    const static std::unordered_set<std::string> blocklist = {
+        // Linux specific
+        LD_LIBRARY_PATH,
+        LD_PRELOAD,          // Preload shared libraries
+        "LD_AUDIT",          // Audit libraries
+        "LD_DEBUG",          // Debugging
+        "LD_PROFILE",        // Profiling
+        "LD_TRACE_LOADED_OBJECTS", // Trace loaded objects
+
+        // macOS specific
+        "DYLD_INSERT_LIBRARIES",       // Preload libraries on macOS
+        "DYLD_FRAMEWORK_PATH",         // Framework search path
+        "DYLD_FALLBACK_FRAMEWORK_PATH", // Fallback framework path
+        "DYLD_FALLBACK_LIBRARY_PATH",   // Fallback library path
+        "DYLD_VERSIONED_FRAMEWORK_PATH", // Versioned framework path
+        "DYLD_VERSIONED_LIBRARY_PATH",   // Versioned library path
+        "DYLD_PRINT_LIBRARIES",         // Print loaded libraries
+        "DYLD_PRINT_TO_FILE",           // Print to file
+
+        // Compiler specific
+        "RUSTC_WRAPPER",     // Rust compiler wrapper
+        "LLVM_SYS_*",        // LLVM system variables
+        "MLIR_SYS_*",        // MLIR system variables
+        "TABLEGEN_*",        // TableGen variables
+    };
+
     for (const auto& environmentVar : environmentVars) {
-        if (environmentVar.first == LD_LIBRARY_PATH) {
+        // Skip blocklisted environment variables
+        if (blocklist.find(environmentVar.first) != blocklist.end()) {
+            continue;
+        }
+        // Also skip variables that match patterns like LLVM_SYS_*, MLIR_SYS_*, TABLEGEN_*
+        if (environmentVar.first.find("LLVM_SYS_") == 0 ||
+            environmentVar.first.find("MLIR_SYS_") == 0 ||
+            environmentVar.first.find("TABLEGEN_") == 0) {
             continue;
         }
         environment.emplace_back(environmentVar.first + "=" + environmentVar.second);

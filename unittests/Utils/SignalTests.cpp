@@ -17,8 +17,10 @@
 #ifdef __unix__
 #include <cstdlib>
 #include <unistd.h>
-#elif _WIN32
+#else
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #endif
 
 #include <fstream>
@@ -40,10 +42,12 @@ const std::string PRPJECT_PATH = "..";
 const int STACK_OVERFLOW_RETURN_CODE = SIGSEGV + 128;
 const std::unordered_map<std::string, int> signalStringValueMap = {{"SIGABRT", SIGABRT}, {"SIGFPE", SIGFPE},
     {"SIGSEGV", SIGSEGV}, {"SIGILL", SIGILL}, {"SIGTRAP", SIGTRAP}, {"SIGBUS", SIGBUS}};
-#elif _WIN32
+#else
+#ifdef _WIN32
 const DWORD STACK_OVERFLOW_RETURN_CODE = EXCEPTION_STACK_OVERFLOW;
 const std::unordered_map<std::string, int> signalStringValueMap = {
     {"SIGABRT", SIGABRT}, {"SIGFPE", SIGFPE}, {"SIGSEGV", SIGSEGV}, {"SIGILL", SIGILL}};
+#endif
 #endif
 
 const std::unordered_map<std::string, int64_t> moduleValueMap = {
@@ -101,8 +105,10 @@ std::string GetSignalString(std::string& signalValue, std::string& module)
     if (signalValue == "StackOverflow") {
 #ifdef __unix__
         return CANGJIE_COMPILER_VERSION + "\n" + result1 + std::to_string(SIGSEGV) + result2;
-#elif _WIN32
+#else
+#ifdef _WIN32
         return CANGJIE_COMPILER_VERSION + "\n" + result1 + std::to_string(STACK_OVERFLOW_RETURN_CODE) + result2;
+#endif
 #endif
     }
     auto found = signalStringValueMap.find(signalValue);
@@ -186,7 +192,8 @@ int ExecuteProcess(std::string signalValue, std::string triggerPoint)
     return -1;
 }
 
-#elif _WIN32
+#else
+#ifdef _WIN32
 DWORD ExecuteProcess(std::string signalValue, std::string triggerPoint)
 {
     char buffer[MAX_PATH];
@@ -215,6 +222,7 @@ DWORD ExecuteProcess(std::string signalValue, std::string triggerPoint)
     return exit_code;
 }
 #endif
+#endif
 
 #define CT(sig, module)                                                                                                \
     TEST_F(SignalTests, module##Signal##sig)                                                                           \
@@ -233,7 +241,7 @@ CT(SIGABRT, main)
 CT(SIGFPE, main)
 CT(SIGSEGV, main)
 CT(SIGILL, main)
-#if __unix__
+#ifdef __unix__
 CT(SIGTRAP, main)
 CT(SIGBUS, main)
 #endif
@@ -243,7 +251,7 @@ CT(SIGABRT, parser)
 CT(SIGFPE, parser)
 CT(SIGSEGV, parser)
 CT(SIGILL, parser)
-#if __unix__
+#ifdef __unix__
 CT(SIGTRAP, parser)
 CT(SIGBUS, parser)
 #endif

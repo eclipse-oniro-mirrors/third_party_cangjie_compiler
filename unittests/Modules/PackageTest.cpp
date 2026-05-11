@@ -70,7 +70,7 @@ protected:
 #endif
 #ifdef _WIN32
         invocation.globalOptions.target.os = Cangjie::Triple::OSType::WINDOWS;
-#elif __unix__
+#elif defined(__unix__)
         invocation.globalOptions.target.os = Cangjie::Triple::OSType::LINUX;
 #endif
         invocation.globalOptions.outputMode = GlobalOptions::OutputMode::STATIC_LIB;
@@ -288,7 +288,7 @@ TEST_F(PackageTest, ImportPackage)
 {
 #ifdef _WIN32
     srcPath = projectPath + "\\unittests\\Modules\\ImportPackage\\";
-#elif __unix__
+#elif defined(__unix__)
     srcPath = projectPath + "/unittests/Modules/ImportPackage/";
 #endif
 
@@ -718,9 +718,8 @@ TEST_F(PackageTest, LSPExportInterfaceFuncFromMacro)
             auto macroCall = MakeOwned<MacroExpandDecl>();
             id->curMacroCall = macroCall.get();
             meds.emplace_back(std::move(macroCall));
-            id->EnableAttr(Attribute::MACRO_EXPANDED_NODE);
             for (auto& d : id->body->decls) {
-                d->EnableAttr(Attribute::MACRO_EXPANDED_NODE);
+                d->curMacroCall = macroCall.get();
             }
         }
     }
@@ -1179,7 +1178,7 @@ TEST_F(PackageTest, LoadPackageFromCjo)
 #endif
 #ifdef _WIN32
     testInvocation.globalOptions.target.os = Cangjie::Triple::OSType::WINDOWS;
-#elif __unix__
+#elif defined(__unix__)
     testInvocation.globalOptions.target.os = Cangjie::Triple::OSType::LINUX;
 #endif
     DiagnosticEngine testDiag;

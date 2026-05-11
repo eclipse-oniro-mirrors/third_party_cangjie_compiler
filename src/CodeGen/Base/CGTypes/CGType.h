@@ -247,6 +247,11 @@ public:
         cgExtensionDef = ed;
     }
 
+    virtual llvm::StructType* GetLayoutType() const
+    {
+        return layoutType;
+    }
+
     virtual llvm::Constant* GenSizeOfTypeInfo();
     virtual llvm::Constant* GenAlignOfTypeInfo();
     virtual void CalculateSizeAndAlign() = 0;

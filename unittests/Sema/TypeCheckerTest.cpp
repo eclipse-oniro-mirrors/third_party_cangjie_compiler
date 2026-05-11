@@ -40,7 +40,7 @@ protected:
 #endif
 #ifdef _WIN32
         instance->invocation.globalOptions.target.os = Cangjie::Triple::OSType::WINDOWS;
-#elif __unix__
+#elif defined(__unix__)
         instance->invocation.globalOptions.target.os = Cangjie::Triple::OSType::LINUX;
 #endif
         Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
@@ -275,7 +275,7 @@ TEST_F(TypeCheckerTest, DISABLED_AssumptionTest)
 {
 #ifdef _WIN32
     srcPath = projectPath + "\\unittests\\Sema\\SemaCangjieFiles\\AssumptionTest";
-#elif __unix__
+#elif defined(__unix__)
     srcPath = projectPath + "/unittests/Sema/SemaCangjieFiles/AssumptionTest";
 #endif
 
@@ -323,7 +323,7 @@ TEST_F(TypeCheckerTest, DISABLED_SpawnTest)
 {
 #ifdef _WIN32
     srcPath = projectPath + "\\unittests\\Sema\\SemaCangjieFiles\\";
-#elif __unix__
+#elif defined(__unix__)
     srcPath = projectPath + "/unittests/Sema/SemaCangjieFiles/";
 #endif
     auto srcFile = srcPath + "spawn.cj";

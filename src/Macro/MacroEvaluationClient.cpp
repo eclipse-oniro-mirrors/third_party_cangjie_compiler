@@ -14,7 +14,11 @@
 
 #include "cangjie/Macro/MacroEvaluation.h"
 #include "cangjie/Utils/ProfileRecorder.h"
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__linux__)
+#include <sys/select.h>
+#include <sys/signal.h>
+#include <sys/wait.h>
+#elif defined(__APPLE__)
 #include <sys/select.h>
 #include <sys/signal.h>
 #include <sys/wait.h>
@@ -22,8 +26,14 @@
 #include <windows.h>
 #endif
 
-#ifdef __linux__
+#if defined(__linux__)
 #include <sys/prctl.h>
+#endif
+
+#if defined(__linux__)
+#define CANGJIE_POSIX_MACRO_SRV 1
+#elif defined(__APPLE__)
+#define CANGJIE_POSIX_MACRO_SRV 1
 #endif
 
 #include <cstdlib>
@@ -38,6 +48,7 @@ namespace {
 
 const std::string MACRO_SRV_NAME = "LSPMacroServer";
 
+#ifndef _WIN32
 void SignalHandler(int)
 {
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
@@ -51,6 +62,7 @@ void SetExitSignal(void)
     std::signal(SIGTERM, SignalHandler);
     std::signal(SIGSEGV, SignalHandler);
 }
+#endif
 
 inline bool IsResultForMacCall(const std::string& id, const Position& pos, const MacroInvocation& mi)
 {
@@ -154,7 +166,7 @@ void MacroProcMsger::CloseMacroSrv()
 bool MacroProcMsger::WriteToSrvPipe(const uint8_t* buf, size_t size) const
 {
 #ifdef _WIN32
-    return WriteFile(hParentWrite, buf, size, nullptr, 0) == TRUE;
+    return WriteFile(hParentWrite, buf, static_cast<DWORD>(size), nullptr, 0) == TRUE;
 #else
     ssize_t res = write(pipefdP2C[1], buf, size);
     while (res >= 0 && res < static_cast<ssize_t>(size)) {
@@ -169,7 +181,7 @@ bool MacroProcMsger::WriteToSrvPipe(const uint8_t* buf, size_t size) const
 bool MacroProcMsger::ReadFromSrvPipe(uint8_t* buf, size_t size) const
 {
 #ifdef _WIN32
-    return ReadFile(hParentRead, buf, size, nullptr, nullptr) == TRUE;
+    return ReadFile(hParentRead, buf, static_cast<DWORD>(size), nullptr, nullptr) == TRUE;
 #else
     ssize_t res = read(pipefdC2P[0], buf, size);
     // res == 0, means end of file; res == -1, indicates error accurred
@@ -464,7 +476,7 @@ bool MacroEvaluation::WaitMacroCallsEvalResult(std::list<MacroCall*>& calls) con
     return true;
 }
 
-#if defined(__linux__) || defined(__APPLE__)
+#ifdef CANGJIE_POSIX_MACRO_SRV
 namespace {
 static void WaitProcessExit(pid_t pid)
 {
@@ -578,7 +590,7 @@ void CreateJobObjectForMacroSrv()
         Errorln("Create job object for macro srv fail!");
         return;
     } else {
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {0};
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {{}};
         // Configure all child processes associated with the job to terminate when the job end
         jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         if (0 == SetInformationJobObject(ghJob, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli))) {

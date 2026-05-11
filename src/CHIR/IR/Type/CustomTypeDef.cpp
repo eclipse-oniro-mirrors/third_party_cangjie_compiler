@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <optional>
+#include <unordered_set>
 #include <utility>
 
 #include "cangjie/CHIR/Utils/CHIRCasting.h"
@@ -27,6 +28,60 @@
 #include "cangjie/Utils/Utils.h"
 
 using namespace Cangjie::CHIR;
+
+namespace {
+/**
+ *  we choose the well matching but there may be many results, if there are many results, their `instance` must be same
+ *  so we need to define what function is NOT well matching, of course, the rule is from spec:
+ *  1. you can review how the `candidateTypes` are calculated
+ *  2. we assume that i and j are from `candidateTypes`, we define function `i` is NOT well matching if all parameters
+ *     in function `j` can be forwarded to function `i`, but not all parameters in function `i` can be forwarded to
+ *     function `j`
+ */
+std::vector<VTableSearchRes> GetWellMatchingResults(const std::vector<VTableSearchRes>& candidateRes,
+    const std::vector<FuncType*>& candidateTypes, CHIRBuilder& builder)
+{
+    if (candidateRes.size() <= 1) {
+        return candidateRes;
+    }
+    CJC_ASSERT(candidateRes.size() == candidateTypes.size());
+    auto candidateNum = candidateTypes.size();
+    std::vector<bool> targetMark(candidateNum, true);
+    for (size_t i = 0; i < candidateNum; ++i) {
+        if (!targetMark[i]) {
+            continue;
+        }
+        for (size_t j = i + 1; j < candidateNum; ++j) {
+            if (!targetMark[j]) {
+                continue;
+            }
+            auto iToJ = candidateTypes[i]->IsEqualOrInstantiatedTypeOf(*candidateTypes[j], builder);
+            auto jToI = candidateTypes[j]->IsEqualOrInstantiatedTypeOf(*candidateTypes[i], builder);
+            // according to spec, the more specific type is expected
+            // but if iToJ and jToI are both true, that means i and j have same func signature, we need to store both,
+            // if iToJ and jToI are both false, that means there is genric param in i and j, generic params can't
+            // be forwarded to each other
+            if (iToJ && !jToI) {
+                targetMark[j] = false;
+            } else if (!iToJ && jToI) {
+                targetMark[i] = false;
+                break;
+            }
+        }
+    }
+    std::vector<VTableSearchRes> result;
+    std::unordered_set<FuncBase*> instances;
+    for (size_t i = 0; i < candidateNum; ++i) {
+        if (targetMark[i]) {
+            result.emplace_back(candidateRes[i]);
+            instances.emplace(candidateRes[i].instance);
+        }
+    }
+    CJC_ASSERT(!result.empty());
+    CJC_ASSERT(instances.size() == 1);
+    return result;
+}
+}
 
 void CustomTypeDef::AddMethod(FuncBase* method, [[maybe_unused]] bool recordOrder)
 {
@@ -325,6 +380,7 @@ std::vector<VTableSearchRes> CustomTypeDef::GetFuncIndexInVTable(const FuncCallT
     std::unordered_map<const GenericType*, Type*>& replaceTable, CHIRBuilder& builder) const
 {
     std::vector<VTableSearchRes> res;
+    std::vector<FuncType*> candidateTypes;
     for (const auto& vtableIt : vtable.GetTypeVTables()) {
         for (size_t i = 0; i < vtableIt.GetMethodNum(); ++i) {
             const auto& funcInfo = vtableIt.GetVirtualMethods()[i];
@@ -341,11 +397,41 @@ std::vector<VTableSearchRes> CustomTypeDef::GetFuncIndexInVTable(const FuncCallT
                     .attr = funcInfo.GetAttributeInfo(),
                     .offset = i
                 });
-                break;
+                /** open class A<X> {
+                 *      open public func test<T>(x: X, y: X): Unit {
+                 *          println("a");
+                 *      }
+                 *  }
+                 *
+                 *  open class B<X> <: A<X> {
+                 *      open public func test<Y>(x: C<Y>, y: C<Y>): Unit {
+                 *          println("b");
+                 *      }
+                 *  }
+                 *
+                 *  class C<T> {}
+                 *
+                 *  main() {
+                 *      let x: C<Int64> = C<Int64>()
+                 *      B<C<Int64>>().test<Int64>(x, x)
+                 *  }
+                 *  face to this example, we can get two candidates for func call `B<C<Int64>>().test<Int64>(x, x)`
+                 *  one is A<X>.test<T>(x: X, y: X), the other is B<X>.test<Y>(x: C<Y>, y: C<Y>)
+                 *  we need to choose which one is better, according to spec, we need to instantiate func type,
+                 *  but only instantiate generic type which defined in class decl, not in func decl,
+                 *  so our candidate types are:
+                 *  1. (C<Int64>, C<Int64>), instantiated result of A<X>.test<T>(x: X, y: X)
+                 *      because generic type `X` is instantiated by `C<Int64>`
+                 *  2. (C<Y>, C<Y>), instantiated result of B<X>.test<Y>(x: C<Y>, y: C<Y>)
+                 *      because generic type `Y` is defined in func decl, not in class decl
+                 *
+                 */
+                auto instTy = ReplaceRawGenericArgType(*funcInfo.GetCondition().funcType, replaceTable, builder);
+                candidateTypes.emplace_back(StaticCast<FuncType*>(instTy));
             }
         }
     }
-    return res;
+    return GetWellMatchingResults(res, candidateTypes, builder);
 }
 
 std::string CustomTypeDef::ToString() const

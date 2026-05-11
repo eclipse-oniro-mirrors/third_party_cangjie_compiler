@@ -20,6 +20,7 @@
 #include "cangjie/AST/Walker.h"
 #include "cangjie/Basic/Match.h"
 #include "cangjie/Utils/FileUtil.h"
+#include "cangjie/Utils/StdUtils.h"
 
 #include <sstream>
 
@@ -156,7 +157,11 @@ std::string DecimalToManglingNumber(const std::string& decimal)
         }
     }
 
-    int num = std::stoi(decimal) - 1;
+    auto numOpt = Stoi(decimal);
+    if (!numOpt.has_value()) {
+        return "";
+    }
+    int num = *numOpt - 1;
     if (num < 0) {
         return MANGLE_WILDCARD_PREFIX;
     }
@@ -627,7 +632,7 @@ std::string BaseMangler::MangleDecl(const Decl& decl, const std::vector<Ptr<Node
             if (decl.IsFunc()) {
                 auto& funcDecl = static_cast<const AST::FuncDecl&>(decl);
                 newMangled +=
-                    IsLocalFunc(funcDecl) ? GetMangledLocalFuncIndex(static_cast<const FuncDecl&>(decl), prefix) : "";
+                    IsLocalFunc(funcDecl) ? GetMangledLocalFuncIndex(static_cast<const FuncDecl&>(decl)) : "";
             }
         }
         newMangled += MangleGenericArguments(decl, genericsTypeStack, true);
@@ -686,7 +691,7 @@ std::string BaseMangler::ManglePrefix(const Node& node, const std::vector<Ptr<No
                 auto& decl = static_cast<const FuncDecl&>(*curPrefix);
                 mangled += MangleUtils::MangleName(decl.identifier);
                 if (IsLocalFunc(decl)) {
-                    mangled += GetMangledLocalFuncIndex(decl, prefix);
+                    mangled += GetMangledLocalFuncIndex(decl);
                 }
                 mangled += MangleGenericArgumentsHelper(decl, genericsTypeStack, true) + MANGLE_FUNC_PARAM_TYPE_PREFIX +
                     MangleFuncParams(decl, genericsTypeStack, false) + MANGLE_SUFFIX;
@@ -887,7 +892,7 @@ Ptr<AST::Node> BaseMangler::FindOuterNodeOfLambda(
     return Ptr<AST::Node>();
 }
 
-std::string BaseMangler::GetMangledLocalFuncIndex(const AST::FuncDecl& decl, const std::vector<Ptr<AST::Node>>& prefix) const
+std::string BaseMangler::GetMangledLocalFuncIndex(const AST::FuncDecl& decl) const
 {
     auto outerNode = GetOuterDecl(decl);
     std::string pkgName = decl.fullPackageName;

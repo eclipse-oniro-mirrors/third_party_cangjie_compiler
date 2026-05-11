@@ -61,7 +61,7 @@ inline int Mkdir(const std::string& path)
 #else
 inline int Mkdir(const std::string& path)
 {
-    return mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    return mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 }
 #endif
 
@@ -1163,7 +1163,7 @@ bool Access(const std::string& path, FileMode mode)
 
 bool FileExist(const std::string& path, [[maybe_unused]] bool caseSensitive)
 {
-#if defined(_WIN32)
+#ifdef _WIN32
     if (!Access(path, FM_EXIST)) {
         return false;
     }

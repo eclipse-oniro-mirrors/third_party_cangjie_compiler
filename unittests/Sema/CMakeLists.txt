@@ -6,6 +6,15 @@
 
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+add_executable(ParseJsonTest ParseJsonTest.cpp)
+target_link_libraries(
+    ParseJsonTest
+    cangjie-lsp
+    ${LINK_LIBS}
+    GTest::gtest
+    GTest::gtest_main)
+add_test(NAME ParseJsonTest COMMAND ParseJsonTest)
+
 add_executable(TypeCheckerTest TypeCheckerTest.cpp ${CANGJIE_SRC_OBJECTS})
 target_link_libraries(
     TypeCheckerTest

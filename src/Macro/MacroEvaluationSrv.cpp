@@ -13,14 +13,25 @@
  */
 
 #include "cangjie/Macro/MacroEvaluation.h"
-#if defined (__linux__) || defined(__APPLE__)
+#if defined(__linux__)
+#include <sys/wait.h>
+#include <thread>
+#include <unistd.h>
+#include <pthread.h>
+#elif defined(__APPLE__)
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
 #include <pthread.h>
 #endif
-#ifdef __linux__
+#if defined(__linux__)
 #include <sys/prctl.h>
+#endif
+
+#if defined(__linux__)
+#define CANGJIE_POSIX_MACRO_SRV 1
+#elif defined(__APPLE__)
+#define CANGJIE_POSIX_MACRO_SRV 1
 #endif
 
 using namespace Cangjie;
@@ -60,7 +71,7 @@ inline TaskType GetMacroTaskType(const std::vector<uint8_t>& msg)
 bool MacroProcMsger::WriteToClientPipe(const uint8_t* buf, size_t size) const
 {
 #ifdef _WIN32
-    return WriteFile(hChildWrite, buf, size, nullptr, nullptr) == TRUE;
+    return WriteFile(hChildWrite, buf, static_cast<DWORD>(size), nullptr, nullptr) == TRUE;
 
 #else
     ssize_t res = write(pipefdC2P[1], buf, size);
@@ -75,7 +86,7 @@ bool MacroProcMsger::WriteToClientPipe(const uint8_t* buf, size_t size) const
 bool MacroProcMsger::ReadFromClientPipe(uint8_t* buf, size_t size) const
 {
 #ifdef _WIN32
-    return ReadFile(hChildRead, buf, size, nullptr, nullptr) == TRUE;
+    return ReadFile(hChildRead, buf, static_cast<DWORD>(size), nullptr, nullptr) == TRUE;
 #else
     ssize_t res = read(pipefdP2C[0], buf, size);
     // res == 0, means end of file; res == -1, indicates error accurred
@@ -155,7 +166,7 @@ inline void RenameSrvProcess()
 } // namespace
 #endif
 
-#if defined(__linux__) || defined(__APPLE__)
+#ifdef CANGJIE_POSIX_MACRO_SRV
 void MacroEvaluation::RunMacroSrv()
 {
     useChildProcess = false; // macro srv is child

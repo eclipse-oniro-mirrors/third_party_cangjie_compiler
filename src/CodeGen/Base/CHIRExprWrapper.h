@@ -143,6 +143,7 @@ public:
     virtual bool IsCalleeStatic() const = 0;
     virtual const CHIR::Type* GetOuterType([[maybe_unused]] CHIR::CHIRBuilder& builder) const = 0;
     virtual const CHIR::Value* GetThisParam() const = 0;
+    virtual std::vector<CHIR::Value*> GetArgs() const = 0;
 };
 
 class CHIRApplyWrapper : public CHIRCallExpr {
@@ -178,7 +179,7 @@ public:
         }
     }
 
-    std::vector<CHIR::Value*> GetArgs() const
+    std::vector<CHIR::Value*> GetArgs() const override
     {
         if (GetExprKind() == CHIR::ExprKind::APPLY) {
             return StaticCast<const CHIR::Apply&>(chirExpr).GetArgs();
@@ -330,7 +331,7 @@ public:
         }
     }
 
-    std::vector<CHIR::Value*> GetArgs() const
+    std::vector<CHIR::Value*> GetArgs() const override
     {
         if (GetExprKind() == CHIR::ExprKind::INVOKE) {
             return StaticCast<const CHIR::Invoke&>(chirExpr).GetArgs();
@@ -457,7 +458,7 @@ public:
         }
     }
 
-    std::vector<CHIR::Value*> GetArgs() const
+    std::vector<CHIR::Value*> GetArgs() const override
     {
         if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
             return StaticCast<const CHIR::InvokeStatic&>(chirExpr).GetArgs();

@@ -477,7 +477,9 @@ const std::string CANIUSE_IDENTIFIER = "canIUse";
 OwnedPtr<Expr> DesugarIfAvailableLevelCondition(IfAvailableExpr& iae)
 {
     auto me = CreateMemberAccess(CreateRefExpr(SrcIdentifier(DEVICE_INFO)), SDK_API_VERSION);
+    CopyBasicInfo(&iae, me->baseExpr.get());
     auto condition = CreateBinaryExpr(std::move(me), std::move(iae.GetArg()->expr), TokenKind::GE);
+    CopyBasicInfo(&iae, condition->leftExpr.get());
     AddCurFile(*condition, iae.curFile);
     CopyBasicInfo(&iae, condition.get());
     return std::move(condition);
@@ -488,9 +490,10 @@ OwnedPtr<Expr> DesugarIfAvailableLevelCondition(IfAvailableExpr& iae)
 OwnedPtr<Expr> DesugarIfAvailableSyscapCondition(IfAvailableExpr& iae)
 {
     auto canIUseRef = CreateRefExpr(SrcIdentifier(CANIUSE_IDENTIFIER));
+    CopyBasicInfo(&iae, canIUseRef.get());
     std::vector<OwnedPtr<FuncArg>> argList;
     argList.emplace_back(CreateFuncArg(std::move(iae.GetArg()->expr)));
-    auto condition = CreateCallExpr(CreateRefExpr(SrcIdentifier(CANIUSE_IDENTIFIER)), std::move(argList));
+    auto condition = CreateCallExpr(std::move(canIUseRef), std::move(argList));
     AddCurFile(*condition, iae.curFile);
     CopyBasicInfo(&iae, condition.get());
     return std::move(condition);

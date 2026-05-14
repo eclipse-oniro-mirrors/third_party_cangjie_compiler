@@ -14,13 +14,12 @@
 #include "cangjie/Utils/ICEUtil.h"
 #include "cangjie/Utils/Signal.h"
 
-#ifdef __unix__
+#ifndef _WIN32
 #include <cstdlib>
+#include <sys/wait.h>
 #include <unistd.h>
 #else
-#ifdef _WIN32
 #include <windows.h>
-#endif
 #endif
 
 #include <fstream>
@@ -38,16 +37,14 @@ const std::string PRPJECT_PATH = PROJECT_SOURCE_DIR;
 const std::string PRPJECT_PATH = "..";
 #endif
 
-#ifdef __unix__
+#ifndef _WIN32
 const int STACK_OVERFLOW_RETURN_CODE = SIGSEGV + 128;
 const std::unordered_map<std::string, int> signalStringValueMap = {{"SIGABRT", SIGABRT}, {"SIGFPE", SIGFPE},
     {"SIGSEGV", SIGSEGV}, {"SIGILL", SIGILL}, {"SIGTRAP", SIGTRAP}, {"SIGBUS", SIGBUS}};
 #else
-#ifdef _WIN32
 const DWORD STACK_OVERFLOW_RETURN_CODE = EXCEPTION_STACK_OVERFLOW;
 const std::unordered_map<std::string, int> signalStringValueMap = {
     {"SIGABRT", SIGABRT}, {"SIGFPE", SIGFPE}, {"SIGSEGV", SIGSEGV}, {"SIGILL", SIGILL}};
-#endif
 #endif
 
 const std::unordered_map<std::string, int64_t> moduleValueMap = {
@@ -103,12 +100,10 @@ std::string GetSignalString(std::string& signalValue, std::string& module)
     std::string result2 =
         Cangjie::SIGNAL_MSG_PART_TWO + Cangjie::ICE::MSG_PART_TWO + std::to_string(moduleStr->second) + "\n";
     if (signalValue == "StackOverflow") {
-#ifdef __unix__
+#ifndef _WIN32
         return CANGJIE_COMPILER_VERSION + "\n" + result1 + std::to_string(SIGSEGV) + result2;
 #else
-#ifdef _WIN32
         return CANGJIE_COMPILER_VERSION + "\n" + result1 + std::to_string(STACK_OVERFLOW_RETURN_CODE) + result2;
-#endif
 #endif
     }
     auto found = signalStringValueMap.find(signalValue);
@@ -154,7 +149,7 @@ void VerifyErrorOutput(std::string signalValue, std::string module)
     VerifyDeleteTempFile();
 }
 
-#ifdef __unix__
+#ifndef _WIN32
 
 #define MAX_PATH 4096
 
@@ -193,7 +188,6 @@ int ExecuteProcess(std::string signalValue, std::string triggerPoint)
 }
 
 #else
-#ifdef _WIN32
 DWORD ExecuteProcess(std::string signalValue, std::string triggerPoint)
 {
     char buffer[MAX_PATH];
@@ -222,7 +216,6 @@ DWORD ExecuteProcess(std::string signalValue, std::string triggerPoint)
     return exit_code;
 }
 #endif
-#endif
 
 #define CT(sig, module)                                                                                                \
     TEST_F(SignalTests, module##Signal##sig)                                                                           \
@@ -241,7 +234,7 @@ CT(SIGABRT, main)
 CT(SIGFPE, main)
 CT(SIGSEGV, main)
 CT(SIGILL, main)
-#ifdef __unix__
+#ifndef _WIN32
 CT(SIGTRAP, main)
 CT(SIGBUS, main)
 #endif
@@ -251,7 +244,7 @@ CT(SIGABRT, parser)
 CT(SIGFPE, parser)
 CT(SIGSEGV, parser)
 CT(SIGILL, parser)
-#ifdef __unix__
+#ifndef _WIN32
 CT(SIGTRAP, parser)
 CT(SIGBUS, parser)
 #endif

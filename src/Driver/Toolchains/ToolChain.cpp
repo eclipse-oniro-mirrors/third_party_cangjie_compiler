@@ -166,7 +166,7 @@ void ToolChain::CheckOtherDependeniesOfStaticLib(
         dynamicLibraries.emplace("-ldl");
     } else if (libName == "libcangjie-std-ast.a") {
         if (driverOptions.target.os == Triple::OSType::DARWIN) {
-            otherLibs.emplace("-lcangjie- std-astFFI");
+            otherLibs.emplace("-lcangjie-std-astFFI");
         } else {
             otherLibs.emplace("-l:libcangjie-std-astFFI.a");
         }
@@ -182,7 +182,7 @@ void ToolChain::CheckOtherDependeniesOfStaticLib(
             driverOptions.target.env == Triple::Environment::ANDROID) {
             otherLibs.emplace("-lc++");
             otherLibs.emplace("-lunwind");
-        } else if (!driverOptions.target.IsMacOS()) {
+        } else if (!driverOptions.target.IsMacOS() && !driverOptions.target.IsMinGW()) {
             dynamicLibraries.emplace("-lgcc_s");
         }
     }

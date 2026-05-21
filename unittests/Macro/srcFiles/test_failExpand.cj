@@ -1,4 +1,4 @@
-// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
 // This source file is part of the Cangjie project, licensed under Apache-2.0
 // with Runtime Library Exception.
 //
@@ -6,17 +6,29 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+package a
+
 import define.*
 
-@M1[class Ca4 { }](class Ca5{
-    var ab = 3
-    Ca5(x:Int64){
-        this.ab
-    }
-})
+@M
+class A {
+    var a = 3
 
-class Ca6 {
-    var ab = 3
+    @define(let b = 1)
+}
+
+class FailExpand {
+    @GenVar
+    var a = 3
+
+    @define(let b = 1)
+}
+
+func ExpandExpr(): Unit {
+    @GenVar(1)
+
+    @define(b)
+    return
 }
 
 main() {}

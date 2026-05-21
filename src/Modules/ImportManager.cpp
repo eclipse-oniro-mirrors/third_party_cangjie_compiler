@@ -1216,7 +1216,7 @@ const OrderedDeclSet& ImportManager::GetPackageMembersByName(const Package& pack
 }
 
 // For LSP
-AST::OrderedDeclSet ImportManager::GetPackageMembers(
+std::map<std::string, AST::OrderedDeclSet> ImportManager::GetPackageMembers(
     const std::string& srcFullPackageName, const std::string& targetFullPackageName) const
 {
     if (srcFullPackageName == targetFullPackageName) {
@@ -1224,12 +1224,16 @@ AST::OrderedDeclSet ImportManager::GetPackageMembers(
     }
     auto relation = Modules::GetPackageRelation(srcFullPackageName, targetFullPackageName);
     auto members = cjoManager->GetPackageMembers(targetFullPackageName);
-    AST::OrderedDeclSet res;
-    for (auto& [_, decls] : members) {
+    std::map<std::string, AST::OrderedDeclSet> res;
+    for (auto& [name, decls] : members) {
+        AST::OrderedDeclSet visibleDecls;
         for (auto it : decls) {
             if (Modules::IsVisible(*it, relation)) {
-                res.emplace(it.get());
+                visibleDecls.emplace(it.get());
             }
+        }
+        if (!visibleDecls.empty()) {
+            res[name] = std::move(visibleDecls);
         }
     }
     return res;
@@ -1575,4 +1579,31 @@ void ImportManager::ClearCachesForRebuild()
     declToTypeAlias.clear();
     // clear for ResolveImports.
     directMacroDeps.clear();
+}
+
+bool ImportManager::AnalyzeDepStdPkgsOfBC(const std::string& fullPackageName)
+{
+    auto existingPkg = cjoManager->GetPackage(fullPackageName);
+    if (existingPkg || (cjoFilePaths.find(fullPackageName) != cjoFilePaths.end())) {
+        return true;
+    }
+
+    std::string cjoPath = FileUtil::FindSerializationFile(fullPackageName, SERIALIZED_FILE_EXTENSION, GetSearchPath());
+    if (cjoPath.empty() || !cjoManager->LoadPackageHeader(fullPackageName, cjoPath)) {
+        diag.DiagnoseRefactor(DiagKindRefactor::bc_cjo_error, DEFAULT_POSITION, fullPackageName);
+        return false;
+    }
+
+    auto package = cjoManager->GetPackage(fullPackageName);
+    CJC_NULLPTR_CHECK(package);
+    for (const auto& depStdPkg : package->GetAllDependentStdPkgs()) {
+        CJC_ASSERT(STANDARD_LIBS.find(depStdPkg) != STANDARD_LIBS.end());
+        if (cjoFilePaths.find(depStdPkg) == cjoFilePaths.end()) {
+            std::string depCjoPath = FileUtil::FindSerializationFile(
+                depStdPkg, SERIALIZED_FILE_EXTENSION, GetSearchPath());
+            // Stdlib deps in separately-handled .bc files are regarded as indirect.
+            HandleStdPackage(depStdPkg, depCjoPath, true);
+        }
+    }
+    return true;
 }

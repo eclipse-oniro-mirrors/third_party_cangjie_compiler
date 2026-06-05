@@ -27,7 +27,11 @@ namespace {
 std::unordered_map<std::string, std::string> GetEnvironmentVars()
 {
     std::unordered_map<std::string, std::string> envVars;
+#ifdef _WIN32
+    char **env = _environ;
+#else
     char **env = environ;
+#endif
     while (env && *env) {
         std::string entry(*env);
         size_t pos = entry.find('=');
@@ -60,21 +64,69 @@ protected:
 #endif
 #ifdef _WIN32
         invocation.globalOptions.target.os = Cangjie::Triple::OSType::WINDOWS;
-        invocation.globalOptions.executablePath = projectPath + "\\output\\bin";
+        invocation.globalOptions.executablePath = projectPath + "\\output\\bin\\";
 #elif defined(__unix__)
         invocation.globalOptions.target.os = Cangjie::Triple::OSType::LINUX;
-        invocation.globalOptions.executablePath = projectPath + "/output/bin";
+        invocation.globalOptions.executablePath = projectPath + "/output/bin/";
 #endif
         std::string cangjieHome = projectPath + "/output";
-#ifdef __x86_64__
-        std::string cangjiePath = cangjieHome + "/modules/linux_x86_64_cjnative";
+#if defined(_WIN32)
+        std::string platform = "windows_x86_64";
+#elif defined(__APPLE__) && defined(__x86_64__)
+        std::string platform = "darwin_x86_64";
+#elif defined(__APPLE__)
+        std::string platform = "darwin_arm64";
+#elif defined(__x86_64__)
+        std::string platform = "linux_x86_64";
 #else
-        std::string cangjiePath = cangjieHome + "/modules/linux_aarch64_cjnative";
+        std::string platform = "linux_aarch64";
 #endif
+        std::string cangjiePath = cangjieHome + "/modules/" + platform + "_cjnative";
+
+#ifdef _WIN32
+        char* oldHome = getenv("CANGJIE_HOME");
+        char* oldPath = getenv("CANGJIE_PATH");
+        if (oldHome) savedCangjieHome = oldHome;
+        if (oldPath) savedCangjiePath = oldPath;
+        _putenv_s("CANGJIE_HOME", cangjieHome.c_str());
+        _putenv_s("CANGJIE_PATH", cangjiePath.c_str());
+#else
+        char* oldHome = getenv("CANGJIE_HOME");
+        char* oldPath = getenv("CANGJIE_PATH");
+        if (oldHome) savedCangjieHome = oldHome;
+        if (oldPath) savedCangjiePath = oldPath;
         setenv("CANGJIE_HOME", cangjieHome.c_str(), 1);
         setenv("CANGJIE_PATH", cangjiePath.c_str(), 1);
+#endif
         invocation.globalOptions.ReadPathsFromEnvironmentVars(GetEnvironmentVars());
         invocation.globalOptions.importPaths = {definePath};
+    }
+
+    void TearDown() override
+    {
+#ifdef _WIN32
+        if (savedCangjieHome.empty()) {
+            _putenv_s("CANGJIE_HOME", "");
+        } else {
+            _putenv_s("CANGJIE_HOME", savedCangjieHome.c_str());
+        }
+        if (savedCangjiePath.empty()) {
+            _putenv_s("CANGJIE_PATH", "");
+        } else {
+            _putenv_s("CANGJIE_PATH", savedCangjiePath.c_str());
+        }
+#else
+        if (savedCangjieHome.empty()) {
+            unsetenv("CANGJIE_HOME");
+        } else {
+            setenv("CANGJIE_HOME", savedCangjieHome.c_str(), 1);
+        }
+        if (savedCangjiePath.empty()) {
+            unsetenv("CANGJIE_PATH");
+        } else {
+            setenv("CANGJIE_PATH", savedCangjiePath.c_str(), 1);
+        }
+#endif
     }
 
 #ifdef PROJECT_SOURCE_DIR
@@ -87,18 +139,21 @@ protected:
 #endif
     std::string srcPath;
     std::string definePath;
+    std::string savedCangjieHome;
+    std::string savedCangjiePath;
     DiagnosticEngine diag;
     CompilerInvocation invocation;
     std::unique_ptr<TestCompilerInstance> instance;
 };
 
-TEST_F(MacroTest, DISABLED_MacroProcess_Curfile)
+TEST_F(MacroTest, MacroProcess_Curfile)
 {
     auto src = srcPath + "func.cj";
     instance = std::make_unique<TestCompilerInstance>(invocation, diag);
     instance->compileOnePackageFromSrcFiles = true;
     instance->srcFilePaths = {src};
     instance->Compile(CompileStage::PARSE);
+    instance->PerformImportPackage();
 
     // Test mapping curfile in macro expansion.
     for (auto& decl : instance->GetSourcePackages()[0]->files[0]->decls) {
@@ -111,7 +166,7 @@ TEST_F(MacroTest, DISABLED_MacroProcess_Curfile)
     EXPECT_EQ(diag.GetErrorCount(), 0);
 }
 
-TEST_F(MacroTest, DISABLED_MacroCall_GetNewPos)
+TEST_F(MacroTest, MacroCall_GetNewPos)
 {
     auto src = srcPath + "func_not_annotation.cj";
     invocation.globalOptions.enableMacroInLSP = true;
@@ -192,7 +247,7 @@ TEST_F(MacroTest, MacroCall_Complementatcion_For_LSP)
     std::function<VisitAction(Ptr<Node>)> visitPre1 = [&](Ptr<Node> curNode) -> VisitAction {
         if (curNode->astKind == ASTKind::MACRO_EXPAND_DECL) {
             auto med = StaticAs<ASTKind::MACRO_EXPAND_DECL>(curNode);
-            if (med->invocation.identifier == "M1") {
+            if (med->invocation.macroCallDiagInfo.identifier == "M1") {
                 med->invocation.newTokens = med->invocation.attrs;
                 med->invocation.newTokens.emplace_back(Token(TokenKind::SEMI, ";"));
                 med->invocation.newTokens.insert(
@@ -223,10 +278,11 @@ TEST_F(MacroTest, MacroCall_Complementatcion_For_LSP)
     Walker walker2(file, visitPre2);
     walker2.Walk();
 
+    // error: undeclared identifier 'M1'
     EXPECT_EQ(diag.GetErrorCount(), 1);
 }
 
-TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP)
+TEST_F(MacroTest, MacroCall_Check_For_LSP)
 {
     Cangjie::ICE::TriggerPointSetter iceSetter(static_cast<int64_t>(Cangjie::ICE::UNITTEST_TP));
     auto defInstance = std::make_unique<TestCompilerInstance>(invocation, diag);
@@ -252,7 +308,7 @@ TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP)
     std::function<VisitAction(Ptr<Node>)> visitPre1 = [&](Ptr<Node> curNode) -> VisitAction {
         if (curNode->astKind == ASTKind::MACRO_EXPAND_EXPR) {
             auto mee = StaticAs<ASTKind::MACRO_EXPAND_EXPR>(curNode);
-            if (mee->invocation.identifier == "B1") {
+            if (mee->invocation.macroCallDiagInfo.identifier == "B1") {
                 mee->invocation.newTokens = mee->invocation.args;
                 mee->invocation.newTokensStr = "6";
             }
@@ -280,14 +336,14 @@ TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP)
             EXPECT_TRUE(mee->invocation.target);
             auto fileID = mee->invocation.target->begin.fileID;
             auto path = instance->GetSourceManager().GetSource(fileID).path;
-            if (mee->invocation.identifier == "B1") {
+            if (mee->invocation.macroCallDiagInfo.identifier == "B1") {
 #ifdef _WIN32
                 EXPECT_EQ(path, "define\\define.cj");
 #else
                 EXPECT_EQ(path, "define/define.cj");
 #endif
             }
-            if (mee->invocation.identifier == "B2") {
+            if (mee->invocation.macroCallDiagInfo.identifier == "B2") {
 #ifdef _WIN32
                 EXPECT_EQ(path, "define\\define2.cj");
 #else
@@ -305,7 +361,7 @@ TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP)
     EXPECT_EQ(diag.GetErrorCount(), 2);
 }
 
-TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP_Paralle)
+TEST_F(MacroTest, MacroCall_Check_For_LSP_Paralle)
 {
     Cangjie::ICE::TriggerPointSetter iceSetter(static_cast<int64_t>(Cangjie::ICE::UNITTEST_TP));
     auto defInstance = std::make_unique<TestCompilerInstance>(invocation, diag);
@@ -337,7 +393,7 @@ TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP_Paralle)
     std::function<VisitAction(Ptr<Node>)> visitPre1 = [&](Ptr<Node> curNode) -> VisitAction {
         if (curNode->astKind == ASTKind::MACRO_EXPAND_EXPR) {
             auto mee = StaticAs<ASTKind::MACRO_EXPAND_EXPR>(curNode);
-            if (mee->invocation.identifier == "B1") {
+            if (mee->invocation.macroCallDiagInfo.identifier == "B1") {
                 mee->invocation.newTokens = mee->invocation.args;
                 mee->invocation.newTokensStr = "6";
             }
@@ -365,14 +421,14 @@ TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP_Paralle)
             EXPECT_TRUE(mee->invocation.target);
             auto fileID = mee->invocation.target->begin.fileID;
             auto path = instance->GetSourceManager().GetSource(fileID).path;
-            if (mee->invocation.identifier == "B1") {
+            if (mee->invocation.macroCallDiagInfo.identifier == "B1") {
 #ifdef _WIN32
                 EXPECT_EQ(path, "define\\define.cj");
 #else
                 EXPECT_EQ(path, "define/define.cj");
 #endif
             }
-            if (mee->invocation.identifier == "B2") {
+            if (mee->invocation.macroCallDiagInfo.identifier == "B2") {
 #ifdef _WIN32
                 EXPECT_EQ(path, "define\\define2.cj");
 #else
@@ -393,7 +449,7 @@ TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP_Paralle)
 }
 
 #ifndef _WIN32
-TEST_F(MacroTest, DISABLED_IfAvailable_In_LSP)
+TEST_F(MacroTest, IfAvailable_In_LSP)
 {
     auto src = srcPath + "test_IfAvailable_LSP.cj";
     invocation.globalOptions.enableMacroInLSP = true;
@@ -407,7 +463,7 @@ TEST_F(MacroTest, DISABLED_IfAvailable_In_LSP)
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP_context)
+TEST_F(MacroTest, MacroCall_Check_For_LSP_context)
 {
     std::string command = "cd " + definePath + " && cjc define_childMessage.cj --compile-macro";
     int err = system(command.c_str());
@@ -420,11 +476,12 @@ TEST_F(MacroTest, DISABLED_MacroCall_Check_For_LSP_context)
     instance->compileOnePackageFromSrcFiles = true;
     instance->srcFilePaths = {src};
     instance->Compile(CompileStage::SEMA);
+    EXPECT_EQ(diag.GetErrorCount(), 0);
 
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(MacroTest, DISABLED_MacroDiagReportForLsp)
+TEST_F(MacroTest, MacroDiagReportForLsp)
 {
     std::string command = "cd " + definePath + " && cjc define_report.cj --compile-macro";
     int err = system(command.c_str());
@@ -438,15 +495,13 @@ TEST_F(MacroTest, DISABLED_MacroDiagReportForLsp)
     instance->compileOnePackageFromSrcFiles = true;
     Warningln("exe path ", invocation.globalOptions.executablePath);
     instance->srcFilePaths = {srcPath + "func_report.cj"};
-    invocation.globalOptions.outputMode = GlobalOptions::OutputMode::STATIC_LIB;
-    invocation.globalOptions.enableCompileTest = true;
     instance->Compile(CompileStage::SEMA);
 
     EXPECT_EQ(diag.GetErrorCount(), 1);
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(MacroTest, DISABLED_NoErrorInLSPMacro)
+TEST_F(MacroTest, NoErrorInLSPMacro)
 {
     std::string command = "cd " + definePath + " && cjc define.cj --compile-macro";
     int err = system(command.c_str());
@@ -464,7 +519,7 @@ TEST_F(MacroTest, DISABLED_NoErrorInLSPMacro)
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(MacroTest, DISABLED_NoErrorInDeriveEnum)
+TEST_F(MacroTest, NoErrorInDeriveEnum)
 {
     auto src = srcPath + "derive_enum2.cj";
     invocation.globalOptions.enableMacroInLSP = true;
@@ -473,12 +528,12 @@ TEST_F(MacroTest, DISABLED_NoErrorInDeriveEnum)
     instance->compileOnePackageFromSrcFiles = true;
     instance->srcFilePaths = {src};
     instance->Compile(CompileStage::SEMA);
- 
+
     EXPECT_EQ(diag.GetErrorCount(), 0);
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(MacroTest, DISABLED_MacroCall_HighLight_LSP)
+TEST_F(MacroTest, MacroCall_HighLight_LSP)
 {
     std::string command = "cd " + definePath + " && cjc define3.cj --compile-macro";
     int err = system(command.c_str());
@@ -499,14 +554,14 @@ TEST_F(MacroTest, DISABLED_MacroCall_HighLight_LSP)
         if (auto cd = AST::As<ASTKind::CLASS_DECL>(decl.get()); cd && macrocall) {
             auto newTks = macrocall->GetInvocation()->newTokens;
             // class A
-            ASSERT_TRUE(macrocall->GetMacroCallNewPos(Position{1, 6, 7}).isCurFile);
-            ASSERT_EQ(macrocall->GetMacroCallNewPos(Position{1, 6, 7}), (Position{1, 4, 20}));
+            ASSERT_TRUE(macrocall->GetMacroCallNewPos(Position{1, 13, 7}).isCurFile);
+            ASSERT_EQ(macrocall->GetMacroCallNewPos(Position{1, 13, 7}), (Position{1, 11, 10}));
             // var a
-            auto pos = Position{1, 8, 9};
-            ASSERT_TRUE(macrocall->GetMacroCallNewPos(Position{1, 8, 9}).isCurFile);
-            ASSERT_EQ(macrocall->GetMacroCallNewPos(Position{1, 8, 9}), (Position{1, 4, 40}));
+            auto pos = Position{1, 15, 9};
+            ASSERT_TRUE(macrocall->GetMacroCallNewPos(Position{1, 15, 9}).isCurFile);
+            ASSERT_EQ(macrocall->GetMacroCallNewPos(Position{1, 15, 9}), (Position{1, 11, 20}));
             // identifier ttt, define in macro Rename
-            ASSERT_EQ(newTks[15].Value(), "ttt");
+            ASSERT_EQ(newTks[12].Value(), "ttt");
         }
     }
 }
@@ -923,7 +978,6 @@ TEST_F(MacroTest, ExpandDecl_WithNoMacroCall_ReturnsSameDecl)
     EXPECT_EQ(expandedDecl->identifier, "SingleAnno");
     EXPECT_EQ(expandedDecl->annotations.size(), 1);
     EXPECT_EQ(expandedDecl->annotations[0]->identifier, "LogWithLevel");
-
 }
 
 TEST_F(MacroTest, ExpandDecl_WithNullDecl_ReturnsEmpty)

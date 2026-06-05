@@ -74,6 +74,12 @@ public:
     {
         importedPackageNameMap.emplace(importSpec, pkgNamePair);
     }
+    void RemoveImportedPackageNames(const std::vector<OwnedPtr<AST::ImportSpec>>& imports)
+    {
+        for (auto& import : imports) {
+            (void)importedPackageNameMap.erase(import.get());
+        }
+    }
     std::string GetPackageNameByImport(const AST::ImportSpec& importSpec) const
     {
         auto found = importedPackageNameMap.find(&importSpec);
@@ -144,9 +150,7 @@ public:
     {
         hasBuildIndex = value;
     }
-    std::optional<std::vector<std::string>> PreReadCommonPartCjoFiles(CjoManager& cjoManager);
-    Ptr<ASTLoader> GetCommonPartCjo(std::string expectedName);
-
+    std::vector<OwnedPtr<ASTLoader>>& GetCommonPartCjos(std::string expectedName, const CjoManager& cjoManager);
     const GlobalOptions& GetGlobalOptions()
     {
         return globalOptions;
@@ -202,7 +206,7 @@ private:
     // Indirectly imported packages which have been used is recorded in loader. Load their decls on demand.
     std::unordered_set<std::string> loadedPackages;
     // common part loader also stored in `packageNameMap`.
-    OwnedPtr<ASTLoader> commonPartLoader;
+    std::vector<OwnedPtr<ASTLoader>> commonPartLoaders;
     bool canInline{false};
 
     // cache cjo file path result for skip FindSerializationFile call, key is possible cjo name without extension, value

@@ -102,7 +102,7 @@ void CleanExprLineInfo(Expr& expr)
             return;
         }
         auto ma = RawStaticCast<MemberAccess*>(refExpr->baseFunc.get());
-        if (!ma->baseExpr->ty->IsStructArray()) {
+        if (!ma->baseExpr->GetTy()->IsStructArray()) {
             return;
         }
         ma->baseExpr->begin.Mark(PositionStatus::IGNORE);

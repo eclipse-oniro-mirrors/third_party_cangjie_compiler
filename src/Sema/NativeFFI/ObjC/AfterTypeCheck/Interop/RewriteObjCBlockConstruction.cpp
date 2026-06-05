@@ -55,7 +55,7 @@ void RewriteObjCBlockConstruction::HandleImpl(InteropContext& ctx)
                 return VisitAction::WALK_CHILDREN;
             }
             auto containingClass = calledFunc->outerDecl;
-
+            
             if (containingClass == nullptr || containingClass->astKind != ASTKind::CLASS_DECL) {
                 return VisitAction::WALK_CHILDREN;
             }
@@ -66,7 +66,7 @@ void RewriteObjCBlockConstruction::HandleImpl(InteropContext& ctx)
                 return VisitAction::WALK_CHILDREN;
             }
             auto&& arg = callExpr->args[0];
-            if (!arg->ty->IsFunc()) {
+            if (!arg->GetTy()->IsFunc()) {
                 return VisitAction::WALK_CHILDREN;
             }
 

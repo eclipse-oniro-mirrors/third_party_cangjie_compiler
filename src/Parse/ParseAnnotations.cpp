@@ -9,6 +9,7 @@
 #include "ParserImpl.h"
 
 #include "cangjie/AST/Match.h"
+#include "cangjie/AST/Node.h"
 #include "cangjie/Basic/Print.h"
 
 using namespace Cangjie;
@@ -236,6 +237,13 @@ void ParserImpl::ParseAnnotations(PtrVector<Annotation>& annos)
             DiagDuplicatedAnno(*annotation, **anno);
         }
         annos.emplace_back(std::move(annotation));
+    }
+}
+
+void ParserImpl::SetBeginToAnnotationsBegin(Node& node, const PtrVector<Annotation>& annos)
+{
+    if (!annos.empty()) {
+        node.begin = annos.front()->begin;
     }
 }
 

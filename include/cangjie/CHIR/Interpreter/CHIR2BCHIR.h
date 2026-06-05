@@ -25,7 +25,6 @@
 #include "cangjie/CHIR/Interpreter/BCHIRPrinter.h"
 #include "cangjie/CHIR/IR/Package.h"
 #include "cangjie/CHIR/IR/Value/Value.h"
-#include "cangjie/Mangle/BaseMangler.h"
 #include "cangjie/Option/Option.h"
 
 namespace Cangjie::CHIR::Interpreter {
@@ -158,10 +157,6 @@ private:
     {
     }
 
-#if defined(__clang__)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#endif
     template <typename... Args> inline void PushArgs(Context& ctx, Bchir::ByteCodeContent v, Args&&... args)
     {
         ctx.def.Push(v);
@@ -206,9 +201,6 @@ private:
         }
         PushArgs(ctx, args...);
     }
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#endif
 
     bool IsConstClass(const CustomTypeDef& def) const;
 };

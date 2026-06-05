@@ -16,9 +16,9 @@
 #include <future>
 #include <queue>
 
-using namespace Cangjie::CHIR;
+namespace Cangjie::CHIR {
 
-DeadCodeElimination::DeadCodeElimination(CHIRBuilder& builder, DiagAdapter& diag, const Package& curPkg)
+DeadCodeElimination::DeadCodeElimination(CHIRBuilder& builder, DiagnosticEngine& diag, const Package& curPkg)
     : builder(builder), diag(diag), curPkg(curPkg)
 {
 }
@@ -117,8 +117,7 @@ void ClearRemovedFuncParamDftValHostFunc(Package& package)
     }
 }
 
-bool ReflectPackageIsUsed(const Package& package)
-{
+bool ReflectPackageIsUsed(const Package& package) {
     for (auto def : package.GetAllImportedCustomTypeDef()) {
         if (def->GetPackageName() == Cangjie::REFLECT_PACKAGE_NAME) {
             return true;
@@ -136,7 +135,7 @@ bool ReflectPackageIsUsed(const Package& package)
     }
     return false;
 }
-} // namespace
+}  // namespace
 
 static inline const std::unordered_map<ExprKind, std::string> EXPR_KIND_TO_STR = {
     {ExprKind::NEG, "-"},
@@ -288,8 +287,7 @@ void DeadCodeElimination::ReportUnusedFunc(const Function& func, const GlobalOpt
 
 static bool IsExternalDecl(const Value& v)
 {
-    using namespace Cangjie;
-    if (v.Get<LinkTypeInfo>() == Linkage::EXTERNAL) {
+    if (v.Get<LinkTypeInfo>() == Cangjie::Linkage::EXTERNAL) {
         return true;
     }
     // const var/func never have external linkage
@@ -935,22 +933,15 @@ bool DeadCodeElimination::CheckUselessFunc(const Function& func, const GlobalOpt
         // C func may use in c code.
         return false;
     }
-    if (func.IsCFunc() && func.TestAttr(Attribute::PUBLIC)) {
-        // C func may use in c code.
-        return false;
-    }
     if (func.IsVirtualFunc()) {
-        // The func is in vtable.
         // The func is in vtable.
         return false;
     }
     if (func.GetFuncKind() == Cangjie::CHIR::CLASS_CONSTRUCTOR) {
         // should be revised
-        // should be revised
         return false;
     }
     if (func.GetFuncKind() == Cangjie::CHIR::FINALIZER) {
-        // The Finalizer func of a class, can not be removed.
         // The Finalizer func of a class, can not be removed.
         return false;
     }
@@ -1128,3 +1119,4 @@ void DeadCodeElimination::DiagUnusedCode(
         diag.DiagnoseRefactor(diagKind, nodeRange.second, args...);
     }
 }
+}  // namespace Cangjie::CHIR

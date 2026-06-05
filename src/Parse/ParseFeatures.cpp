@@ -48,7 +48,7 @@ void ParserImpl::ParseTopLvlFeatures(OwnedPtr<FeaturesDirective>& ftrDirective, 
     ftrDirective->begin = lastToken.Begin();
     ftrDirective->end = lastToken.End();
     
-    std::for_each(annos.begin(), annos.end(), [&, this](const OwnedPtr<Annotation>& anno) {
+    std::for_each(annos.begin(), annos.end(), [&, this](const OwnedPtr<Annotation>& anno){
         if (NotIn(anno->kind, {AnnotationKind::NON_PRODUCT})) {
             DiagUnexpectedAnnoOn(*anno, ftrDirective->featuresPos, anno->identifier, "features");
             ftrDirective->EnableAttr(Attribute::IS_BROKEN);
@@ -65,7 +65,7 @@ void ParserImpl::ParseTopLvlFeatures(OwnedPtr<FeaturesDirective>& ftrDirective, 
 }
 
 void ParserImpl::ParseFeatureDirective(OwnedPtr<FeaturesDirective>& features)
-{
+{   
     bool isBroken{false};
 
     if (!Skip(TokenKind::LCURL)) {
@@ -109,13 +109,14 @@ void ParserImpl::ParseFeaturesSet(OwnedPtr<FeaturesSet>& ftrSet)
                 DiagExpectCharacter(lastToken.End(), "'.' or ','");
                 ConsumeUntilAny({TokenKind::NL, TokenKind::COMMA, TokenKind::RCURL}, false);
                 isBroken = true;
-            } else {
+            }else {
                 ParseFeatureId(ftrSet);
             }
 
             if (Skip(TokenKind::COMMA)) {
                 ftrSet->commaPoses.emplace_back(lastToken.Begin());
             }
+
         } else {
             DiagExpectedIdentifier(MakeRange(lastToken.Begin(), lastToken.End()),
                 "an identifier", "after this", false);

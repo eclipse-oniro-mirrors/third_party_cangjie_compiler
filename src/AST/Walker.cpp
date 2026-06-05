@@ -123,8 +123,8 @@ VisitAction WalkerT<NodeT>::Walk(Ptr<NodeT> curNode) const
             }
             case ASTKind::PRIMARY_CTOR_DECL: {
                 auto pcd = StaticAs<ASTKind::PRIMARY_CTOR_DECL>(curNode);
-                for (auto modifier : pcd->modifiers) {
-                    if (Walk(&modifier) == VisitAction::STOP_NOW) {
+                for (auto& modifier : pcd->modifiers) {
+                    if (Walk(const_cast<Modifier*>(&modifier)) == VisitAction::STOP_NOW) {
                         return VisitAction::STOP_NOW;
                     }
                 }
@@ -136,8 +136,8 @@ VisitAction WalkerT<NodeT>::Walk(Ptr<NodeT> curNode) const
             }
             case ASTKind::MACRO_DECL: {
                 auto md = StaticAs<ASTKind::MACRO_DECL>(curNode);
-                for (auto modifier : md->modifiers) {
-                    if (Walk(&modifier) == VisitAction::STOP_NOW) {
+                for (auto& modifier : md->modifiers) {
+                    if (Walk(const_cast<Modifier*>(&modifier)) == VisitAction::STOP_NOW) {
                         return VisitAction::STOP_NOW;
                     }
                 }
@@ -169,8 +169,8 @@ VisitAction WalkerT<NodeT>::Walk(Ptr<NodeT> curNode) const
             }
             case ASTKind::FUNC_DECL: {
                 auto fd = StaticAs<ASTKind::FUNC_DECL>(curNode);
-                for (auto modifier : fd->modifiers) {
-                    if (Walk(&modifier) == VisitAction::STOP_NOW) {
+                for (auto& modifier : fd->modifiers) {
+                    if (Walk(const_cast<Modifier*>(&modifier)) == VisitAction::STOP_NOW) {
                         return VisitAction::STOP_NOW;
                     }
                 }
@@ -233,8 +233,8 @@ VisitAction WalkerT<NodeT>::Walk(Ptr<NodeT> curNode) const
             }
             case ASTKind::PROP_DECL: {
                 auto pd = StaticAs<ASTKind::PROP_DECL>(curNode);
-                for (auto modifier : pd->modifiers) {
-                    if (Walk(&modifier) == VisitAction::STOP_NOW) {
+                for (auto& modifier : pd->modifiers) {
+                    if (Walk(const_cast<Modifier*>(&modifier)) == VisitAction::STOP_NOW) {
                         return VisitAction::STOP_NOW;
                     }
                 }
@@ -270,8 +270,8 @@ VisitAction WalkerT<NodeT>::Walk(Ptr<NodeT> curNode) const
             }
             case ASTKind::VAR_DECL: {
                 auto vd = StaticAs<ASTKind::VAR_DECL>(curNode);
-                for (auto modifier : vd->modifiers) {
-                    if (Walk(&modifier) == VisitAction::STOP_NOW) {
+                for (auto& modifier : vd->modifiers) {
+                    if (Walk(const_cast<Modifier*>(&modifier)) == VisitAction::STOP_NOW) {
                         return VisitAction::STOP_NOW;
                     }
                 }
@@ -297,8 +297,8 @@ VisitAction WalkerT<NodeT>::Walk(Ptr<NodeT> curNode) const
             }
             case ASTKind::CLASS_DECL: {
                 auto cd = StaticAs<ASTKind::CLASS_DECL>(curNode);
-                for (auto modifier : cd->modifiers) {
-                    if (Walk(&modifier) == VisitAction::STOP_NOW) {
+                for (auto& modifier : cd->modifiers) {
+                    if (Walk(const_cast<Modifier*>(&modifier)) == VisitAction::STOP_NOW) {
                         return VisitAction::STOP_NOW;
                     }
                 }
@@ -318,8 +318,8 @@ VisitAction WalkerT<NodeT>::Walk(Ptr<NodeT> curNode) const
             }
             case ASTKind::INTERFACE_DECL: {
                 auto id = StaticAs<ASTKind::INTERFACE_DECL>(curNode);
-                for (auto modifier : id->modifiers) {
-                    if (Walk(&modifier) == VisitAction::STOP_NOW) {
+                for (auto& modifier : id->modifiers) {
+                    if (Walk(const_cast<Modifier*>(&modifier)) == VisitAction::STOP_NOW) {
                         return VisitAction::STOP_NOW;
                     }
                 }
@@ -362,8 +362,8 @@ VisitAction WalkerT<NodeT>::Walk(Ptr<NodeT> curNode) const
             }
             case ASTKind::STRUCT_DECL: {
                 auto sd = StaticAs<ASTKind::STRUCT_DECL>(curNode);
-                for (auto modifier : sd->modifiers) {
-                    if (Walk(&modifier) == VisitAction::STOP_NOW) {
+                for (auto& modifier : sd->modifiers) {
+                    if (Walk(const_cast<Modifier*>(&modifier)) == VisitAction::STOP_NOW) {
                         return VisitAction::STOP_NOW;
                     }
                 }

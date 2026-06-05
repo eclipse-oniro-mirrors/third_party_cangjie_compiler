@@ -19,8 +19,7 @@
 
 namespace Cangjie::Interop::ObjC {
 
-void CheckForeignSetterNameAnnotation(
-    Cangjie::DiagnosticEngine& diag, const Cangjie::AST::Annotation& ann, const Cangjie::AST::Decl& decl);
+void CheckForeignSetterNameAnnotation(Cangjie::DiagnosticEngine& diag, const Cangjie::AST::Annotation& ann, const Cangjie::AST::Decl& decl);
 
 } // namespace Cangjie::Interop::ObjC
 

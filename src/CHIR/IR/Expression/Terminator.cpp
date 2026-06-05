@@ -88,9 +88,7 @@ size_t Terminator::GetNumOfOperands() const
 std::vector<Value*> Terminator::GetOperands() const
 {
     CJC_ASSERT(operands.size() >= GetFirstSuccessorIndex());
-    auto firstSuccessor =
-        operands.begin() + static_cast<std::vector<Value*>::difference_type>(GetFirstSuccessorIndex());
-    return {operands.begin(), firstSuccessor};
+    return {operands.begin(), operands.begin() + static_cast<long>(GetFirstSuccessorIndex())};
 }
 
 Value* Terminator::GetOperand(size_t idx) const
@@ -288,9 +286,7 @@ std::vector<Value*> ApplyWithException::GetArgs() const
     if (GetFirstSuccessorIndex() <= 1) {
         return {};
     } else {
-        auto firstSuccessor =
-            operands.begin() + static_cast<std::vector<Value*>::difference_type>(GetFirstSuccessorIndex());
-        return {operands.begin() + 1, firstSuccessor};
+        return {operands.begin() + 1, operands.begin() + static_cast<long>(GetFirstSuccessorIndex())};
     }
 }
 
@@ -318,8 +314,8 @@ inline static void CheckVirFuncInvokeInfo(const InvokeCallContext& callContext)
 {
     CJC_NULLPTR_CHECK(callContext.caller);
     CJC_NULLPTR_CHECK(callContext.funcCallCtx.thisType);
-    CJC_ASSERT(!callContext.virMethodCtx.srcCodeIdentifier.empty());
-    CJC_NULLPTR_CHECK(callContext.virMethodCtx.originalFuncType);
+    CJC_ASSERT(!callContext.virMethodCtx.funcName.empty());
+    CJC_NULLPTR_CHECK(callContext.virMethodCtx.funcType);
 }
 
 DynamicDispatchWithException::DynamicDispatchWithException(
@@ -342,12 +338,12 @@ DynamicDispatchWithException::DynamicDispatchWithException(
 
 const std::string& DynamicDispatchWithException::GetMethodName() const
 {
-    return virMethodCtx.srcCodeIdentifier;
+    return virMethodCtx.funcName;
 }
 
 FuncType* DynamicDispatchWithException::GetMethodType() const
 {
-    return virMethodCtx.originalFuncType;
+    return virMethodCtx.funcType;
 }
 
 const std::vector<GenericType*>& DynamicDispatchWithException::GetGenericTypeParams() const
@@ -369,7 +365,7 @@ std::vector<VTableSearchRes> DynamicDispatchWithException::GetVirtualMethodInfo(
         instParamTypes.erase(instParamTypes.begin());
     }
     auto instFuncType = builder.GetType<FuncType>(instParamTypes, builder.GetUnitTy());
-    FuncCallType funcCallType{virMethodCtx.srcCodeIdentifier, instFuncType, instantiatedTypeArgs};
+    FuncCallType funcCallType{virMethodCtx.funcName, instFuncType, instantiatedTypeArgs};
     auto res = GetFuncIndexInVTable(*thisTypeDeref, funcCallType, builder);
     CJC_ASSERT(!res.empty());
     return res;
@@ -430,9 +426,7 @@ Value* InvokeWithException::GetObject() const
 /** @brief Get the call args of this InvokeWithException operation */
 std::vector<Value*> InvokeWithException::GetArgs() const
 {
-    auto firstSuccessor =
-        operands.begin() + static_cast<std::vector<Value*>::difference_type>(GetFirstSuccessorIndex());
-    return {operands.begin(), firstSuccessor};
+    return {operands.begin(), operands.begin() + static_cast<long>(GetFirstSuccessorIndex())};
 }
 
 std::string DynamicDispatchWithException::OperandsToString() const
@@ -457,9 +451,7 @@ Value* InvokeStaticWithException::GetRTTIValue() const
 
 std::vector<Value*> InvokeStaticWithException::GetArgs() const
 {
-    auto firstSuccessor =
-        operands.begin() + static_cast<std::vector<Value*>::difference_type>(GetFirstSuccessorIndex());
-    return {operands.begin() + 1, firstSuccessor};
+    return {operands.begin() + 1, operands.begin() + static_cast<long>(GetFirstSuccessorIndex())};
 }
 
 // IntOpWithException

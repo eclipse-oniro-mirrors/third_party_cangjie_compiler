@@ -21,7 +21,6 @@
 #include <sstream>
 #include <unordered_map>
 #include <vector>
-#include "cangjie/Utils/Macros.h"
 
 namespace Cangjie::AST {
 using AttrSizeType = uint64_t;
@@ -587,8 +586,8 @@ enum class Attribute {
     JAVA_HAS_DEFAULT,
 
     /**
-     * Mark whether a class is a wrapper synthetic class generated for every mirror interface and abstract class.
-     * W: Parser, Sema.
+     * Mark whether a class is a synthetic wrapper class generated for every mirror interface and abstract class.
+     * W: Sema.
      * R: Sema.
      */
     JAVA_MIRROR_SYNTHETIC_WRAPPER,
@@ -677,6 +676,21 @@ enum class Attribute {
      * R: Sema.
      */
     CJ_MIRROR_OBJC_INTERFACE_FWD,
+
+    /**
+     * Mark declaration that was already loaded from another CJO,
+     * this solution need to be improved by modernization of ASTLoader.
+     * W: ASTLoader
+     * R: ASTLoader
+     */
+    ALREADY_LOADED,
+
+    /**
+     * Mark whether a class is a registry companion class generated for every impl class.
+     * W: Sema.
+     * R: Sema.
+     */
+    JAVA_IMPL_REGISTRY_COMPANION,
 
     AST_ATTR_END,
 };

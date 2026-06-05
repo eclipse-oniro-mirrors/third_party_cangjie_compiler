@@ -108,7 +108,7 @@ template <> RangeValueDomain HandleNonNullLiteralValue<RangeValueDomain>(const L
     }
 }
 
-RangeAnalysis::RangeAnalysis(const Function* func, CHIRBuilder& builder, bool isDebug, const Ptr<DiagAdapter>& diag)
+RangeAnalysis::RangeAnalysis(const Function* func, CHIRBuilder& builder, bool isDebug, DiagnosticEngine& diag)
     : ValueAnalysis(func, builder, isDebug), diag(diag)
 {
 }
@@ -290,7 +290,7 @@ std::string GenerateTypeRangePrompt(const Ptr<Type>& type)
 }
 
 template <typename TBinary, typename T>
-void RaiseArithmeticOverflowError(const TBinary* expr, ExprKind kind, T leftVal, T rightVal, DiagAdapter& diag)
+void RaiseArithmeticOverflowError(const TBinary* expr, ExprKind kind, T leftVal, T rightVal, DiagnosticEngine& diag)
 {
     auto& loc = expr->GetDebugLocation();
     auto ty = expr->GetResult()->GetType();
@@ -313,7 +313,7 @@ void RaiseArithmeticOverflowError(const TBinary* expr, ExprKind kind, T leftVal,
 }
 
 template <typename T>
-bool CheckDivZero(ExprKind exprKind, const Ptr<const BinaryExpression>& binary, T rVal, DiagAdapter& diag)
+bool CheckDivZero(ExprKind exprKind, const Ptr<const BinaryExpression>& binary, T rVal, DiagnosticEngine& diag)
 {
     if (rVal == 0 && (exprKind == ExprKind::DIV || exprKind == ExprKind::MOD)) {
         auto& loc = binary->GetDebugLocation();
@@ -325,8 +325,8 @@ bool CheckDivZero(ExprKind exprKind, const Ptr<const BinaryExpression>& binary, 
     return false;
 }
 
-SIntDomain CheckSingleValueOverflow(
-    const CHIRArithmeticBinopArgs& args, const Ptr<const BinaryExpression>& expr, ExprKind exprKind, DiagAdapter& diag)
+SIntDomain CheckSingleValueOverflow(const CHIRArithmeticBinopArgs& args, const Ptr<const BinaryExpression>& expr,
+    ExprKind exprKind, DiagnosticEngine& diag)
 {
     bool isOv = false;
     if (args.uns) {
@@ -377,7 +377,7 @@ void RangeAnalysis::HandleBinaryExpr(RangeDomain& state, const BinaryExpression*
         if (lRange.IsSingleValue() && rRange.IsSingleValue()) {
             auto domain = CheckSingleValueOverflow(
                 CHIRArithmeticBinopArgs{lRange, rRange, lhs, rhs, binaryExpr->GetExprKind(), ov, isUnsigned},
-                binaryExpr, binaryExpr->GetExprKind(), *diag);
+                binaryExpr, binaryExpr->GetExprKind(), diag);
             state.Update(dest, std::make_unique<SIntRange>(domain));
             return;
         }

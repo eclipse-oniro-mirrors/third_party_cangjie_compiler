@@ -15,7 +15,6 @@
 #include "cangjie/Frontend/CompilerInstance.h"
 
 #include <fstream>
-#include <iterator>
 
 #include "PrintSymbolTable.h"
 #include "cangjie/Basic/DiagnosticEngine.h"
@@ -46,8 +45,8 @@
 #include "cangjie/Utils/Utils.h"
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-#include "cangjie/CHIR/Checker/ComputeAnnotations.h"
 #include "cangjie/Mangle/CHIRMangler.h"
+#include "cangjie/CHIR/Checker/ComputeAnnotations.h"
 #endif
 #ifdef RELEASE
 #include "cangjie/Utils/Signal.h"
@@ -189,9 +188,7 @@ void CompilerInstance::DestroyASTResources()
 
 bool CompilerInstance::InitCompilerInstance()
 {
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     performMap.insert_or_assign(CompileStage::LOAD_PLUGINS, &CompilerInstance::PerformPluginLoad);
-#endif
     performMap.insert_or_assign(CompileStage::PARSE, &CompilerInstance::PerformParse);
     performMap.insert_or_assign(CompileStage::CONDITION_COMPILE, &CompilerInstance::PerformConditionCompile);
     performMap.insert_or_assign(CompileStage::IMPORT_PACKAGE, &CompilerInstance::PerformImportPackage);
@@ -307,91 +304,57 @@ static bool IsNeedSaveIncrCompilationLogFile(const GlobalOptions& globalOpts, co
     return true;
 }
 
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-namespace {
-class MetaTransformPlugin {
-public:
-    static MetaTransformPlugin Get(const std::string& path);
-    void RegisterCallbackTo(MetaTransformPluginBuilder& mtm) const;
-
-    bool IsValid() const
-    {
-        return !pluginPath.empty() && metaTransformPluginInfo.cjcVersion == CANGJIE_VERSION &&
-            metaTransformPluginInfo.registerTo;
-    }
-
-    void* GetHandle() const
-    {
-        return handle;
-    }
-
-private:
-    MetaTransformPlugin() = default;
-    MetaTransformPlugin(const std::string& pluginPath, const MetaTransformPluginInfo& info, HANDLE handle);
-
-private:
-    std::string pluginPath;
-    MetaTransformPluginInfo metaTransformPluginInfo;
-    HANDLE handle;
-};
-
-MetaTransformPlugin::MetaTransformPlugin(
-    const std::string& pluginPath, const MetaTransformPluginInfo& info, HANDLE handle)
-    : pluginPath(pluginPath), metaTransformPluginInfo(info), handle(handle)
-{
-}
-
-MetaTransformPlugin MetaTransformPlugin::Get(const std::string& path)
-{
-    HANDLE handle = nullptr;
-#ifdef _WIN32
-    handle = InvokeRuntime::OpenSymbolTable(path);
-#elif defined(__linux__) || defined(__APPLE__)
-    handle = InvokeRuntime::OpenSymbolTable(path, RTLD_NOW | RTLD_LOCAL);
-#endif
-    if (!handle) {
-#ifndef CANGJIE_ENABLE_GCOV
-        throw NullPointerException();
-#else
-        CJC_ABORT();
-#endif
-    }
-    void* fPtr = InvokeRuntime::GetMethod(handle, "getMetaTransformPluginInfo");
-    if (!fPtr) {
-#ifndef CANGJIE_ENABLE_GCOV
-        throw NullPointerException();
-#else
-        CJC_ABORT();
-#endif
-    }
-    auto pluginInfo = reinterpret_cast<MetaTransformPluginInfo (*)()>(fPtr)();
-    return MetaTransformPlugin(path, pluginInfo, handle);
-}
-
-void MetaTransformPlugin::RegisterCallbackTo(MetaTransformPluginBuilder& mtm) const
-{
-    metaTransformPluginInfo.registerTo(mtm);
-}
-} // namespace
-
 bool CompilerInstance::PerformPluginLoad()
 {
-    for (auto pluginPath : invocation.globalOptions.pluginPaths) { // loop for all plugins
-        try {
-            auto metaTransformPlugin = MetaTransformPlugin::Get(pluginPath);
-            if (!metaTransformPlugin.IsValid()) {
-                diag.DiagnoseRefactor(DiagKindRefactor::not_a_valid_plugin, DEFAULT_POSITION, pluginPath);
-            }
-            AddPluginHandle(metaTransformPlugin.GetHandle());
-            metaTransformPlugin.RegisterCallbackTo(metaTransformPluginBuilder); // register MetaTransform into builder
-        } catch (...) {
-            diag.DiagnoseRefactor(DiagKindRefactor::not_a_valid_plugin, DEFAULT_POSITION, pluginPath);
-            return false;
-        }
+    if (invocation.globalOptions.pluginPaths.empty()) {
+        return true;
     }
+#ifndef CANGJIE_ENABLE_GCOV
+    try {
+#endif
+        RuntimeInit::GetInstance().InitRuntime(
+            invocation.GetRuntimeLibPath(), invocation.globalOptions.environment.allVariables);
+        auto rtHandle = InvokeRuntime::OpenSymbolTable(invocation.GetRuntimeLibPath());
+        if (rtHandle == nullptr) {
+            throw NullPointerException();
+        }
+        auto initLibFunc = reinterpret_cast<int (*)(const char*)>(InvokeRuntime::GetMethod(rtHandle, "InitCJLibrary"));
+        if (initLibFunc == nullptr) {
+            throw NullPointerException();
+        }
+        for (auto pluginPath : invocation.globalOptions.pluginPaths) {
+#ifndef CANGJIE_ENABLE_GCOV
+            try {
+#endif
+    #ifdef _WIN32
+                HANDLE handle = InvokeRuntime::OpenSymbolTable(pluginPath);
+    #elif defined(__linux__) || defined(__APPLE__)
+                HANDLE handle = InvokeRuntime::OpenSymbolTable(pluginPath, RTLD_NOW | RTLD_LOCAL);
+    #else
+                throw NullPointerException();
+    #endif
+                if (handle == nullptr) {
+                    throw NullPointerException();
+                }
+                InvokeRuntime::SetOpenedLibHandles(handle);
+                bool res = initLibFunc(pluginPath.c_str());
+                if (res != 0) {
+                    throw NullPointerException();
+                }
+#ifndef CANGJIE_ENABLE_GCOV
+            } catch (...) {
+                diag.DiagnoseRefactor(DiagKindRefactor::not_a_valid_plugin, DEFAULT_POSITION, pluginPath);
+                return false;
+            }
+#endif
+        }
+#ifndef CANGJIE_ENABLE_GCOV
+    } catch (...) {
+        return false;
+    }
+#endif
     return true;
 }
-#endif
 
 bool CompilerInstance::PerformParse()
 {
@@ -523,7 +486,7 @@ void UpdateMemberDeclMangleNameForCachedInfo(const RawMangled2DeclMap& rawMangle
     } else {
         CJC_ABORT();
     }
-    for (auto& m : memCache.members) {
+    for (auto &m : memCache.members) {
         UpdateMemberDeclMangleNameForCachedInfo(rawMangleName2DeclMap, m);
     }
 }
@@ -536,19 +499,19 @@ void UpdateTopLevelDeclMangleNameForCachedInfo(
     } else {
         CJC_ABORT();
     }
-    for (auto& m : topCache.members) {
+    for (auto &m : topCache.members) {
         UpdateMemberDeclMangleNameForCachedInfo(rawMangleName2DeclMap, m);
     }
 }
-} // namespace
+}
 
 void CompilerInstance::UpdateMangleNameForCachedInfo()
 {
-    for (auto& it : cachedInfo.curPkgASTCache) {
+    for (auto &it : cachedInfo.curPkgASTCache) {
         auto rawMangle = it.first;
         UpdateTopLevelDeclMangleNameForCachedInfo(rawMangleName2DeclMap, rawMangle, it.second);
     }
-    for (auto& it : cachedInfo.importedASTCache) {
+    for (auto &it : cachedInfo.importedASTCache) {
         auto rawMangle = it.first;
         UpdateTopLevelDeclMangleNameForCachedInfo(rawMangleName2DeclMap, rawMangle, it.second);
     }
@@ -681,7 +644,6 @@ bool CompilerInstance::PerformGenericInstantiation()
     if (gim == nullptr) {
         gim = new GenericInstantiationManager(*this);
         CJC_NULLPTR_CHECK(gim);
-        testManager->Init(gim);
     }
     if (!invocation.globalOptions.enIncrementalCompilation) {
         Utils::ProfileRecorder::Start("Generic Instantiation", "ResetGenericInstantiationStage");
@@ -716,6 +678,12 @@ bool CompilerInstance::PerformGenericInstantiation()
 namespace {
 using DeclAndPackageName = std::pair<AST::Decl*, std::string>;
 using LambdaAndPackageName = std::pair<AST::LambdaExpr*, std::string>;
+struct DeclAndPackageNameHasher {
+    size_t operator()(const DeclAndPackageName& elem) const noexcept
+    {
+        return std::hash<Ptr<const AST::Decl>>()(elem.first);
+    }
+};
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
 void DoNewMangling(
@@ -741,17 +709,18 @@ void DoNewMangling(
                     desugar.mangledName = baseMangler.Mangle(desugar);
                     return VisitAction::WALK_CHILDREN;
                 }
-                if (!Ty::IsTyCorrect(decl.ty)) {
+                if (!Ty::IsTyCorrect(decl.GetTy())) {
                     return VisitAction::SKIP_CHILDREN;
                 }
                 decl.mangledName = baseMangler.Mangle(decl, filteredPrefix);
                 return VisitAction::WALK_CHILDREN;
             },
             [&baseMangler, &filteredPrefix](LambdaExpr& lambda) {
-                if (lambda.TestAttr(Attribute::GENERIC) || !Ty::IsTyCorrect(lambda.ty)) {
+                if (lambda.TestAttr(Attribute::GENERIC) || !Ty::IsTyCorrect(lambda.GetTy())) {
                     return VisitAction::SKIP_CHILDREN;
                 }
-                lambda.mangledName = baseMangler.MangleLambda(lambda, filteredPrefix);
+                lambda.mangledName = baseMangler.MangleLambda(lambda,
+                    filteredPrefix);
                 return VisitAction::WALK_CHILDREN;
             },
             []([[maybe_unused]] const Annotation& anno) {
@@ -797,7 +766,6 @@ void DoMangling(const BaseMangler& baseMangler, size_t parallelNum, const std::v
         auto tasksNum = topDecls.size() / batchSize;
         size_t start = 0;
         size_t end = batchSize;
-        std::unordered_map<int, std::vector<LambdaAndPackageName>> lambdasCollectedByTask;
         // Creating a Concurrent Task Queue
         Utils::TaskQueue taskQueue(parallelNum);
         for (size_t i = 0; i < tasksNum; ++i) {
@@ -813,30 +781,6 @@ void DoMangling(const BaseMangler& baseMangler, size_t parallelNum, const std::v
         DoNewMangling(baseMangler, topDecls, start, topDecls.size());
     }
 }
-
-void SortForBep(Package& pkg)
-{
-    std::unordered_map<Ptr<Decl>, std::string> declMangleMap;
-    auto compare = [&declMangleMap](const Ptr<Decl> d1, const Ptr<Decl> d2) {
-        const std::string& mangle1 = declMangleMap[d1];
-        const std::string& mangle2 = declMangleMap[d2];
-        if (mangle1 == mangle2) {
-            return CompNodeByPos(d1, d2);
-        }
-        return mangle1 < mangle2;
-    };
-    // Reorder genericInstantiatedDecls for bep.
-    std::set<Ptr<Decl>, decltype(compare)> orderedDecls(compare);
-    std::for_each(pkg.genericInstantiatedDecls.begin(), pkg.genericInstantiatedDecls.end(),
-        [&orderedDecls, &declMangleMap](auto& it) {
-            BaseMangler mangler;
-            declMangleMap.emplace(it.get(), mangler.Mangle(*it));
-            orderedDecls.emplace(it.release());
-        });
-    pkg.genericInstantiatedDecls.clear();
-    std::for_each(orderedDecls.cbegin(), orderedDecls.cend(),
-        [&pkg](auto it) { pkg.genericInstantiatedDecls.emplace_back(OwnedPtr<Decl>(it)); });
-}
 #endif
 } // namespace
 
@@ -845,18 +789,14 @@ void CompilerInstance::ManglingHelpFunction(const BaseMangler& baseMangler)
 #endif
 {
     // Collect all top-level decls
-    std::vector<DeclAndPackageName> topDecls;
-    auto deduplicatedEmplace = [&topDecls](AST::Decl* decl, std::string pkgName) {
+    std::unordered_set<DeclAndPackageName, DeclAndPackageNameHasher> topDeclsSet;
+    auto deduplicatedEmplace = [&topDeclsSet](AST::Decl* decl, std::string pkgName) {
         if (!decl->TestAttr(AST::Attribute::IMPORTED)) {
-            if (std::find(topDecls.begin(), topDecls.end(), std::make_pair(decl, pkgName)) == topDecls.end()) {
-                topDecls.emplace_back(decl, pkgName);
-            }
+            topDeclsSet.insert(std::make_pair(decl, pkgName));
             return;
         }
         if (decl->isUsedImports) {
-            if (std::find(topDecls.begin(), topDecls.end(), std::make_pair(decl, pkgName)) == topDecls.end()) {
-                topDecls.emplace_back(std::make_pair(decl, pkgName));
-            }
+            topDeclsSet.insert(std::make_pair(decl, pkgName));
         }
     };
 
@@ -878,29 +818,28 @@ void CompilerInstance::ManglingHelpFunction(const BaseMangler& baseMangler)
             deduplicatedEmplace(decl.get(), package->fullPackageName);
         }
     }
-    if (invocation.globalOptions.disableInstantiation) {
-        for (auto& importPkg : importManager->GetAllImportedPackages()) {
-            CJC_NULLPTR_CHECK(importPkg->srcPackage.get());
-            // exclude current package
-            if (!importPkg->srcPackage->TestAttr(AST::Attribute::IMPORTED)) {
-                continue;
+    for (auto& importPkg : importManager->GetAllImportedPackages()) {
+        CJC_NULLPTR_CHECK(importPkg->srcPackage.get());
+        // exclude current package
+        if (!importPkg->srcPackage->TestAttr(AST::Attribute::IMPORTED)) {
+            continue;
+        }
+        for (auto& file : importPkg->srcPackage->files) {
+            for (auto& decl : file->decls) {
+                deduplicatedEmplace(decl.get(), importPkg->fullPackageName);
             }
-            for (auto& file : importPkg->srcPackage->files) {
-                for (auto& decl : file->decls) {
-                    deduplicatedEmplace(decl.get(), importPkg->fullPackageName);
-                }
-                for (auto& decl : file->exportedInternalDecls) {
-                    deduplicatedEmplace(decl.get(), importPkg->fullPackageName);
-                }
+            for (auto& decl : file->exportedInternalDecls) {
+                deduplicatedEmplace(decl.get(), importPkg->fullPackageName);
             }
-            for (auto& decl : importPkg->srcPackage->genericInstantiatedDecls) {
-                if (decl->IsNominalDecl()) {
-                    deduplicatedEmplace(decl.get(), importPkg->fullPackageName);
-                }
+        }
+        for (auto& decl : importPkg->srcPackage->genericInstantiatedDecls) {
+            if (decl->IsNominalDecl()) {
+                deduplicatedEmplace(decl.get(), importPkg->fullPackageName);
             }
         }
     }
 
+    std::vector<DeclAndPackageName> topDecls(topDeclsSet.begin(), topDeclsSet.end());
     DoMangling(baseMangler, invocation.globalOptions.GetJobs(), topDecls);
 }
 
@@ -927,13 +866,6 @@ bool CompilerInstance::PerformMangling()
     mangler->lambdaCounter = cachedInfo.lambdaCounter;
     ManglingHelpFunction(*mangler);
     cachedInfo.lambdaCounter = mangler->lambdaCounter;
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-    if (!invocation.globalOptions.disableInstantiation) {
-        for (auto& package : GetSourcePackages()) {
-            SortForBep(*package);
-        }
-    }
-#endif
     // when dump to screen, only dump once and dump the ast immediately after mangling
     if (!srcPkgs.empty() && invocation.globalOptions.NeedDumpAST()) {
         DumpAST(GetSourcePackages(), invocation.globalOptions.output, "mangle", invocation.globalOptions.dumpToScreen);
@@ -941,12 +873,29 @@ bool CompilerInstance::PerformMangling()
     return true;
 }
 
+namespace {
+void RegisterMacroCallDiagInfos(DiagnosticEngine& diag, AST::Package& pkg)
+{
+    for (auto& file : pkg.files) {
+        for (auto& macrocall : file->originalMacroCallNodes) {
+            auto pInvocation = macrocall->GetInvocation();
+            if (!pInvocation) {
+                continue;
+            }
+            auto uniqueInfo = std::make_unique<MacroCallDiagInfo>(pInvocation->macroCallDiagInfo);
+            diag.RegisterMacroCallDiagInfo(std::move(uniqueInfo));
+        }
+    }
+}
+} // namespace
+
 bool CompilerInstance::GenerateCHIRForPkg(AST::Package& pkg)
 {
     if (pkg.files.empty()) {
         return true;
     }
 
+    RegisterMacroCallDiagInfos(diag, pkg);
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     // use this result when APILevel check supports arbitrary const expressions
     (void)CHIR::ComputeAnnotations(pkg, *this);
@@ -1152,7 +1101,7 @@ std::vector<Ptr<Decl>> CompilerInstance::GetAllVisibleExtendMembers(
     if (type.index() == 0) {
         exprTy = std::get<Ptr<Ty>>(type);
     } else if (type.index() == 1) {
-        exprTy = std::get<Ptr<InheritableDecl>>(type)->ty;
+        exprTy = std::get<Ptr<InheritableDecl>>(type)->GetTy();
     }
     if (!Ty::IsTyCorrect(exprTy)) {
         return {};
@@ -1213,8 +1162,8 @@ bool CompilerInstance::DetectCangjieHome()
     }
     // Detect from exepath.
     if (invocation.globalOptions.executablePath.empty()) {
-        diag.DiagnoseRefactor(DiagKindRefactor::frontend_failed_to_detect_cangjie_home, DEFAULT_POSITION,
-            "can not resolve executable path");
+        diag.DiagnoseRefactor(DiagKindRefactor::frontend_failed_to_detect_cangjie_home,
+            DEFAULT_POSITION, "can not resolve executable path");
         return false;
     } else {
         cangjieHome =

@@ -7,6 +7,7 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "cangjie/CHIR/Optimization/LambdaInline.h"
+#include "cangjie/CHIR/Utils/Utils.h"
 
 namespace Cangjie::CHIR {
 bool LambdaIsUnused(const Lambda& lambda)

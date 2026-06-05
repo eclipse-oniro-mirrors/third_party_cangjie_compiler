@@ -15,6 +15,7 @@
 #ifndef CANGJIE_BASIC_POSITION_H
 #define CANGJIE_BASIC_POSITION_H
 
+#include <cstdint>
 #include <string>
 #include <cstdint>
 

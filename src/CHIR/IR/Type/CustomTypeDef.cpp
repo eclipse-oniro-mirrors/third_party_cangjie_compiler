@@ -414,7 +414,7 @@ std::string CustomTypeDef::ToString() const
     */
     std::stringstream ss;
     ss << AddNewLineOrNot(annoInfo.ToString(0));
-    ss << attributeInfo.ToString();
+    ss << attributes.ToString();
     ss << CustomTypeDefTitleToString();
     ss << ParentToString();
     ss << " {";
@@ -566,11 +566,6 @@ std::string CustomTypeDef::GetIdentifier() const
     return identifier;
 }
 
-void CustomTypeDef::AppendAttributeInfo(const AttributeInfo& info)
-{
-    attributeInfo.AppendAttrs(info);
-}
-
 /**
  * Get identifier without prefix '@'
  */
@@ -578,26 +573,6 @@ std::string CustomTypeDef::GetIdentifierWithoutPrefix() const
 {
     CJC_ASSERT(!identifier.empty());
     return identifier.substr(1);
-}
-
-void CustomTypeDef::EnableAttr(Attribute attr)
-{
-    attributeInfo.SetAttr(attr, true);
-}
-
-void CustomTypeDef::DisableAttr(Attribute attr)
-{
-    attributeInfo.SetAttr(attr, false);
-}
-
-bool CustomTypeDef::TestAttr(Attribute attr) const
-{
-    return attributeInfo.TestAttr(attr);
-}
-
-AttributeInfo CustomTypeDef::GetAttributeInfo() const
-{
-    return attributeInfo;
 }
 
 Function* CustomTypeDef::GetVarInitializationFunc() const

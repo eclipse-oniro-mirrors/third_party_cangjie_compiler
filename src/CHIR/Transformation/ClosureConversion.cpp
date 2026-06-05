@@ -503,8 +503,7 @@ Value* CastTypeFromAutoEnvRefToFuncType(FuncType& srcFuncType, Value& autoEnvObj
      * }
      * class B <: A<Bool> {
      * }
-     * In B, we will generate a func B::foo with type (Box<Bool>&) -> Unit to meet consistent function signatures
-     * in vtable.
+     * In B, we will generate a func B::foo with type (Box<Bool>&) -> Unit to meet consistent function signatures in vtable
      * However when we got a function call B::foo(true), we should get its real function type (Bool) -> Unit,
      *   and type info is stored in orphan flag in generic type.
      */
@@ -1496,7 +1495,7 @@ void ClosureConversion::LiftType()
         return VisitResult::CONTINUE;
     };
     for (auto func : package.GetGlobalFunctions(true)) {
-        if (auto body = func->GetBody()) {
+        if (func->GetBody()) {
             Visitor::Visit(*func, preVisit);
         }
         converter.VisitValue(*func);
@@ -2241,9 +2240,9 @@ void ClosureConversion::ConvertApplyToInvoke(Apply& apply)
             .args = apply.GetArgs(),
             .thisType = instParentType
         },
-        .virMethodCtx = VirMethodContext {
-            .srcCodeIdentifier = methodName,
-            .originalFuncType = originalFuncType
+        .virMethodCtx = FuncSigInfo {
+            .funcName = methodName,
+            .funcType = originalFuncType
         }
     };
     auto invoke = builder.CreateExpression<Invoke>(
@@ -2274,9 +2273,9 @@ void ClosureConversion::ConvertApplyWithExceptionToInvokeWithException(ApplyWith
             .args = apply.GetArgs(),
             .thisType = instParentType
         },
-        .virMethodCtx = VirMethodContext {
-            .srcCodeIdentifier = methodName,
-            .originalFuncType = originalFuncType
+        .virMethodCtx = FuncSigInfo {
+            .funcName = methodName,
+            .funcType = originalFuncType
         }
     };
     auto invoke = builder.CreateExpression<InvokeWithException>(
@@ -2436,9 +2435,9 @@ Function* ClosureConversion::CreateGenericMethodInAutoEnvWrapper(ClassDef& autoE
             .args = invokeArgs,
             .thisType = instCustomType
         },
-        .virMethodCtx = VirMethodContext {
-            .srcCodeIdentifier = methodName,
-            .originalFuncType = originalFuncType
+        .virMethodCtx = FuncSigInfo {
+            .funcName = methodName,
+            .funcType = originalFuncType
         }
     };
     auto invokeRes = CreateAndAppendExpression<Invoke>(builder, retType, invokeInfo, entry)->GetResult();

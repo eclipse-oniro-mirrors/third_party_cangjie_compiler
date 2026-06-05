@@ -10,7 +10,6 @@
 #define CANGJIE_CHIR_VALUE_H
 
 #include "cangjie/CHIR/IR/AnnoInfo.h"
-#include "cangjie/CHIR/IR/AttributeInfo.h"
 #include "cangjie/CHIR/IR/Base.h"
 #include "cangjie/CHIR/IR/Type/Type.h"
 #include "cangjie/CHIR/Utils/UserDefinedType.h"
@@ -132,21 +131,6 @@ public:
     void Dump() const;
 
     bool IsCompileTimeValue() const;
-
-    // ===--------------------------------------------------------------------===//
-    // Attribute
-    // ===--------------------------------------------------------------------===//
-    AttributeInfo GetAttributeInfo() const;
-    void AppendAttributeInfo(const AttributeInfo& info);
-    void DisableAttr(Attribute attr);
-    void EnableAttr(Attribute attr);
-    bool TestAttr(Attribute attr) const;
-
-    // ===--------------------------------------------------------------------===//
-    // Annotation
-    // ===--------------------------------------------------------------------===//
-    const AnnoInfo& GetAnnoInfo() const;
-    void SetAnnoInfo(AnnoInfo&& info);
     
 protected:
     explicit Value(Type* ty, std::string identifier, ValueKind kind);
@@ -165,10 +149,8 @@ protected:
 protected:
     Type* ty;                       // variable type
     std::string identifier;         // variable identifier
-    AttributeInfo attributes;       // variable attribute
     std::vector<Expression*> users; // variable users
     std::mutex userMutex;           // mutex for AddUserOnly and RemoveUserOnly
-    AnnoInfo annoInfo;              // annoInfo, used in struct/class/enum member func
 
 private:
     ValueKind GetValueKind() const;
@@ -203,6 +185,12 @@ public:
     Function* GetTopLevelFunc() const;
 
     // ===--------------------------------------------------------------------===//
+    // Annotation
+    // ===--------------------------------------------------------------------===//
+    const AnnoInfo& GetAnnoInfo() const;
+    void SetAnnoInfo(AnnoInfo&& info);
+
+    // ===--------------------------------------------------------------------===//
     // Debug Expression
     // ===--------------------------------------------------------------------===//
     // if parameter do not have debug, return nullptr
@@ -212,6 +200,7 @@ private:
     Function* ownerFunc = nullptr;
     Lambda* ownerLambda = nullptr;
     std::string srcCodeIdentifier;
+    AnnoInfo annoInfo;
 
 private:
     explicit Parameter(Type* ty, const std::string& id, Function* ownerFunc);
@@ -412,7 +401,7 @@ public:
     void AddBlocks(const std::vector<Block*>& newBlocks);
     Block* GetBlockByIdx(size_t idx) const;
     std::vector<Block*> GetBlocks() const;
-
+    std::vector<Block*> GetAllBlocks() const;
     Block* GetEntryBlock() const;
     void SetEntryBlock(Block* block);
 
@@ -490,6 +479,12 @@ public:
     virtual bool IsSrcCodeImported() const = 0;
 
     // ===--------------------------------------------------------------------===//
+    // Annotation
+    // ===--------------------------------------------------------------------===//
+    const AnnoInfo& GetAnnoInfo() const;
+    void SetAnnoInfo(AnnoInfo&& info);
+
+    // ===--------------------------------------------------------------------===//
     // Modify Self
     // ===--------------------------------------------------------------------===//
     virtual void DestroySelf() = 0;
@@ -513,6 +508,7 @@ protected:
     std::string packageName;
     CustomTypeDef* declaredParent{nullptr};
     std::set<std::string> features;
+    AnnoInfo annoInfo;
 };
 
 class Function : public GlobalValue {

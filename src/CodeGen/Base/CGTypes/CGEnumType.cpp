@@ -63,6 +63,9 @@ std::optional<std::size_t> TryComputeAndroidArm32StructConstructorUnionSize(
     CGModule& cgMod, const std::vector<CHIR::Type*>& paramTypes)
 {
     for (auto associatedValueCHIRType : paramTypes) {
+        if (IsReferenceType(*associatedValueCHIRType, cgMod)) {
+            continue;
+        }
         auto associatedValueCGType = CGType::GetOrCreate(cgMod, associatedValueCHIRType);
         if (!associatedValueCGType->GetSize().has_value()) {
             return std::nullopt;
@@ -150,7 +153,12 @@ llvm::StructType* CGEnumType::GetAndroidArm32AssociatedNonRefLayoutType(
     std::vector<llvm::Type*> llvmFieldTypes;
     llvmFieldTypes.reserve(fieldTypes.size());
     for (auto fieldType : fieldTypes) {
-        llvmFieldTypes.emplace_back(CGType::GetOrCreate(cgMod, DeRef(*fieldType))->GetLLVMType());
+        auto* derefType = DeRef(*fieldType);
+        if (IsReferenceType(*derefType, cgMod)) {
+            llvmFieldTypes.emplace_back(CGType::GetRefType(cgMod.GetLLVMContext()));
+        } else {
+            llvmFieldTypes.emplace_back(CGType::GetOrCreate(cgMod, derefType)->GetLLVMType());
+        }
     }
     return llvm::StructType::get(cgMod.GetLLVMContext(), llvmFieldTypes, false);
 }
@@ -505,7 +513,7 @@ llvm::Constant* CGEnumType::GenFieldsOfTypeInfo()
         }
         case CGEnumTypeKind::EXHAUSTIVE_ASSOCIATED_OPTION_LIKE_REF: {
             CJC_NULLPTR_CHECK(optionLikeInfo);
-            fieldTypes.emplace_back(const_cast<CHIR::Type*>(&CGType::GetZeroSizedCGType(cgMod)->GetOriginal()));
+            fieldTypes.emplace_back(const_cast<CHIR::Type*>(&CGType::GetUnitCGType(cgMod)->GetOriginal()));
             fieldTypes.emplace_back(optionLikeInfo->associatedValueType);
             break;
         }
@@ -578,6 +586,7 @@ llvm::Constant* CGEnumType::GenFieldsFnsOfTypeTemplateForOptionLikeT(CGModule& c
     auto getTiFn1 = llvm::Function::Create(
         fieldFnType, llvm::Function::PrivateLinkage, funcPrefixName + ".fieldTiFn.0", cgMod.GetLLVMModule());
     getTiFn1->addFnAttr("native-interface-fn");
+    getTiFn1->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
     CodeGen::IRBuilder2 irBuilder(cgMod);
     auto entryBB = irBuilder.CreateEntryBasicBlock(getTiFn1, "entry");
     irBuilder.SetInsertPoint(entryBB);
@@ -587,7 +596,7 @@ llvm::Constant* CGEnumType::GenFieldsFnsOfTypeTemplateForOptionLikeT(CGModule& c
     irBuilder.CreateCondBr(isRef, refBB, nonRefBB);
     irBuilder.SetInsertPoint(refBB);
     irBuilder.CreateRet(
-        irBuilder.CreateBitCast(CGType::GetZeroSizedCGType(cgMod)->GetOrCreateTypeInfo(), p0i8));
+        irBuilder.CreateBitCast(CGType::GetUnitCGType(cgMod)->GetOrCreateTypeInfo(), p0i8));
     irBuilder.SetInsertPoint(nonRefBB);
     irBuilder.CreateRet(irBuilder.CreateBitCast(CGType::GetBoolCGType(cgMod)->GetOrCreateTypeInfo(), p0i8));
 
@@ -595,15 +604,10 @@ llvm::Constant* CGEnumType::GenFieldsFnsOfTypeTemplateForOptionLikeT(CGModule& c
     auto getTiFn2 = llvm::Function::Create(
         fieldFnType, llvm::Function::PrivateLinkage, funcPrefixName + ".fieldTiFn.1", cgMod.GetLLVMModule());
     getTiFn2->addFnAttr("native-interface-fn");
+    getTiFn2->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
     entryBB = irBuilder.CreateEntryBasicBlock(getTiFn2, "entry");
     irBuilder.SetInsertPoint(entryBB);
     ti = irBuilder.LLVMIRBuilder2::CreateLoad(typeInfoPtrType, getTiFn2->getArg(1));
-    isRef = irBuilder.CreateTypeInfoIsReferenceCall(ti);
-    auto [refBB2, nonRefBB2] = Vec2Tuple<2>(irBuilder.CreateAndInsertBasicBlocks({"ref", "nonRef"}));
-    irBuilder.CreateCondBr(isRef, refBB2, nonRefBB2);
-    irBuilder.SetInsertPoint(refBB2);
-    irBuilder.CreateRet(irBuilder.CreateBitCast(ti, p0i8));
-    irBuilder.SetInsertPoint(nonRefBB2);
     irBuilder.CreateRet(irBuilder.CreateBitCast(ti, p0i8));
 
     return CGTypeInfo::GenFieldsFnsOfTypeTemplate(cgMod, funcPrefixName, {getTiFn1, getTiFn2});
@@ -623,9 +627,9 @@ llvm::Constant* CGEnumType::GenFieldsFnsOfTypeTemplate()
             break;
         }
         case CGEnumTypeKind::EXHAUSTIVE_ASSOCIATED_OPTION_LIKE_REF: {
+            fieldTypes.emplace_back(const_cast<CHIR::Type*>(&CGType::GetUnitCGType(cgMod)->GetOriginal()));
             fieldTypes.emplace_back(
                 CGType::GetRefTypeOf(cgCtx.GetCHIRBuilder(), CGType::GetObjectCGType(cgMod)->GetOriginal()));
-            fieldTypes.emplace_back(const_cast<CHIR::Type*>(&CGType::GetZeroSizedCGType(cgMod)->GetOriginal()));
             break;
         }
         case CGEnumTypeKind::EXHAUSTIVE_ASSOCIATED_OPTION_LIKE_NONREF: {

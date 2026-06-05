@@ -137,11 +137,11 @@ public:
     }
     inline std::string GetFullName()
     {
-        return invocation->fullName;
+        return invocation->macroCallDiagInfo.fullName;
     }
     inline std::string GetIdentifier()
     {
-        return invocation->identifier;
+        return invocation->macroCallDiagInfo.identifier;
     }
     inline Ptr<const AST::FuncDecl> GetDefinition()
     {

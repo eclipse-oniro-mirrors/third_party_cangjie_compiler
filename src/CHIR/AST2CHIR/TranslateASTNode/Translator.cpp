@@ -77,7 +77,7 @@ Ptr<FuncType> Translator::CreateVirtualFuncType(const AST::FuncDecl& decl)
 {
     std::vector<Type*> args;
     for (size_t i = 0; i < decl.funcBody->paramLists[0]->params.size(); i++) {
-        args.emplace_back(TranslateType(*decl.funcBody->paramLists[0]->params[i]->ty));
+        args.emplace_back(TranslateType(*decl.funcBody->paramLists[0]->params[i]->GetTy()));
     }
     return builder.GetType<FuncType>(args, builder.GetUnitTy());
 }
@@ -222,13 +222,13 @@ Value* Translator::TranslateExprArg(const AST::Node& node, Type& targetTy, bool 
     if (targetTy.IsUnit()) {
         return CreateAndAppendConstantExpression<UnitLiteral>(builder.GetUnitTy(), *GetCurrentBlock())->GetResult();
     }
-    if (node.ty->IsNothing() || targetTy.IsNothing()) {
+    if (node.GetTy()->IsNothing() || targetTy.IsNothing()) {
         return CreateAndAppendConstantExpression<NullLiteral>(builder.GetNothingType(),
             *GetCurrentBlock())->GetResult();
     }
     if (!value) {
         // unit can be converted to Any, or any other interface it extends
-        if (node.ty->IsUnit() && !targetTy.IsUnit()) {
+        if (node.GetTy()->IsUnit() && !targetTy.IsUnit()) {
             value = CreateAndAppendConstantExpression<UnitLiteral>(
                 builder.GetUnitTy(), *GetCurrentBlock())->GetResult();
         } else {
@@ -250,7 +250,7 @@ Value* Translator::TranslateExprArg(const AST::Node& node)
 {
     auto value = TranslateASTNode(node, *this);
     if (!value) {
-        if (node.ty->IsUnit()) {
+        if (node.GetTy()->IsUnit()) {
             return CreateAndAppendConstantExpression<UnitLiteral>(builder.GetUnitTy(), *GetCurrentBlock())->GetResult();
         }
         return CreateAndAppendConstantExpression<NullLiteral>(builder.GetNothingType(),
@@ -286,7 +286,7 @@ void Translator::TranslateSubExprToLoc(const AST::Node& node, Value* location, c
         return;
     }
     // unit can be converted to Any, or any other interface it extends
-    if (node.ty->IsUnit() && !targetTy->IsUnit()) {
+    if (node.GetTy()->IsUnit() && !targetTy->IsUnit()) {
         value = CreateAndAppendConstantExpression<UnitLiteral>(
             debugLoc, builder.GetUnitTy(), *currentBlock)->GetResult();
     }
@@ -297,7 +297,7 @@ void Translator::TranslateSubExprToLoc(const AST::Node& node, Value* location, c
         }
         // create a null/unit value if -g
         if (!value) {
-            if (node.ty->IsUnit()) {
+            if (node.GetTy()->IsUnit()) {
                 auto unit = CreateAndAppendConstantExpression<UnitLiteral>(
                     debugLoc, builder.GetUnitTy(), *currentBlock);
                 value = unit->GetResult();
@@ -316,7 +316,7 @@ void Translator::TranslateSubExprToLoc(const AST::Node& node, Value* location, c
         return;
     }
     value = TypeCastOrBoxIfNeeded(*value, *targetTy, debugLoc);
-    CreateWrappedStore(debugLoc, value, location, GetCurrentBlock());
+    CreateAndAppendWrappedStore(*value, *location, debugLoc);
 }
 
 Ptr<Value> Translator::TranslateSubExprAsValue(const AST::Node& node)

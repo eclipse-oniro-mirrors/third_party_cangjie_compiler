@@ -495,7 +495,7 @@ void PluginCustomAnnoChecker::CheckHideOfExtendDecl(const Decl& decl, const Plug
     if (decl.astKind != ASTKind::EXTEND_DECL) {
         return;
     }
-    auto extendedDecl = Ty::GetDeclPtrOfTy(decl.ty);
+    auto extendedDecl = Ty::GetDeclPtrOfTy(decl.GetTy());
     if (!extendedDecl) {
         return;
     }
@@ -742,7 +742,7 @@ void PluginCustomAnnoChecker::MarkClassLikeMembersAsExternalWeakIfNeeded(
     }
 }
 
-bool PluginCustomAnnoChecker::CheckNode(Ptr<Node> node, const PluginCustomAnnoInfo& scopeAnnoInfo, bool reportDiag)
+bool PluginCustomAnnoChecker::CheckNode(Ptr<Node> node, PluginCustomAnnoInfo& scopeAnnoInfo, bool reportDiag)
 {
     if (!node) {
         return true;

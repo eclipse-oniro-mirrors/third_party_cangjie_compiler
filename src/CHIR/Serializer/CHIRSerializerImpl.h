@@ -39,6 +39,7 @@ public:
 
     // Utility
     void Save(const std::string& filename, ToCHIR::Phase phase);
+    flatbuffers::DetachedBuffer ConvertToMemoryData();
     void Initialize();
     void Dispatch();
 

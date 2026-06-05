@@ -25,11 +25,11 @@ Ptr<ClassDecl> GetMirrorSuperClass(const ClassLikeDecl& target)
 {
     if (auto classDecl = DynamicCast<const ClassDecl*>(&target)) {
         auto superClass = classDecl->GetSuperClassDecl();
-        if (superClass && TypeMapper::IsObjCMirror(*superClass->ty)) {
+        if (superClass && TypeMapper::IsObjCMirror(*superClass->GetTy())) {
             return superClass;
         }
 
-        if (superClass && TypeMapper::IsObjCImpl(*superClass->ty)) {
+        if (superClass && TypeMapper::IsObjCImpl(*superClass->GetTy())) {
             return GetMirrorSuperClass(*superClass);
         }
     }
@@ -92,6 +92,16 @@ Ptr<Decl> FindMirrorMember(const std::string_view& mirrorMemberIdent, const Inhe
     return Ptr<Decl>(nullptr);
 }
 
+Ptr<Decl> FindMirrorMember(const InheritableDecl& target, std::function<bool(Decl&)> pred)
+{
+    auto& decls = target.GetMemberDecls();
+    auto found = std::find_if(decls.begin(), decls.end(), [pred](auto& decl) { return pred(*decl); });
+    if (found != decls.end()) {
+        return found->get();
+    }
+    return nullptr;
+}
+
 bool HasMirrorSuperClass(const ClassLikeDecl& target)
 {
     return GetMirrorSuperClass(target) != nullptr;
@@ -110,7 +120,7 @@ bool HasMirrorSuperInterface(const ClassLikeDecl& target)
 
 Ptr<VarDecl> GetNativeVarHandle(const ClassDecl& target)
 {
-    CJC_ASSERT(TypeMapper::IsObjCMirror(*target.ty) || TypeMapper::IsObjCImpl(*target.ty) ||
+    CJC_ASSERT(TypeMapper::IsObjCMirror(*target.GetTy()) || TypeMapper::IsObjCImpl(*target.GetTy()) ||
         TypeMapper::IsSyntheticWrapper(target) || TypeMapper::IsObjCFwdClass(target));
 
     auto mirrorSuperClass = GetMirrorSuperClass(target);
@@ -133,7 +143,7 @@ bool IsStaticInitMethod(const Node& node)
 
 Ptr<FuncDecl> GetNativeHandleGetter(const ClassLikeDecl& target)
 {
-    CJC_ASSERT(TypeMapper::IsObjCMirror(*target.ty) || TypeMapper::IsObjCImpl(*target.ty) ||
+    CJC_ASSERT(TypeMapper::IsObjCMirror(*target.GetTy()) || TypeMapper::IsObjCImpl(*target.GetTy()) ||
         TypeMapper::IsSyntheticWrapper(target) || TypeMapper::IsObjCFwdClass(target));
 
     auto mirrorSuperClass = GetMirrorSuperClass(target);
@@ -146,7 +156,7 @@ Ptr<FuncDecl> GetNativeHandleGetter(const ClassLikeDecl& target)
 
 Ptr<ClassDecl> GetSyntheticWrapper(const ImportManager& importManager, const ClassLikeDecl& target)
 {
-    CJC_ASSERT(TypeMapper::IsObjCMirror(*target.ty));
+    CJC_ASSERT(TypeMapper::IsObjCMirror(*target.GetTy()));
     auto* synthetic =
         importManager.GetImportedDecl<ClassDecl>(target.fullPackageName, target.identifier + SYNTHETIC_CLASS_SUFFIX);
 
@@ -169,7 +179,7 @@ Ptr<FuncDecl> GetFinalizer(const ClassDecl& target)
 
 bool IsSyntheticWrapper(const Decl& decl)
 {
-    return TypeMapper::IsSyntheticWrapper(*decl.ty);
+    return TypeMapper::IsSyntheticWrapper(*decl.GetTy());
 }
 
 void GenerateSyntheticClassAbstractMemberImplStubs(ClassDecl& synthetic, const MemberMap& members)

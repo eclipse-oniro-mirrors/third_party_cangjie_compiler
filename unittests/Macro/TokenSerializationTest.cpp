@@ -16,7 +16,6 @@ class TokenSerializationTest : public testing::Test {
 protected:
     void SetUp() override
     {
-        lexer = new Lexer(code, diag, sm);
     }
     std::string code = R"(
 ?:
@@ -34,16 +33,16 @@ protected:
     @abc
     };
 )";
-    Lexer* lexer;
     DiagnosticEngine diag{};
     SourceManager sm;
 };
 
 TEST_F(TokenSerializationTest, BufferCase)
 {
+    Lexer lexer(code, diag, sm);
     std::vector<Token> tokens{};
     for (;;) {
-        Token tok = lexer->Next();
+        Token tok = lexer.Next();
         tokens.emplace_back(tok);
         if (tok.kind == TokenKind::END) {
             break;

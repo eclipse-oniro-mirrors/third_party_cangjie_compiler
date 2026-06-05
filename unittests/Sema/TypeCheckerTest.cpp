@@ -8,6 +8,7 @@
 
 #include <cstdlib>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "gtest/gtest.h"
 #include "TestCompilerInstance.h"
@@ -15,10 +16,38 @@
 #include "cangjie/AST/PrintNode.h"
 #include "cangjie/AST/Walker.h"
 #include "cangjie/Basic/Match.h"
-#include "cangjie/Driver/Driver.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 using namespace Cangjie;
 using namespace AST;
+
+namespace {
+std::unordered_map<std::string, std::string> GetEnvironmentVars()
+{
+    std::unordered_map<std::string, std::string> envVars;
+#ifdef _WIN32
+    char **env = _environ;
+#else
+    char **env = environ;
+#endif
+    while (env && *env) {
+        std::string entry(*env);
+        size_t pos = entry.find('=');
+        if (pos != std::string::npos) {
+            std::string key = entry.substr(0, pos);
+            std::string value = entry.substr(pos + 1);
+            envVars[key] = value;
+        }
+        ++env;
+    }
+    return envVars;
+}
+}
 
 class TypeCheckerTest : public testing::Test {
 protected:
@@ -40,19 +69,83 @@ protected:
 #endif
 #ifdef _WIN32
         instance->invocation.globalOptions.target.os = Cangjie::Triple::OSType::WINDOWS;
+        invocation.globalOptions.executablePath = projectPath + "\\output\\bin\\";
+#elif defined(__APPLE__)
+        instance->invocation.globalOptions.target.os = Cangjie::Triple::OSType::DARWIN;
+        invocation.globalOptions.executablePath = projectPath + "/output/bin/";
 #elif defined(__unix__)
         instance->invocation.globalOptions.target.os = Cangjie::Triple::OSType::LINUX;
+        invocation.globalOptions.executablePath = projectPath + "/output/bin/";
 #endif
+        std::string cangjieHome = projectPath + "/output";
+#if defined(_WIN32)
+        std::string platform = "windows_x86_64";
+#elif defined(__APPLE__) && defined(__x86_64__)
+        std::string platform = "darwin_x86_64";
+#elif defined(__APPLE__)
+        std::string platform = "darwin_arm64";
+#elif defined(__x86_64__)
+        std::string platform = "linux_x86_64";
+#else
+        std::string platform = "linux_aarch64";
+#endif
+        std::string cangjiePath = cangjieHome + "/modules/" + platform + "_cjnative";
+#ifdef _WIN32
+        char* oldHome = getenv("CANGJIE_HOME");
+        char* oldPath = getenv("CANGJIE_PATH");
+        if (oldHome) savedCangjieHome = oldHome;
+        if (oldPath) savedCangjiePath = oldPath;
+        _putenv_s("CANGJIE_HOME", cangjieHome.c_str());
+        _putenv_s("CANGJIE_PATH", cangjiePath.c_str());
+#else
+        char* oldHome = getenv("CANGJIE_HOME");
+        char* oldPath = getenv("CANGJIE_PATH");
+        if (oldHome) savedCangjieHome = oldHome;
+        if (oldPath) savedCangjiePath = oldPath;
+        setenv("CANGJIE_HOME", cangjieHome.c_str(), 1);
+        setenv("CANGJIE_PATH", cangjiePath.c_str(), 1);
+#endif
+        invocation.globalOptions.ReadPathsFromEnvironmentVars(GetEnvironmentVars());
         Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
     }
+
+    void TearDown() override
+    {
+#ifdef _WIN32
+        if (savedCangjieHome.empty()) {
+            _putenv_s("CANGJIE_HOME", "");
+        } else {
+            _putenv_s("CANGJIE_HOME", savedCangjieHome.c_str());
+        }
+        if (savedCangjiePath.empty()) {
+            _putenv_s("CANGJIE_PATH", "");
+        } else {
+            _putenv_s("CANGJIE_PATH", savedCangjiePath.c_str());
+        }
+#else
+        if (savedCangjieHome.empty()) {
+            unsetenv("CANGJIE_HOME");
+        } else {
+            setenv("CANGJIE_HOME", savedCangjieHome.c_str(), 1);
+        }
+        if (savedCangjiePath.empty()) {
+            unsetenv("CANGJIE_PATH");
+        } else {
+            setenv("CANGJIE_PATH", savedCangjiePath.c_str(), 1);
+        }
+#endif
+    }
+
     std::string srcPath;
     std::string projectPath;
+    std::string savedCangjieHome;
+    std::string savedCangjiePath;
     DiagnosticEngine diag;
     CompilerInvocation invocation;
     std::unique_ptr<TestCompilerInstance> instance;
 };
 
-TEST_F(TypeCheckerTest, DISABLED_TypecheckTest)
+TEST_F(TypeCheckerTest, TypecheckTest)
 {
     std::string code = R"(
 main() {
@@ -68,17 +161,17 @@ main() {
     Walker walker(instance->GetSourcePackages()[0]->files[0].get(), [](Ptr<Node> node) -> VisitAction {
         Meta::match (*node)(
             [](const FuncDecl& decl) {
-                auto ty = dynamic_cast<FuncTy*>(decl.ty.get());
+                auto ty = dynamic_cast<FuncTy*>(decl.GetTy().get());
                 EXPECT_EQ(ty->retTy->kind, TypeKind::TYPE_INT64);
             },
-            [](const VarDecl& decl) { EXPECT_EQ(decl.ty->kind, TypeKind::TYPE_INT32); });
+            [](const VarDecl& decl) { EXPECT_EQ(decl.TyKind(), TypeKind::TYPE_INT32); });
         return VisitAction::WALK_CHILDREN;
     });
     walker.Walk();
     EXPECT_EQ(diag.GetErrorCount(), 0);
 }
 
-TEST_F(TypeCheckerTest, DISABLED_MacroDeclTest)
+TEST_F(TypeCheckerTest, MacroDeclTest)
 {
     std::string code = R"(
     public macro
@@ -94,7 +187,7 @@ TEST_F(TypeCheckerTest, DISABLED_MacroDeclTest)
     EXPECT_EQ(diag.GetErrorCount(), 3);
 }
 
-TEST_F(TypeCheckerTest, DISABLED_MacroCallInLSPTest)
+TEST_F(TypeCheckerTest, MacroCallInLSPTest)
 {
     std::string code = R"(
     @M1
@@ -159,7 +252,7 @@ TEST_F(TypeCheckerTest, DISABLED_MacroCallInLSPTest)
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(TypeCheckerTest, DISABLED_MacroDiagInLSPTest)
+TEST_F(TypeCheckerTest, MacroDiagInLSPTest)
 {
     instance->invocation.globalOptions.enableMacroInLSP = true;
     srcPath = projectPath + "/unittests/Sema/SemaCangjieFiles/";
@@ -204,18 +297,12 @@ TEST_F(TypeCheckerTest, DISABLED_NoDiagInLSPMacroCallTest)
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(TypeCheckerTest, DISABLED_NoDiagInLSPMacroCallForTest)
+TEST_F(TypeCheckerTest, NoDiagInLSPMacroCallForTest)
 {
     srcPath = projectPath + "/unittests/Sema/SemaCangjieFiles/";
-    std::vector<std::string> argStrs = {"cjc", "--compile-macro", "-Woff", "all", srcPath + "ModifyClassBuildFunc.cj"};
-    DiagnosticEngine driverDiag;
-    std::unique_ptr<Driver> driver = std::make_unique<Driver>(argStrs, driverDiag, projectPath + "/output/bin/cjc");
-    driver->driverOptions->customizedSysroot = true;
-    bool succ = driver->ParseArgs();
-    EXPECT_TRUE(succ);
-
-    succ = driver->ExecuteCompilation();
-    EXPECT_TRUE(succ);
+    std::string command = "cjc " + srcPath + "ModifyClassBuildFunc.cj --compile-macro -Woff all";
+    int err = system(command.c_str());
+    ASSERT_EQ(0, err);
 
     instance->invocation.globalOptions.enableMacroInLSP = true;
     invocation.globalOptions.executablePath = projectPath + "/output/bin/";
@@ -229,7 +316,7 @@ TEST_F(TypeCheckerTest, DISABLED_NoDiagInLSPMacroCallForTest)
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(TypeCheckerTest, DISABLED_MacroCallOfTopLevelInLSPTest)
+TEST_F(TypeCheckerTest, MacroCallOfTopLevelInLSPTest)
 {
     std::string code = R"(
     @M1
@@ -259,7 +346,7 @@ TEST_F(TypeCheckerTest, DISABLED_MacroCallOfTopLevelInLSPTest)
             checkCount++;
             EXPECT_TRUE(fp->type != nullptr);
             if (fp->type != nullptr) {
-                EXPECT_EQ(fp->type->ty->String(), "Struct-String");
+                EXPECT_EQ(fp->type->GetTy()->String(), "Struct-String");
             }
         }
         return VisitAction::WALK_CHILDREN;
@@ -271,7 +358,7 @@ TEST_F(TypeCheckerTest, DISABLED_MacroCallOfTopLevelInLSPTest)
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(TypeCheckerTest, DISABLED_AssumptionTest)
+TEST_F(TypeCheckerTest, AssumptionTest)
 {
 #ifdef _WIN32
     srcPath = projectPath + "\\unittests\\Sema\\SemaCangjieFiles\\AssumptionTest";
@@ -355,8 +442,8 @@ TEST_F(TypeCheckerTest, DISABLED_SpawnTest)
     auto var2 = As<ASTKind::VAR_DECL>(targetFutureObj2);
     EXPECT_TRUE(var1);
     EXPECT_TRUE(var2);
-    auto ty1 = dynamic_cast<ClassTy*>(var1->ty.get());
-    auto ty2 = dynamic_cast<ClassTy*>(var2->ty.get());
+    auto ty1 = dynamic_cast<ClassTy*>(var1->GetTy().get());
+    auto ty2 = dynamic_cast<ClassTy*>(var2->GetTy().get());
     EXPECT_TRUE(ty1 && ty2 && ty1 == ty2);
     EXPECT_TRUE(ty1->decl->identifier == "Future");
     EXPECT_TRUE(ty1->typeArgs.size() == 1);

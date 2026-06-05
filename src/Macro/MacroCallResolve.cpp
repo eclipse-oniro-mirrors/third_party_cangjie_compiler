@@ -47,14 +47,11 @@ void FindMacroDefPkg(MacroCall& macCall, CompilerInstance* ci)
     auto macroDefFunc = macCall.GetDefinition();
     auto importedMacroPackages = ci->importManager->GetImportedStdMacroPackages();
     auto foundStdMacroPkg = std::find_if(importedMacroPackages.begin(), importedMacroPackages.end(),
-        [&macroDefFunc](const std::string packageName) {
-            return packageName == macroDefFunc->fullPackageName;
-        });
+        [&macroDefFunc](const std::string packageName) { return packageName == macroDefFunc->fullPackageName; });
     if (foundStdMacroPkg != importedMacroPackages.end()) {
-        auto basePath = FileUtil::JoinPath(
-            FileUtil::GetDirPath(ci->invocation.globalOptions.executablePath), "../runtime/lib");
-        auto libName =
-            "lib" + FileUtil::ConvertPackageNameToLibCangjieBaseFormat(*foundStdMacroPkg) + LIB_SUFFIX;
+        auto basePath =
+            FileUtil::JoinPath(FileUtil::GetDirPath(ci->invocation.globalOptions.executablePath), "../runtime/lib");
+        auto libName = "lib" + FileUtil::ConvertPackageNameToLibCangjieBaseFormat(*foundStdMacroPkg) + LIB_SUFFIX;
         macCall.libPath = FileUtil::JoinPath(
             FileUtil::JoinPath(basePath, ci->invocation.globalOptions.GetCangjieLibHostPathName()), libName);
     } else {
@@ -68,18 +65,17 @@ void FindMacroDefPkg(MacroCall& macCall, CompilerInstance* ci)
         }
     }
 }
-}
+} // namespace
 
 namespace Cangjie {
-bool MacroCall::GetAllDeclsForMacroName(const std::string &macroName, std::vector<Ptr<Decl>>& decls)
+bool MacroCall::GetAllDeclsForMacroName(const std::string& macroName, std::vector<Ptr<Decl>>& decls)
 {
     auto file = node->curFile;
     CJC_NULLPTR_CHECK(file);
     if (macroName.find(".") != std::string::npos) {
         // We may have alias for package name: import p0.* as p1.* , p1 is the alias for p0.
         std::string pkgNameMaybeAlias = macroName.substr(0, macroName.rfind("."));
-        auto [packageDecl, isConflicted] =
-            ci->importManager->GetImportedPackageDecl(node, pkgNameMaybeAlias);
+        auto [packageDecl, isConflicted] = ci->importManager->GetImportedPackageDecl(node, pkgNameMaybeAlias);
         if (packageDecl == nullptr) {
             (void)ci->diag.Diagnose(begin, DiagKind::macro_undefined_pkg_name, pkgNameMaybeAlias);
             return false;
@@ -87,10 +83,11 @@ bool MacroCall::GetAllDeclsForMacroName(const std::string &macroName, std::vecto
             (void)ci->diag.Diagnose(begin, DiagKind::sema_package_name_conflict, pkgNameMaybeAlias);
             return false;
         }
-        auto foundDecls = ci->importManager->GetPackageMembersByName(*packageDecl->srcPackage, invocation->identifier);
+        auto foundDecls = ci->importManager->GetPackageMembersByName(
+            *packageDecl->srcPackage, invocation->macroCallDiagInfo.identifier);
         decls.insert(decls.end(), foundDecls.begin(), foundDecls.end());
     } else {
-        decls = ci->importManager->GetImportedDeclsByName(*file, invocation->identifier);
+        decls = ci->importManager->GetImportedDeclsByName(*file, invocation->macroCallDiagInfo.identifier);
     }
     return true;
 }
@@ -101,7 +98,8 @@ bool MacroCall::GetValidFuncDecl(std::vector<Ptr<Decl>>& decls)
     for (auto& dl : decls) {
         if (!(dl->TestAttr(Attribute::MACRO_FUNC)) || dl->astKind != ASTKind::FUNC_DECL) {
             if (invocation->hasParenthesis) {
-                (void)ci->diag.Diagnose(begin, DiagKind::macro_expect_macro_definition, invocation->identifier);
+                (void)ci->diag.Diagnose(
+                    begin, DiagKind::macro_expect_macro_definition, invocation->macroCallDiagInfo.identifier);
                 return false;
             }
         }
@@ -115,9 +113,11 @@ bool MacroCall::GetValidFuncDecl(std::vector<Ptr<Decl>>& decls)
     if (fds.empty()) {
         if (invocation->hasParenthesis && !invocation->IsIfAvailable()) {
             auto pos = invocation->macroNamePos;
-            auto content = ci->diag.GetSourceManager().GetContentBetween(pos, pos + invocation->identifier.length());
-            if (content == invocation->identifier) {
-                (void)ci->diag.Diagnose(begin, DiagKind::macro_undeclared_identifier, invocation->identifier);
+            auto content = ci->diag.GetSourceManager().GetContentBetween(
+                pos, pos + invocation->macroCallDiagInfo.identifier.length());
+            if (content == invocation->macroCallDiagInfo.identifier) {
+                (void)ci->diag.Diagnose(
+                    begin, DiagKind::macro_undeclared_identifier, invocation->macroCallDiagInfo.identifier);
             }
         }
         return false;
@@ -128,24 +128,26 @@ bool MacroCall::GetValidFuncDecl(std::vector<Ptr<Decl>>& decls)
         if (HasAttribute()) {
             // Make sure fd has two input arguments: macro M(attr: Tokens, input: Tokens)
             if (argsSize != MACRO_ATTR_ARGS) {
-                (void)ci->diag.Diagnose(begin, DiagKind::macro_expect_attributed_macro, invocation->identifier);
+                (void)ci->diag.Diagnose(
+                    begin, DiagKind::macro_expect_attributed_macro, invocation->macroCallDiagInfo.identifier);
                 return false;
             }
         } else {
             if (argsSize != MACRO_COMMON_ARGS) {
-                (void)ci->diag.Diagnose(begin, DiagKind::macro_expect_plain_macro, invocation->identifier);
+                (void)ci->diag.Diagnose(
+                    begin, DiagKind::macro_expect_plain_macro, invocation->macroCallDiagInfo.identifier);
                 return false;
             }
         }
         this->BindDefinition(fds[0]);
         return true;
     }
-    if (fds.size() == MACRO_DEF_NUM &&
-        fds[0]->funcBody->paramLists.size() > 0 && fds[1]->funcBody->paramLists.size() > 0) {
+    if (fds.size() == MACRO_DEF_NUM && fds[0]->funcBody->paramLists.size() > 0 &&
+        fds[1]->funcBody->paramLists.size() > 0) {
         auto argsSize1 = fds[0]->funcBody->paramLists[0]->params.size();
         auto argsSize2 = fds[1]->funcBody->paramLists[0]->params.size();
         if (argsSize1 == argsSize2) { // args should have the size of {1, 2}
-            (void)ci->diag.Diagnose(begin, DiagKind::macro_ambiguous_match, invocation->identifier);
+            (void)ci->diag.Diagnose(begin, DiagKind::macro_ambiguous_match, invocation->macroCallDiagInfo.identifier);
             return false;
         }
         if (HasAttribute()) {
@@ -158,7 +160,7 @@ bool MacroCall::GetValidFuncDecl(std::vector<Ptr<Decl>>& decls)
     return true;
 }
 
-bool MacroCall::BindDefinition(const std::string &macroName)
+bool MacroCall::BindDefinition(const std::string& macroName)
 {
     if (definition) {
         return true;
@@ -179,7 +181,7 @@ bool MacroCall::BindDefinition(const std::string &macroName)
     if (definition) {
         return true;
     }
-    (void)ci->diag.Diagnose(begin, DiagKind::macro_ambiguous_match, invocation->identifier);
+    (void)ci->diag.Diagnose(begin, DiagKind::macro_ambiguous_match, invocation->macroCallDiagInfo.identifier);
     return false;
 }
 
@@ -213,8 +215,8 @@ bool MacroCall::FindMacroDefMethod(CompilerInstance* instance)
 bool MacroCall::BindInvokeFunc()
 {
     CJC_ASSERT(definition);
-    this->methodName = Utils::GetMacroFuncName(definition->fullPackageName,
-        invocation->HasAttr(), definition->identifier);
+    this->methodName =
+        Utils::GetMacroFuncName(definition->fullPackageName, invocation->HasAttr(), definition->identifier);
     this->packageName = definition->fullPackageName;
 
     if (ci->invocation.globalOptions.macroLib.empty()) {
@@ -230,7 +232,7 @@ bool MacroCall::ResolveMacroCall(CompilerInstance* instance)
     CJC_NULLPTR_CHECK(instance);
     this->ci = instance;
 
-    std::string macCallFullName = invocation->fullName;
+    std::string macCallFullName = invocation->macroCallDiagInfo.fullName;
     if (Utils::In(macCallFullName, BUILD_IN_MACROS)) {
         return true;
     }
@@ -261,4 +263,4 @@ bool MacroCall::ResolveMacroCall(CompilerInstance* instance)
     }
     return true;
 }
-}
+} // namespace Cangjie

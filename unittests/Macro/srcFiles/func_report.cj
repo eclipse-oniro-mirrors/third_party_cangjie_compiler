@@ -6,7 +6,7 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-import define.*
+import define_report.*
 
 main() {
     @TEST_REPORT(let a = 1)

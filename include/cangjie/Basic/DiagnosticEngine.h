@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "cangjie/AST/Node.h"
+#include "cangjie/Basic/MacroCallDiagInfo.h"
 #include "cangjie/Basic/Position.h"
 #include "cangjie/Basic/SourceManager.h"
 #include "cangjie/Option/Option.h"
@@ -373,6 +374,23 @@ public:
         diagCategory = GetDiagnoseCategory(kind);
     }
 
+    Diagnostic(bool refactor, const Range& range, DiagKindRefactor kind, std::vector<std::string> arguments)
+        : isRefactor(refactor), rKind(kind)
+    {
+        auto errData = errorData[static_cast<unsigned>(kind)];
+        diagSeverity = rDiagSeveritys[static_cast<unsigned>(kind)];
+        warnGroup = rWarnGroups[static_cast<unsigned>(kind)];
+
+        errorMessage = InsertArguments(errData.message, arguments);
+        if (SEVE_TO_COLOR.find(diagSeverity) != SEVE_TO_COLOR.end()) {
+            mainHint = IntegratedString(range, errData.mainHint, SEVE_TO_COLOR.at(diagSeverity));
+        } else {
+            mainHint = IntegratedString(range, errData.mainHint, DiagColor::RED);
+        }
+
+        diagCategory = GetDiagnoseCategory(kind);
+    }
+
     Diagnostic()
     {
         diagSeverity = DiagSeveritys[static_cast<size_t>(kind)];
@@ -420,7 +438,7 @@ public:
     /// 6 |     public open func foo(): This {
     ///   |                      ^^^
     std::vector<Diagnostic> notes;
-    Ptr<AST::Node> curMacroCall{nullptr};
+    const MacroCallDiagInfo* macroDiagInfo{nullptr};
     bool isInMacroCall{false};
 
     // This is API supported to lsp. Will delete after refactoring.
@@ -434,6 +452,13 @@ public:
     static DiagCategory GetDiagnoseCategory(DiagKind diagKind);
     static DiagCategory GetDiagnoseCategory(DiagKindRefactor diagKind);
     static std::string InsertArguments(std::string& rawString, std::vector<std::string>& arguments);
+};
+
+struct DiagnosticInfo {
+    DiagSeverity severity;
+    Range range = MakeRange(DEFAULT_POSITION, DEFAULT_POSITION);
+    std::string msg; // main diagnostic message
+    std::string hint;
 };
 
 enum class DiagHandlerKind : uint8_t {
@@ -511,6 +536,7 @@ public:
     {
     }
     void EmitCategoryDiagnostics(DiagCategory cate);
+    void EmitCategoryDiagnosticInfos(DiagCategory cate, std::vector<DiagnosticInfo>& diagOut);
     void EmitDiagnoseGroup();
     void EmitDiagnosesInJson() noexcept;
     std::vector<Diagnostic> GetCategoryDiagnostic(DiagCategory cate) const
@@ -551,7 +577,8 @@ public:
         return success;
     }
     void EmitDiagnose(Diagnostic d);
-    
+    DiagnosticInfo GetDiagnosticInfo(Diagnostic d);
+
     /**
      * Save all diagnostic to a structure. For deduplication or some tools may need read from it.
      */
@@ -606,6 +633,7 @@ private:
 class DiagnosticBuilder {
 public:
     DiagnosticBuilder(DiagnosticEngine& diag, Diagnostic diagnostic);
+    DiagnosticBuilder(DiagnosticEngine& diag, Diagnostic diagObj, const MacroCallDiagInfo* info);
     Diagnostic diagnostic;
     DiagnosticEngine& diag;
     DiagnosticBuilder(const DiagnosticBuilder& p) = delete;
@@ -639,8 +667,8 @@ public:
         static_assert(IsAllString<Args...>, "args of AddHint in diagnostic builder should all be string.");
         std::vector<std::string> arguments{args...};
         auto finalPos = pos;
-        if (diagnostic.curMacroCall) {
-            finalPos = diagnostic.curMacroCall->GetMacroCallPos(pos, true);
+        if (diagnostic.macroDiagInfo) {
+            finalPos = diagnostic.macroDiagInfo->MapPos(pos, true);
         }
         Range range = MakeRange(finalPos, finalPos + 1);
         AddHint(range, arguments);
@@ -650,9 +678,9 @@ public:
     {
         static_assert(IsAllString<Args...>, "args of AddHint in diagnostic builder should all be string.");
         std::vector<std::string> arguments{args...};
-        if (diagnostic.curMacroCall) {
-            return AddHint(MakeRange(diagnostic.curMacroCall->GetMacroCallPos(range.begin),
-                                     diagnostic.curMacroCall->GetMacroCallPos(range.end, true)),
+        if (diagnostic.macroDiagInfo) {
+            return AddHint(MakeRange(diagnostic.macroDiagInfo->MapPos(range.begin),
+                                     diagnostic.macroDiagInfo->MapPos(range.end, true)),
                 arguments);
         }
         AddHint(range, arguments);
@@ -772,6 +800,12 @@ public:
 
     void AddMacroCallNote(Diagnostic& diagnostic, const AST::Node& node, const Position& pos);
 
+    void AddMacroCallNote(Diagnostic& diagnostic, const MacroCallDiagInfo& info, const Position& pos);
+
+    MacroCallDiagInfo* FindMacroCallInfo(Position pos) const;
+
+    void RegisterMacroCallDiagInfo(std::unique_ptr<MacroCallDiagInfo> info);
+
     // ability of transaction
     void Prepare();
     void Commit();
@@ -870,6 +904,11 @@ public:
     {
         static_assert(IsAllString<Args...>, "the diagnose only support string type argument");
         // The span of 'range' is left off and right on, like: [begin, end).
+        auto info = FindMacroCallInfo(pos);
+        if (info) {
+            std::vector<std::string> formatArgs{std::string(args)...};
+            return DiagnoseRefactor(kind, *info, pos, std::move(formatArgs));
+        }
         Range range = MakeRange(pos, pos + 1);
         Diagnostic diagnostic(true, range, kind, args...);
         return DiagnosticBuilder(*this, diagnostic);
@@ -879,7 +918,11 @@ public:
     DiagnosticBuilder DiagnoseRefactor(DiagKindRefactor kind, const Range range, Args... args)
     {
         static_assert(IsAllString<Args...>, "the diagnose only support string type argument");
-
+        auto info = FindMacroCallInfo(range.begin);
+        if (info) {
+            std::vector<std::string> formatArgs{std::string(args)...};
+            return DiagnoseRefactor(kind, *info, range, std::move(formatArgs));
+        }
         CheckRange(Diagnostic::GetDiagnoseCategory(kind), range);
         Diagnostic diagnostic(true, range, kind, args...);
         return DiagnosticBuilder(*this, diagnostic);
@@ -942,9 +985,14 @@ public:
         diagnostic.node = &node;
         diagnostic.isInMacroCall = node.isInMacroCall;
         AddMacroCallNote(diagnostic, node, token.Begin());
-        diagnostic.curMacroCall = node.curMacroCall;
         return DiagnosticBuilder(*this, diagnostic);
     }
+
+    DiagnosticBuilder DiagnoseRefactor(DiagKindRefactor kind, const MacroCallDiagInfo& info, const Range& range,
+        std::vector<std::string> formatArgs = {});
+
+    DiagnosticBuilder DiagnoseRefactor(DiagKindRefactor kind, const MacroCallDiagInfo& info, const Position pos,
+        std::vector<std::string> formatArgs = {});
     ///@}
 
     /**
@@ -979,6 +1027,7 @@ public:
     void EmitCategoryDiagnostics(DiagCategory cate);
 
     DiagEngineErrorCode GetCategoryDiagnosticsString(DiagCategory cate, std::string& diagOut);
+    DiagEngineErrorCode GetCategoryDiagnosticInfos(DiagCategory cate, std::vector<DiagnosticInfo>& diagOut);
     void EmitCategoryGroup();
 
     void SetErrorCountLimit(std::optional<unsigned int> errorCountLimit);

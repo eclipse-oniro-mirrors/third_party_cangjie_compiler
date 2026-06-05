@@ -188,41 +188,6 @@ void Value::ReplaceWith(Value& newValue, const BlockGroup* scope)
     }
 }
 
-AttributeInfo Value::GetAttributeInfo() const
-{
-    return attributes;
-}
-
-bool Value::TestAttr(Attribute attr) const
-{
-    return attributes.TestAttr(attr);
-}
-
-void Value::AppendAttributeInfo(const AttributeInfo& info)
-{
-    attributes.AppendAttrs(info);
-}
-
-void Value::EnableAttr(Attribute attr)
-{
-    attributes.SetAttr(attr, true);
-}
-
-void Value::DisableAttr(Attribute attr)
-{
-    attributes.SetAttr(attr, false);
-}
-
-const AnnoInfo& Value::GetAnnoInfo() const
-{
-    return annoInfo;
-}
-
-void Value::SetAnnoInfo(AnnoInfo&& info)
-{
-    annoInfo = std::move(info);
-}
-
 void Value::ClearUsersOnly()
 {
     users.clear();
@@ -231,7 +196,7 @@ void Value::ClearUsersOnly()
 Parameter::Parameter(Type* ty, const std::string& id, Function* ownerFunc)
     : Value(ty, id, ValueKind::KIND_PARAMETER), ownerFunc(ownerFunc)
 {
-    if (ownerFunc) {
+    if (ownerFunc && !ownerFunc->TestAttr(Attribute::PREVIOUSLY_DESERIALIZED)) {
         ownerFunc->AddParam(*this);
     }
 }
@@ -291,6 +256,16 @@ Debug* Parameter::GetDebugExpr() const
         }
     }
     return nullptr;
+}
+
+const AnnoInfo& Parameter::GetAnnoInfo() const
+{
+    return annoInfo;
+}
+
+void Parameter::SetAnnoInfo(AnnoInfo&& info)
+{
+    annoInfo = std::move(info);
 }
 
 std::string Parameter::ToString(size_t indent) const
@@ -661,7 +636,6 @@ std::vector<ClassType*> Block::GetExceptions() const
 std::string Block::ToString(size_t indent) const
 {
     std::stringstream ss;
-    ss << AddNewLineOrNot(annoInfo.ToString(indent));
     ss << IndentToString(indent) << attributes.ToString();
     ss << "Block " << identifier << ": ";
     std::vector<std::string> comments;
@@ -782,6 +756,20 @@ std::vector<Block*> BlockGroup::GetBlocks() const
     return blocks;
 }
 
+std::vector<Block*> BlockGroup::GetAllBlocks() const
+{
+    auto res = blocks;
+    for (auto block : blocks) {
+        for (auto e : block->GetExpressions()) {
+            if (e->GetExprKind() == ExprKind::LAMBDA) {
+                auto lambdaBlocks = StaticCast<Lambda*>(e)->GetBody()->GetAllBlocks();
+                res.insert(res.end(), lambdaBlocks.begin(), lambdaBlocks.end());
+            }
+        }
+    }
+    return res;
+}
+
 Block* BlockGroup::GetBlockByIdx(size_t idx) const
 {
     CJC_ASSERT(idx < blocks.size());
@@ -871,7 +859,6 @@ void BlockGroup::AddBlocks(const std::vector<Block*>& newBlocks)
 std::string BlockGroup::ToString(size_t indent) const
 {
     std::stringstream ss;
-    ss << AddNewLineOrNot(annoInfo.ToString(indent));
     ss << IndentToString(indent) << "{ Block Group: " << identifier;
     ss << CommentToString(BaseCommentToString());
     ss << std::endl;
@@ -1379,16 +1366,16 @@ std::string Function::ToString(size_t indent) const
         comments.emplace_back("kind: " + FUNCKIND_TO_STRING.at(funcKind));
     }
     if (genericDecl != nullptr) {
-        comments.emplace_back(genericDecl->GetIdentifier());
+        comments.emplace_back("genericDecl: " + genericDecl->GetIdentifier());
     }
     if (paramDftValHostFunc != nullptr) {
-        comments.emplace_back(paramDftValHostFunc->GetIdentifier());
+        comments.emplace_back("paramDftValHostFunc: " + paramDftValHostFunc->GetIdentifier());
     }
     if (funcKind == FuncKind::LAMBDA) {
-        comments.emplace_back(originalLambdaInfo.ToString());
+        comments.emplace_back("originalLambdaInfo: " + originalLambdaInfo.ToString());
     }
     if (!propLoc.IsInvalidPos()) {
-        comments.emplace_back(propLoc.ToString());
+        comments.emplace_back("propLoc: " + propLoc.ToString());
     }
     ss << CommentToString(comments);
     if (body != nullptr) {
@@ -1450,6 +1437,16 @@ const std::set<std::string>& GlobalValue::GetFeatures() const
 void GlobalValue::SetFeatures(const std::set<std::string>& newFeatures)
 {
     features = newFeatures;
+}
+
+const AnnoInfo& GlobalValue::GetAnnoInfo() const
+{
+    return annoInfo;
+}
+
+void GlobalValue::SetAnnoInfo(AnnoInfo&& info)
+{
+    annoInfo = std::move(info);
 }
 
 CustomTypeDef* GlobalValue::GetParentCustomTypeDef() const

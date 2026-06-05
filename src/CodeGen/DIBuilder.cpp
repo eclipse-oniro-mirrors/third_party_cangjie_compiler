@@ -116,7 +116,9 @@ void DIBuilder::CreateCompileUnit(const std::string& pkgName)
         // of '.gcno' file for the same package is affected by the '--test' option. Therefore, when compiled with the
         // '--test' option, the "$test" suffix is added to the corresponding '.gcno' file.
         // NB: in the "test-only" mode, packages are already suffixed with "$test".
-        if (cgMod.GetCGContext().GetCompileOptions().enableCompileTest &&
+        // NB: when compiled with '--export-for-test', test conditional compilation is enabled, but "_test.cj" files
+        // are not compiled, so "$test" suffix should not be added.
+        if (cgMod.GetCGContext().GetCompileOptions().parseTest &&
             !cgMod.GetCGContext().GetCompileOptions().compileTestsOnly) {
             tempPkgName += SourceManager::testPkgSuffix;
         }
@@ -1247,6 +1249,9 @@ llvm::DICompositeType* DIBuilder::GetOrCreateEnumCtorType(const CHIR::EnumType& 
             ctors.push_back(enumDITy);
             fieldIdx++;
         }
+        if (isOption) {
+            name = "E2$" + name;
+        }
     } else {
         for (auto& it : enumDef->GetCtors()) {
             auto enumDITy = createEnumerator(it.name, fieldIdx);
@@ -1326,7 +1331,8 @@ llvm::DICompositeType* DIBuilder::CreateEnumWithNonRefArgsType(
         CGEnumType::AssociatedNonRefLayout layout;
         if (useAndroidArm32Layout) {
             fields.emplace_back(cgMod.GetCGContext().GetCHIRBuilder().GetInt32Ty());
-            fields.insert(fields.end(), ctor.funcType->GetParamTypes().begin(), ctor.funcType->GetParamTypes().end());
+            auto paramTypes = ctor.funcType->GetParamTypes();
+            fields.insert(fields.end(), paramTypes.begin(), paramTypes.end());
             layout = CGEnumType::ComputeAssociatedNonRefLayout(cgMod, fields);
             totalSize = static_cast<size_t>(layout.size) * 8U;
         } else {

@@ -244,6 +244,9 @@ public:
     void MergeAllocatedPtrInFuncOrLambda(std::unordered_map<BlockGroup*, std::vector<Base*>>& input);
     void FreeMemoryInFunc(BlockGroup& funcBody);
     void FreeWholePackage();
+    void Init();
+    ClassType* SearchObjectTyInPackage() const;
+    ClassType* SearchAnyTyInPackage() const;
 
 private:
     /*
@@ -285,11 +288,15 @@ private:
         if (p == nullptr) {
             return;
         }
+#ifndef CANGJIE_ENABLE_GCOV
         try {
+#endif
             delete p;
+#ifndef CANGJIE_ENABLE_GCOV
         } catch (...) {
             // Destructors should not throw; continue releasing other resources.
         }
+#endif
     }
 };
 } // namespace Cangjie::CHIR

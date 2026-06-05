@@ -27,13 +27,13 @@ using namespace Cangjie::AST;
 
 ParserImpl::ExprHandler ParserImpl::LookupExprHandler(TokenKind kind)
 {
-    static constexpr int firstKind = static_cast<int>(TokenKind::LPAREN);
-    static constexpr int lastKind = static_cast<int>(TokenKind::RESUME);
-    static constexpr int arraySize = lastKind - firstKind + 1;
+    static constexpr int FIRST_KIND = static_cast<int>(TokenKind::LPAREN);
+    static constexpr int LAST_KIND = static_cast<int>(TokenKind::RESUME);
+    static constexpr int ARRAY_SIZE = LAST_KIND - FIRST_KIND + 1;
 
     // clang-format off
 SUPPRESS_WARNING("-Wcast-function-type-mismatch")
-    static const ExprHandler HANDLERS[arraySize] = {
+    static const ExprHandler HANDLERS[ARRAY_SIZE] = {
         reinterpret_cast<ExprHandler>(&ParserImpl::ParseLeftParenExpr),
         nullptr, // RPAREN
         reinterpret_cast<ExprHandler>(&ParserImpl::ParseArrayLitExpr),
@@ -83,8 +83,8 @@ SUPPRESS_WARNING("-Wcast-function-type-mismatch")
 UNSUPPRESS_WARNING()
     // clang-format on
 
-    int index = static_cast<int>(kind) - firstKind;
-    if (index < 0 || index >= arraySize) {
+    int index = static_cast<int>(kind) - FIRST_KIND;
+    if (index < 0 || index >= ARRAY_SIZE) {
         return nullptr;
     }
     return HANDLERS[index];
@@ -263,9 +263,6 @@ OwnedPtr<LitConstExpr> ParserImpl::GetLitConstExprFromStr(
     } else if (token.kind == TokenKind::STRING_LITERAL) {
         ret->kind = LitConstKind::STRING;
         ret->stringKind = StringKind::NORMAL;
-    } else if (token.kind == TokenKind::JSTRING_LITERAL) {
-        ret->kind = LitConstKind::JSTRING;
-        ret->stringKind = StringKind::JSTRING;
     }
     ret->stringValue = StringConvertor::Normalize(value);
     ret->codepoint = StringConvertor::UTF8ToCodepoint(ret->stringValue);
@@ -331,9 +328,6 @@ OwnedPtr<Expr> ParserImpl::ParseInterpolationExpr(const std::string& value, cons
 
 OwnedPtr<Expr> ParserImpl::ProcessStringInterpolation(const Token& token)
 {
-    if (token.kind == TokenKind::JSTRING_LITERAL) {
-        return GetLitConstExprFromStr(token.Value(), token, token.Begin());
-    }
     std::vector<StringPart> strParts = lexer->GetStrParts(token);
     auto tokenValue = token.Value();
     if (strParts.size() == 1) {
@@ -478,7 +472,7 @@ void ParserImpl::ParseElse(IfExpr& ret)
 OwnedPtr<Block> ParserImpl::ParseExprOrDeclsInMatchCase()
 {
     OwnedPtr<Block> exprOrDecls = MakeOwned<Block>();
-    exprOrDecls->begin = lastToken.Begin();
+    exprOrDecls->begin = lookahead.Begin();
     auto flag = false;
     auto hasSemi = false;
     while (!SeeingAny({TokenKind::CASE, TokenKind::RCURL})) {
@@ -492,6 +486,10 @@ OwnedPtr<Block> ParserImpl::ParseExprOrDeclsInMatchCase()
         }
         if (SeeingMacroCallDecl() || SeeingDecl() || SeeingExpr()) {
             auto node = ParseExprOrDecl(ScopeKind::FUNC_BODY);
+            // only set the begin of the block when parsing the first expr of the block
+            if (exprOrDecls->body.empty()) {
+                exprOrDecls->begin = node->begin;
+            }
             exprOrDecls->body.emplace_back(std::move(node));
         } else {
             DiagMatchCaseExpectedExprOrDecl();
@@ -540,7 +538,7 @@ static void DesugarTry(const OwnedPtr<TryExpr>& expr)
         auto teWithoutHandle = ASTCloner::Clone(expr.get(), SetIsClonedSourceCode);
         teWithoutHandle->handlers.clear();
         teWithoutHandle->finallyBlock = nullptr;
-        teWithoutHandle->ty = expr->ty;
+        teWithoutHandle->SetTy(expr->GetTy());
         std::vector<OwnedPtr<Node>> lambdaBodyExprs;
         lambdaBodyExprs.emplace_back(std::move(teWithoutHandle));
         lambdaBlock = CreateBlock(std::move(lambdaBodyExprs));
@@ -559,7 +557,7 @@ static void DesugarTry(const OwnedPtr<TryExpr>& expr)
         auto paramList = MakeOwned<FuncParamList>();
 
         auto originalCommandPatternType = cmdPat->types[0].get();
-        auto commandTy = originalCommandPatternType->ty;
+        auto commandTy = originalCommandPatternType->GetTy();
         auto commandPattern = ASTCloner::Clone(originalCommandPatternType);
         OwnedPtr<FuncParam> command;
         if (auto varPattern = DynamicCast<VarPattern*>(cmdPat->pattern.get()); varPattern) {
@@ -853,7 +851,7 @@ void ParserImpl::ParseMatchNoSelector(AST::MatchExpr& matchExpr)
         }
         matchCaseOther->arrowPos = lookahead.Begin();
         matchCaseOther->exprOrDecls = ParseExprOrDeclsInMatchCase();
-        matchCaseOther->end = lastToken.Begin();
+        matchCaseOther->end = lastToken.End();
         if (matchCaseOther->exprOrDecls->body.empty() && !matchCaseOther->TestAttr(Attribute::HAS_BROKEN)) {
             DiagMatchCaseBodyCannotBeEmpty(matchCaseOther->arrowPos + std::string("=>").size());
             matchCaseOther->EnableAttr(Attribute::HAS_BROKEN);
@@ -1117,9 +1115,10 @@ OwnedPtr<AST::Expr> ParserImpl::ParseLeftParenExprInKind(ExprKind ek)
         }
     }
     // Not identifier.
-    OwnedPtr<Expr> expr = ParseExpr(ek == ExprKind::IF_COND_EXPR ? ExprKind::EXPR_IN_IF_COND_TUPLE
-            : ek == ExprKind::WHILE_COND_EXPR                    ? ExprKind::EXPR_IN_WHILE_COND_TUPLE
-                                                                 : ExprKind::EXPR_IN_TUPLE);
+    OwnedPtr<Expr> expr = ParseExpr(
+        ek == ExprKind::IF_COND_EXPR || ek == ExprKind::EXPR_IN_IF_COND_TUPLE ? ExprKind::EXPR_IN_IF_COND_TUPLE
+        : ek == ExprKind::WHILE_COND_EXPR || ek == ExprKind::EXPR_IN_WHILE_COND_TUPLE
+        ? ExprKind::EXPR_IN_WHILE_COND_TUPLE : ExprKind::EXPR_IN_TUPLE);
     if (Seeing(TokenKind::COMMA)) {
         // It's actually a tuple literal.
         auto ret = ParseTupleLitForParenExprComma(leftParenPos, std::move(expr));
@@ -1443,6 +1442,7 @@ OwnedPtr<Expr> ParserImpl::ParseAnnotationLambdaExpr(bool isTailClosure)
             DiagExpectedDeclaration(ret->begin, "lambda expression");
         }
     }
+    SetBeginToAnnotationsBegin(*ret, annos);
     return ret;
 }
 

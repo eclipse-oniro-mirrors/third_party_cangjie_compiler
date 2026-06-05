@@ -122,8 +122,7 @@ void WrapVirtualFunc::CheckAndWrap(CustomTypeDef& customTypeDef)
                 continue;
             }
             auto& parentVirMethodInfo = parentVTable.GetVirtualMethods()[i];
-            auto wrapper = CreateVirtualWrapperIfNeeded(
-                curVirMethodInfo, parentVirMethodInfo, *selfTy, customTypeDef, *parentTy);
+            auto wrapper = CreateVirtualWrapperIfNeeded(curVirMethodInfo, parentVirMethodInfo, *selfTy, customTypeDef, *parentTy);
             if (incrementalKind != IncreKind::INVALID) {
                 HandleVirtualFuncWrapperForIncrCompilation(wrapper, *curVirMethodInfo.GetVirtualMethod());
             }

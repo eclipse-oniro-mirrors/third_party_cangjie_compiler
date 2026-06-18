@@ -146,11 +146,6 @@ public:
         return *llvmContext;
     }
 
-    CHIR::Function* GetImplicitUsedFunc(const std::string& funcMangledName)
-    {
-        return cgPkgContext.GetImplicitUsedFunc(funcMangledName);
-    }
-
     const CachedMangleMap& GetCachedMangleMap() const
     {
         return cgPkgContext.GetCachedMangleMap();

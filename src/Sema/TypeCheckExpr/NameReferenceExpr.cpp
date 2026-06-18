@@ -534,7 +534,7 @@ void TypeChecker::TypeCheckerImpl::TryInitializeBaseSum(ASTContext& ctx, MemberA
     } else {
         sig = MemSig{ma.field, true};
     }
-    TryEnforceCandidate(*tv, ctx.Mem2Decls(sig), typeManager);
+    TryEnforceCandidate(*tv, ctx.Mem2Decls(sig), typeManager, {sig});
 }
 
 void TypeChecker::TypeCheckerImpl::InferMemberAccess(ASTContext& ctx, MemberAccess& ma)

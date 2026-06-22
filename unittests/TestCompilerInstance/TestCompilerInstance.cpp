@@ -42,7 +42,12 @@ bool TestCompilerInstance::Compile(CompileStage stage)
     if (!srcPkgs.empty() && stage == CompileStage::DESUGAR_AFTER_SEMA) {
         rawMangleName2DeclMap = RunASTCacheCalculation(*srcPkgs[0], invocation.globalOptions);
     }
+    // Perform condition compilation for handling conditional compilation directives.
+    // This stage is added to support new test cases for condition compilation.
     bool cc = PerformConditionCompile();
+    if (stage == CompileStage::CONDITION_COMPILE) {
+        return cc;
+    }
     bool modular = true;
     if (!loadSrcFilesFromCache) {
         modular = ModularizeCompilation();
@@ -53,6 +58,9 @@ bool TestCompilerInstance::Compile(CompileStage stage)
         return cc && modular && importRes;
     }
     auto macroRes = PerformMacroExpand();
+    if (stage == CompileStage::MACRO_EXPAND) {
+        return Utils::AllOf(cc, importRes, macroRes, modular);
+    }
     auto semaRes = PerformSema();
     if (stage == CompileStage::SEMA || stage == CompileStage::DESUGAR_AFTER_SEMA) {
         return Utils::AllOf(cc, importRes, macroRes, semaRes, modular);

@@ -24,7 +24,6 @@
 #include "cangjie/AST/Walker.h"
 
 #include "cangjie/AST/Utils.h"
-#include "cangjie/CHIR/AST2CHIR/ImplicitImportedFuncMgr.h"
 #include "cangjie/CHIR/AST2CHIR/AST2CHIRNodeMap.h"
 #include "cangjie/CHIR/AST2CHIR/GlobalVarInitializer.h"
 #include "cangjie/CHIR/IR/Package.h"
@@ -207,11 +206,6 @@ public:
         return std::move(srcCodeImportedVars);
     }
 
-    std::unordered_map<std::string, Function*>&& GetImplicitFuncs()
-    {
-        return std::move(implicitFuncs);
-    }
-
     std::vector<Function*>&& GetInitFuncsForConstVar()
     {
         for (auto f : initFuncsForAnnoFactory) {
@@ -253,9 +247,6 @@ private:
     }
 
     void AST2CHIRCheck();
-    void CollectImplicitFuncs();
-    void AddToImplicitFuncs(AST::FuncDecl& funcDecl, std::vector<ImplicitImportedFunc>& registeredImplicitFuncs,
-        std::unordered_set<Ptr<const AST::Decl>>& implicitlyImportedDecls) const;
     void CollectImportedDecls(const AST::Package& node);
     void CollectDeclsInCurPkg(AST::Package& node);
     void CollectImportedGenericInstantiatedDecl(
@@ -400,7 +391,6 @@ private:
     std::vector<Ptr<AST::Node>> allTopLevelNodes;
     /** @brief all files that after sorting in this package */
     std::vector<AST::File*> pkgFiles;
-    std::unordered_map<std::string, Function*> implicitFuncs;
     std::vector<Function*> initFuncsForConstVar;
     std::vector<Function*> initFuncsForAnnoFactory;
     std::unordered_map<Block*, Terminator*> maybeUnreachable;
@@ -411,9 +401,6 @@ private:
     bool failure{false};
 
     // ======================== Imported Pkg Top-Level Decl Part ======================== //
-
-    // See REG_IMPLICIT_IMPORTED_NON_GENERIC_FUNC for more details.
-    std::unordered_set<Ptr<const AST::Decl>> implicitDecls{};
     // including imported global var and static var.
     std::vector<Ptr<const AST::Decl>> importedGlobalAndStaticVars{};
     // including imported global func and member func.

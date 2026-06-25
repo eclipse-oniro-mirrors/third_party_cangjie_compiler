@@ -17,6 +17,7 @@
 #include <limits>
 
 #include "cangjie/Utils/FileUtil.h"
+#include "cangjie/Utils/StdUtils.h"
 
 using namespace Cangjie;
 
@@ -102,9 +103,13 @@ std::optional<GCCVersion> GCCPathScanner::StrToGCCVersion(const std::string& ver
     if (invalidMajorVer) {
         return std::nullopt;
     }
-    int majorVer = std::stoi(versionStr.substr(0, majorEndIndex));
-    CJC_ASSERT(majorVer >= std::numeric_limits<uint8_t>::min() && majorVer <= std::numeric_limits<uint8_t>::max());
-    ver.major = static_cast<uint8_t>(majorVer);
+    auto majorVer = Cangjie::Stoi(versionStr.substr(0, majorEndIndex));
+    if (!majorVer.has_value()) {
+        return std::nullopt;
+    }
+    CJC_ASSERT(majorVer.value() >= std::numeric_limits<uint8_t>::min() &&
+        majorVer.value() <= std::numeric_limits<uint8_t>::max());
+    ver.major = static_cast<uint8_t>(majorVer.value());
 
     if (majorEndIndex == versionStr.length()) {
         return {ver};
@@ -125,9 +130,13 @@ std::optional<GCCVersion> GCCPathScanner::StrToGCCVersion(const std::string& ver
         return std::nullopt;
     }
 
-    int minorVer = std::stoi(versionStr.substr(majorEndIndex + 1, (minorEndIndex - majorEndIndex) - 1));
-    CJC_ASSERT(minorVer >= std::numeric_limits<uint8_t>::min() && minorVer <= std::numeric_limits<uint8_t>::max());
-    ver.minor = static_cast<uint8_t>(minorVer);
+    auto minorVer = Cangjie::Stoi(versionStr.substr(majorEndIndex + 1, (minorEndIndex - majorEndIndex) - 1));
+    if (!minorVer.has_value()) {
+        return std::nullopt;
+    }
+    CJC_ASSERT(minorVer.value() >= std::numeric_limits<uint8_t>::min() &&
+        minorVer.value() <= std::numeric_limits<uint8_t>::max());
+    ver.minor = static_cast<uint8_t>(minorVer.value());
 
     if (minorEndIndex == versionStr.length()) {
         return {ver};
@@ -144,9 +153,13 @@ std::optional<GCCVersion> GCCPathScanner::StrToGCCVersion(const std::string& ver
         return std::nullopt;
     }
 
-    int buildVer = std::stoi(versionStr.substr(minorEndIndex + 1, (versionStr.length() - minorEndIndex) - 1));
-    CJC_ASSERT(buildVer >= std::numeric_limits<uint8_t>::min() && buildVer <= std::numeric_limits<uint8_t>::max());
-    ver.build = static_cast<uint8_t>(buildVer);
+    auto buildVer = Cangjie::Stoi(versionStr.substr(minorEndIndex + 1, (versionStr.length() - minorEndIndex) - 1));
+    if (!buildVer.has_value()) {
+        return std::nullopt;
+    }
+    CJC_ASSERT(buildVer.value() >= std::numeric_limits<uint8_t>::min() &&
+        buildVer.value() <= std::numeric_limits<uint8_t>::max());
+    ver.build = static_cast<uint8_t>(buildVer.value());
     return {ver};
 }
 

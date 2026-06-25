@@ -167,6 +167,10 @@ OwnedPtr<File> ParserImpl::ParseTopLevel()
         if (ParsePackageHeaderEnd()) {
             // seeing end of file
             ret->end = lastToken.End();
+            if (enableAttachComment) {
+                AttachCommentToFile(ret.get());
+            }
+            commentsMap.emplace(std::make_pair(ret->begin.fileID, lexer->GetComments()));
             ret->curFile = ret;
             return ret;
         }

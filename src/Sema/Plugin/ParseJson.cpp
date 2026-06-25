@@ -40,6 +40,11 @@ inline bool IsNonEscapedChar(size_t pos, const std::vector<uint8_t>& in, uint8_t
     return (CountBackslashesBefore(pos, in) % 2) == 0;
 }
 
+inline bool IsNumberChar(size_t pos, const std::vector<uint8_t>& in)
+{
+    return pos < in.size() && in[pos] >= '0' && in[pos] <= '9';
+}
+
 std::string ParseJsonString(size_t& pos, const std::vector<uint8_t>& in)
 {
     if (pos >= in.size() || !IsNonEscapedChar(pos, in, '"')) {
@@ -135,7 +140,7 @@ OwnedPtr<JsonObject> ParseJsonObject(size_t& pos, const std::vector<uint8_t>& in
                 ret->pairs.back()->valueStr.emplace_back(ParseJsonString(pos, in));
             }
         }
-        if (in[pos] >= '0' && in[pos] <= '9') {
+        if (IsNumberChar(pos, in)) {
             // Json key cannot be a number.
             if (mod != StringMod::VALUE) {
                 return MakeOwned<JsonObject>();

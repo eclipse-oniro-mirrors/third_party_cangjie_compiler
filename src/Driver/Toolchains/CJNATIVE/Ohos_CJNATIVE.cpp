@@ -65,7 +65,7 @@ void Ohos_CJNATIVE::GenerateLinkingTool(const std::vector<TempFileInfo>& objFile
     tool->AppendArgIf(driverOptions.stripSymbolTable, "-s");
 
     // Hot reload relies on .gnu.hash section.
-    tool->AppendArg("--hash-style=both");
+    tool->AppendArg("--hash-style=gnu");
 
     tool->AppendArg("-m", GetEmulation());
 

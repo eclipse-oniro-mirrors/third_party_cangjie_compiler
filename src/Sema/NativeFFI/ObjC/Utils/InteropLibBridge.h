@@ -134,10 +134,6 @@ public:
 
     Ptr<AST::FuncDecl> GetGetProtoDecl();
 
-    Ptr<AST::FuncDecl> GetWithMethodEnvDecl();
-
-    Ptr<AST::FuncDecl> GetWithMethodEnvObjDecl();
-
     Ptr<AST::FuncDecl> GetObjCMsgSendDecl();
 
     Ptr<AST::FuncDecl> GetObjCMsgSendSuperDecl();
@@ -161,6 +157,8 @@ public:
     Ptr<AST::FuncDecl> GetConvertToNSStringDecl();
 
     Ptr<AST::FuncDecl> GetDescriptionAsStringDecl();
+
+    Ptr<AST::FuncDecl> GetObjCRetainAutoreleasedReturnValue();
 
     /**
      * Get objc.lang.ObjCPointer declaration

@@ -521,7 +521,7 @@ size_t DeCompression<T>::ForwardName(T& mangled, size_t idx)
     }
     if (mangled[idx] == MANGLE_ANONYMOUS_PREFIX) { return idx + MANGLE_CHAR_LEN; }
     size_t numberLen = 0;
-    while (idx < mangled.Length() && isdigit(mangled[idx + numberLen])) {
+    while (idx + numberLen < mangled.Length() && isdigit(mangled[idx + numberLen])) {
         numberLen++;
     }
     uint32_t number{};

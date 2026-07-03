@@ -8,6 +8,7 @@
 
 #include "JavaDesugarManager.h"
 #include "GenerateJavaImplApiStub.h"
+#include "JniBridge.h"
 #include "NativeFFI/Utils.h"
 #include "InteropLibBridge.h"
 
@@ -36,7 +37,7 @@ OwnedPtr<AST::FuncDecl> GenerateJavaImplWrappingConstructorStub::CreateWrappingC
     auto& entityParam = *params[0];
 
     // regId: RegistryId (Int64)
-    auto& regIdParam = man.PushSelfParams(params);
+    auto& regIdParam = *params.emplace_back(jni.CreateRegistryIdParam());
 
     std::vector<Ptr<Ty>> paramTys;
     paramTys.push_back(entityParam.GetTy());
@@ -69,8 +70,8 @@ FuncDecl& GenerateJavaImplWrappingConstructorStub::InsertWrappingConstructor(Cla
     return res;
 }
 
-GenerateJavaImplWrappingConstructorStub::GenerateJavaImplWrappingConstructorStub(JavaDesugarManager& man)
-    : man(man), typeManager(man.typeManager), ilib(man.lib)
+GenerateJavaImplWrappingConstructorStub::GenerateJavaImplWrappingConstructorStub(
+    TypeManager& typeManager, InteropLibBridge& ilib, JniBridge& jni) : typeManager(typeManager), ilib(ilib), jni(jni)
 {
 }
 

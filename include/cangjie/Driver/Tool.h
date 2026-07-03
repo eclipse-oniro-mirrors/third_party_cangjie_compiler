@@ -17,6 +17,7 @@
 
 #include <future>
 #include <list>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -82,6 +83,7 @@ public:
     void AppendArg(const std::string& arg)
     {
         this->args.emplace_back(arg);
+        this->argKinds.push_back(ArgKind::Literal);
     }
 
     /**
@@ -95,6 +97,7 @@ public:
     {
         if (condition) {
             this->args.emplace_back(std::forward<String>(argument));
+            this->argKinds.push_back(ArgKind::Literal);
         }
     }
 
@@ -173,6 +176,14 @@ public:
     }
 
     /**
+     * @brief Append all files with the given extension from a directory when the tool is executed.
+     *
+     * @param dir The directory to scan.
+     * @param extension The file extension for collection.
+     */
+    void AppendArgsFromDirAtExecution(const std::string& dir, const std::string& extension);
+
+    /**
      * @brief Set LD_LIBRARY_PATH.
      *
      * @param newLdLibraryPath The new LD_LIBRARY_PATH to set.
@@ -225,10 +236,24 @@ public:
     std::unique_ptr<ToolFuture> Execute(bool verbose) const;
 
 private:
+    enum class ArgKind : uint8_t { Literal, DeferredDir };
+
+    struct DeferredDirArgs {
+        std::string dir;
+        std::string extension;
+    };
+
     std::vector<std::string> args{};       /**< Arguments for this tool. */
+    // Parallel to args: argKinds[i] is the kind of args[i].
+    std::vector<ArgKind> argKinds{};
+    // Map from arg position → deferredDirArgs index. Only positions with
+    // kind == DeferredDir are expanded
+    std::unordered_map<size_t, size_t> deferredArgMap{};
+    std::vector<DeferredDirArgs> deferredDirArgs{};
     std::string ldLibraryPath{""};       /**< LD_LIBRARY_PATH */
 
     std::string GenerateCommand() const;
+    std::vector<std::string> ExpandArgs() const;
 
 #ifndef _WIN32
     std::list<std::string> BuildEnvironmentVector() const;

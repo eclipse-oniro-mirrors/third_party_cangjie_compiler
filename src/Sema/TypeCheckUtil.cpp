@@ -1547,5 +1547,4 @@ Ptr<Decl> FindCorrespondingCommonDecl(const Decl& specificDecl)
 
     return nullptr;
 }
-
 } // namespace Cangjie::TypeCheckUtil

@@ -565,11 +565,19 @@ bool GlobalOptions::CheckLtoOptions() const
         Errorln("LTO on iOS is an experimental feature, use '--experimental' to enable it.");
         return false;
     }
+    if (target.os == OSType::IOS && IsObfuscationEnabled()) {
+        Errorln("Obfuscation is not supported when LTO is enabled on iOS.");
+        return false;
+    }
+    if (target.os == OSType::IOS && outputMode != OutputMode::STATIC_LIB) {
+        Errorln("iOS LTO only supports --output-type=staticlib.");
+        return false;
+    }
     if (outputMode == OutputMode::OBJ) {
         Errorln("--output-type=obj is not allowed in LTO mode");
         return false;
     }
-    if (outputMode == OutputMode::STATIC_LIB && !bcInputFiles.empty() && !emitStaticLibInLTO) {
+    if (outputMode == OutputMode::STATIC_LIB && !bcInputFiles.empty() && !ShouldEmitStaticLibInLTO()) {
         Errorln("The input file cannot be bc files When generating a static library in LTO mode.");
         return false;
     }
@@ -608,13 +616,15 @@ bool GlobalOptions::CheckCompileAsExeOptions() const
     }
     if (IsCompileAsExeEnabled() && !IsLTOEnabled()) {
         DiagnosticEngine diag;
-        diag.DiagnoseRefactor(DiagKindRefactor::driver_invalid_compile_as_exe, DEFAULT_POSITION);
+        diag.DiagnoseRefactor(DiagKindRefactor::driver_option_requires_lto, DEFAULT_POSITION,
+            "--compile-as-exe");
         return false;
     }
     auto osType = target.GetOSFamily();
     if (osType == OSType::WINDOWS || osType == OSType::DARWIN || osType == OSType::IOS) {
         DiagnosticEngine diag;
-        diag.DiagnoseRefactor(DiagKindRefactor::driver_invalid_compile_as_exe_platform, DEFAULT_POSITION);
+        diag.DiagnoseRefactor(DiagKindRefactor::driver_unsupported_platform, DEFAULT_POSITION,
+            "--compile-as-exe", "Windows, Mac, IOS");
         return false;
     }
     return true;
@@ -624,13 +634,15 @@ bool GlobalOptions::CheckLTOPkgVisibilityOptions() const
 {
     if (IsLTOPkgVisibilityEnabled() && !IsLTOEnabled()) {
         DiagnosticEngine diag;
-        diag.DiagnoseRefactor(DiagKindRefactor::driver_invalid_visible_pkgs, DEFAULT_POSITION);
+        diag.DiagnoseRefactor(DiagKindRefactor::driver_option_requires_lto, DEFAULT_POSITION,
+            "--lto-keep-pkg-visibility");
         return false;
     }
 
     if (!ltoVisiblePkgs.empty() && IsCompileAsExeEnabled()) {
         DiagnosticEngine diag;
-        diag.DiagnoseRefactor(DiagKindRefactor::driver_invalid_visible_pkgs_conflict, DEFAULT_POSITION);
+        diag.DiagnoseRefactor(DiagKindRefactor::driver_conflicting_options, DEFAULT_POSITION,
+            "--lto-keep-pkg-visibility", "--compile-as-exe");
         return false;
     }
 
@@ -639,7 +651,8 @@ bool GlobalOptions::CheckLTOPkgVisibilityOptions() const
         bool validForStaticLib = (outputMode == OutputMode::STATIC_LIB && target.os == OSType::IOS);
         if (!validForDylib && !validForStaticLib) {
             DiagnosticEngine diag;
-            diag.DiagnoseRefactor(DiagKindRefactor::driver_visible_pkgs_only_for_dylib, DEFAULT_POSITION);
+            diag.DiagnoseRefactor(DiagKindRefactor::driver_ineffective_option, DEFAULT_POSITION,
+                "--lto-keep-pkg-visibility");
         }
     }
 
@@ -648,21 +661,20 @@ bool GlobalOptions::CheckLTOPkgVisibilityOptions() const
 
 bool GlobalOptions::CheckLTOStaticLibFormatOptions() const
 {
-    if (!emitStaticLibInLTO) {
+    if (!emitStaticLibInLTO.has_value()) {
         return true;
     }
-
     if (!IsLTOEnabled()) {
-        Errorln("Option '--lto-staticlib-format=native' only takes effect when lto mode is enabled.");
+        Errorln("Option '--lto-staticlib-format' only takes effect when lto mode is enabled.");
         return false;
     }
 
     if (outputMode != OutputMode::STATIC_LIB) {
-        Errorln("Option '--lto-staticlib-format=native' requires '--output-type=staticlib'.");
+        Errorln("Option '--lto-staticlib-format' requires '--output-type=staticlib'.");
         return false;
     }
     if (target.os != OSType::IOS) {
-        Errorln("Option '--lto-staticlib-format=native' is only supported on iOS platforms.");
+        Errorln("Option '--lto-staticlib-format' is only supported on iOS platforms.");
         return false;
     }
     return true;
@@ -1664,7 +1676,6 @@ std::vector<std::string> GlobalOptions::ToSerialized() const
     result.emplace_back(BoolToSerializedString(enableCoverage));
     result.emplace_back(SanitizerTypeToSerializedString());
     result.emplace_back(BoolToSerializedString(experimentalMode));
-    result.emplace_back(BoolToSerializedString(emitStaticLibInLTO));
     result.emplace_back(OverflowStrategyToSerializedString());
     (void)result.emplace_back(BoolToSerializedString(interpreter));
     (void)result.emplace_back(VectorStrToSerializedString(interpreterSearchPaths, ":"));

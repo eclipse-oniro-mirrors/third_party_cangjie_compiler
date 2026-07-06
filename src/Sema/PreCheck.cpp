@@ -14,6 +14,7 @@
 
 #include "Diags.h"
 #include "JoinAndMeet.h"
+#include "SearchSymbol.h"
 #include "TypeCheckUtil.h"
 #include "TypeCheckerImpl.h"
 
@@ -814,7 +815,7 @@ void TypeChecker::TypeCheckerImpl::ResolveOneDecl(ASTContext& ctx, Decl& decl)
 
 void TypeChecker::TypeCheckerImpl::ResolveDecls(ASTContext& ctx)
 {
-    std::vector<Symbol*> syms = GetAllDecls(ctx);
+    std::vector<Symbol*> syms = SearchSymbol::GetAllDecls(ctx);
     for (auto& sym : syms) {
         if (sym->node->astKind == ASTKind::VAR_DECL || sym->node->astKind == ASTKind::FUNC_DECL) {
             SetOuterFunctionDecl(*StaticCast<Decl*>(sym->node));
@@ -922,7 +923,7 @@ void TypeChecker::TypeCheckerImpl::ResolveNames(ASTContext& ctx)
         }
         return VisitAction::WALK_CHILDREN;
     };
-    std::vector<Symbol*> syms = GetToplevelDecls(ctx);
+    std::vector<Symbol*> syms = SearchSymbol::GetToplevelDecls(ctx);
     for (auto sym : syms) {
         CJC_NULLPTR_CHECK(sym);
         Walker(sym->node, id, resolveSingleType).Walk();
@@ -1165,7 +1166,7 @@ void TypeChecker::TypeCheckerImpl::CheckAssumption(ASTContext& ctx, const Decl& 
 
 void TypeChecker::TypeCheckerImpl::AddSuperClassObjectForClassDecl(ASTContext& ctx)
 {
-    std::vector<Symbol*> syms = GetSymsByASTKind(ctx, ASTKind::CLASS_DECL, Sort::posAsc);
+    std::vector<Symbol*> syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::CLASS_DECL, Sort::posAsc);
     for (auto& sym : syms) {
         CJC_ASSERT(sym && sym->node && sym->node->astKind == ASTKind::CLASS_DECL);
         auto cd = StaticAs<ASTKind::CLASS_DECL>(sym->node);
@@ -1186,7 +1187,7 @@ void TypeChecker::TypeCheckerImpl::AddSuperClassObjectForClassDecl(ASTContext& c
 void TypeChecker::TypeCheckerImpl::AddSuperInterfaceForClassLikeDecl(ASTContext& ctx)
 {
     // TODO: move it to Interop::ObjC
-    std::vector<Symbol*> syms = GetAllDecls(ctx);
+    std::vector<Symbol*> syms = SearchSymbol::GetAllDecls(ctx);
     for (auto& sym : syms) {
         CJC_ASSERT(sym && sym->node);
         if (!sym->node->TestAnyAttr(Attribute::OBJ_C_MIRROR, Attribute::OBJ_C_MIRROR_SUBTYPE)) {
@@ -1201,7 +1202,7 @@ void TypeChecker::TypeCheckerImpl::AddSuperInterfaceForClassLikeDecl(ASTContext&
 
 void TypeChecker::TypeCheckerImpl::CollectAndCheckAssumption(ASTContext& ctx)
 {
-    std::vector<Symbol*> syms = GetGenericCandidates(ctx);
+    std::vector<Symbol*> syms = SearchSymbol::GetGenericCandidates(ctx);
     for (auto& sym : syms) {
         if (auto decl = AST::As<ASTKind::DECL>(sym->node); decl) {
             CollectAssumption(ctx, *decl);
@@ -1221,7 +1222,7 @@ void TypeChecker::TypeCheckerImpl::TypeAliasCircleCheck(const ASTContext& ctx)
     if (ctx.curPackage->TestAttr(Attribute::IMPORTED)) {
         return; // Alias dependency check can be ignored for imported package.
     }
-    std::vector<Symbol*> syms = GetSymsByASTKind(ctx, ASTKind::TYPE_ALIAS_DECL, Sort::posAsc);
+    std::vector<Symbol*> syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::TYPE_ALIAS_DECL, Sort::posAsc);
     for (auto& sym : syms) {
         if (auto tad = AST::As<ASTKind::TYPE_ALIAS_DECL>(sym->node); tad) {
             std::deque<Ptr<Decl>> path;
@@ -1316,7 +1317,7 @@ void TypeChecker::TypeCheckerImpl::StructDeclCircleOrDupCheckForOneSymbol(ASTCon
 
 void TypeChecker::TypeCheckerImpl::StructDeclCircleOrDupCheck(ASTContext& ctx)
 {
-    std::vector<Symbol*> syms = GetAllStructDecls(ctx);
+    std::vector<Symbol*> syms = SearchSymbol::GetAllStructDecls(ctx);
     for (auto& sym : syms) {
         StructDeclCircleOrDupCheckForOneSymbol(ctx, *sym);
     }
@@ -1402,7 +1403,7 @@ void TypeChecker::TypeCheckerImpl::CheckInheritanceCycleDFSHandleVisiting(
 
 void TypeChecker::TypeCheckerImpl::IgnoreAssumptionForTypeAliasDecls(const ASTContext& ctx) const
 {
-    std::vector<Symbol*> syms = GetSymsByASTKind(ctx, ASTKind::TYPE_ALIAS_DECL, Sort::posAsc);
+    std::vector<Symbol*> syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::TYPE_ALIAS_DECL, Sort::posAsc);
     for (auto& sym : syms) {
         if (auto tad = AST::As<ASTKind::TYPE_ALIAS_DECL>(sym->node); tad && tad->type && tad->generic) {
             for (auto& tp : tad->generic->typeParameters) {
@@ -1416,7 +1417,7 @@ void TypeChecker::TypeCheckerImpl::IgnoreAssumptionForTypeAliasDecls(const ASTCo
 
 void TypeChecker::TypeCheckerImpl::AddAssumptionForExtendDecls(ASTContext& ctx)
 {
-    std::vector<Symbol*> syms = GetSymsByASTKind(ctx, ASTKind::EXTEND_DECL, Sort::posAsc);
+    std::vector<Symbol*> syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::EXTEND_DECL, Sort::posAsc);
     for (auto& sym : syms) {
         if (auto ed = AST::As<ASTKind::EXTEND_DECL>(sym->node); ed) {
             if (ed->extendedType && ed->generic) {
@@ -1656,7 +1657,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckFuncRedefinition(const ASTContext& ct
     if (ctx.curPackage->TestAnyAttr(Attribute::IMPORTED, Attribute::TOOL_ADD)) {
         return; // Redefinition check can be ignored for imported package.
     }
-    auto syms = GetSymsByASTKind(ctx, ASTKind::FUNC_DECL);
+    auto syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::FUNC_DECL);
     // Redefinition candidates.
     std::map<Names, std::vector<Ptr<FuncDecl>>> candidates;
     for (auto sym : syms) {
@@ -1711,7 +1712,7 @@ Ptr<ReturnExpr> GetDanglingReturn(const FuncParam& fp)
 
 void TypeChecker::TypeCheckerImpl::CheckReturnAndJump(const ASTContext& ctx)
 {
-    auto syms = GetSymsByASTKind(ctx, ASTKind::RETURN_EXPR);
+    auto syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::RETURN_EXPR);
     for (auto sym : syms) {
         CJC_ASSERT(sym && sym->node);
         auto re = StaticCast<ReturnExpr*>(sym->node);
@@ -1728,7 +1729,7 @@ void TypeChecker::TypeCheckerImpl::CheckReturnAndJump(const ASTContext& ctx)
             diag.DiagnoseRefactor(DiagKindRefactor::sema_invalid_return, *sym->node);
         }
     }
-    auto paramSyms = GetSymsByASTKind(ctx, ASTKind::FUNC_PARAM);
+    auto paramSyms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::FUNC_PARAM);
     for (auto sym : paramSyms) {
         CJC_ASSERT(sym && sym->node);
         FuncParam& param = *StaticCast<FuncParam*>(sym->node);
@@ -1740,7 +1741,7 @@ void TypeChecker::TypeCheckerImpl::CheckReturnAndJump(const ASTContext& ctx)
         }
     }
 
-    syms = GetSymsByASTKind(ctx, ASTKind::JUMP_EXPR);
+    syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::JUMP_EXPR);
     for (auto sym : syms) {
         CJC_ASSERT(sym && sym->node);
         if (!ScopeManager::GetRefLoopSymbol(ctx, *sym->node)) {
@@ -1773,7 +1774,7 @@ void TypeChecker::TypeCheckerImpl::ReplaceThisTypeInFunc(const AST::FuncDecl& fu
 void TypeChecker::TypeCheckerImpl::PreSetDeclType(const ASTContext& ctx)
 {
     // 1. Set user defined enum constructor's type.
-    auto syms = GetSymsByASTKind(ctx, ASTKind::ENUM_DECL);
+    auto syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::ENUM_DECL);
     for (auto sym : syms) {
         CJC_ASSERT(sym && sym->node);
         auto ed = StaticCast<EnumDecl*>(sym->node);
@@ -1782,8 +1783,8 @@ void TypeChecker::TypeCheckerImpl::PreSetDeclType(const ASTContext& ctx)
         }
     }
     // 2. Set user defined varDecl and propDecl's type.
-    syms = GetSymsByASTKind(ctx, ASTKind::VAR_DECL);
-    auto propSyms = GetSymsByASTKind(ctx, ASTKind::PROP_DECL);
+    syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::VAR_DECL);
+    auto propSyms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::PROP_DECL);
     syms.insert(syms.end(), propSyms.begin(), propSyms.end());
     for (auto sym : syms) {
         CJC_ASSERT(sym && sym->node);
@@ -1793,7 +1794,7 @@ void TypeChecker::TypeCheckerImpl::PreSetDeclType(const ASTContext& ctx)
         }
     }
     // 3. Set user defined function parameter's types (must exist), and function return type if written.
-    syms = GetSymsByASTKind(ctx, ASTKind::FUNC_DECL);
+    syms = SearchSymbol::GetSymsByASTKind(ctx, ASTKind::FUNC_DECL);
     for (auto sym : syms) {
         CJC_ASSERT(sym && sym->node);
         auto fd = StaticCast<FuncDecl*>(sym->node);
@@ -1841,7 +1842,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckUsage(ASTContext& ctx, const Package&
     BuildExtendMap(ctx);
 
     mpImpl->UpdateSpecificMemberGenericTy(
-        ctx, [this](ASTContext& ctx, ASTKind kind) { return this->GetSymsByASTKind(ctx, kind); });
+        ctx, [](ASTContext& ctx, ASTKind kind) { return SearchSymbol::GetSymsByASTKind(ctx, kind); });
     // Check duplicate interface inheritance for nominal decls. NOTE: Should resolve typeAlias first.
     StructDeclCircleOrDupCheck(ctx);
     // Check and set member's basic attributes.
@@ -1873,7 +1874,7 @@ void TypeChecker::TypeCheckerImpl::PreCheckInvalidInherit(const ASTContext& ctx,
         return;
     }
 
-    auto inheritableDecls = GetAllStructDecls(ctx);
+    auto inheritableDecls = SearchSymbol::GetAllStructDecls(ctx);
     for (auto sym : inheritableDecls) {
         CJC_NULLPTR_CHECK(sym);
         CJC_NULLPTR_CHECK(sym->node);
@@ -1970,7 +1971,7 @@ void TypeChecker::TypeCheckerImpl::CollectDeclsWithMember(Ptr<Package> pkg, ASTC
         }
     };
     // collect this package
-    std::vector<Symbol*> syms = GetAllDecls(ctx);
+    std::vector<Symbol*> syms = SearchSymbol::GetAllDecls(ctx);
     for (auto sym : syms) {
         collectDecl(StaticCast<Decl*>(sym->node));
     }

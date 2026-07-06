@@ -7,7 +7,6 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "DesugarJArray.h"
-#include "JavaDesugarManager.h"
 #include "Utils.h"
 #include "NativeFFI/Utils.h"
 
@@ -308,8 +307,10 @@ void DesugarJArray::ReplaceCallsWithArrayJavaEntitySet(File& file) const
     }).Walk();
 }
 
-DesugarJArray::DesugarJArray(JavaDesugarManager& man)
-    : typeManager(man.typeManager), importManager(man.importManager), ilib(man.lib)
+DesugarJArray::DesugarJArray(
+    TypeManager& typeManager,
+    const ImportManager& importManager,
+    InteropLibBridge& ilib) : typeManager(typeManager), importManager(importManager), ilib(ilib)
 {
 }
 

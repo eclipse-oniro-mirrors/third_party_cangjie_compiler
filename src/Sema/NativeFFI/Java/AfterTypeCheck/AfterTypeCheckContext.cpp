@@ -6,7 +6,7 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "Context.h"
+#include "AfterTypeCheckContext.h"
 #include "cangjie/AST/AttributePack.h"
 #include "cangjie/AST/Match.h"
 #include "cangjie/AST/Node.h"
@@ -129,11 +129,6 @@ void AfterTypeCheckContext::FlushGeneratedDecls()
     generated.clear();
 }
 
-void AfterTypeCheckStage::operator()(AfterTypeCheckContext& ctx)
-{
-    Process(ctx);
-    ctx.FlushGeneratedDecls();
-}
 
 AfterTypeCheckContext::AfterTypeCheckContext(const ImportManager& importManager, TypeManager& typeManager,
     AST::Package& pkg) : importManager(importManager), typeManager(typeManager), pkg(pkg),

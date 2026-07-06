@@ -10,20 +10,16 @@
  * @file
  *
  * This file declares after-typecheck Java interop stage:
- * - desugaring JArray constructor, get,set and call-site call trasformations.
+ * - desugaring JArray constructor, get, set and call-site call transformations.
  */
 #ifndef CANGJIE_SEMA_AFTER_TYPECHECK_NATIVE_FFI_JAVA_DESUGAR_JARRAY
 #define CANGJIE_SEMA_AFTER_TYPECHECK_NATIVE_FFI_JAVA_DESUGAR_JARRAY
 
-#include "Context.h"
+#include "AfterTypeCheckStage.h"
 #include "cangjie/AST/Node.h"
 #include "cangjie/Modules/ImportManager.h"
 #include "cangjie/Sema/TypeManager.h"
 #include "NativeFFI/Java/AfterTypeCheck/InteropLibBridge.h"
-
-namespace Cangjie::Interop::Java {
-class JavaDesugarManager;
-}
 
 namespace Cangjie::Native::FFI::Java {
 using namespace Interop::Java;
@@ -33,7 +29,10 @@ using namespace Interop::Java;
  */
 class DesugarJArray : public AfterTypeCheckStage {
 public:
-    explicit DesugarJArray(JavaDesugarManager& man);
+    explicit DesugarJArray(
+        TypeManager& typeManager,
+        const ImportManager& importManager,
+        InteropLibBridge& ilib);
 protected:
     void Process(AfterTypeCheckContext& ctx) override;
 private:
@@ -71,12 +70,12 @@ private:
 
     /**
     * Transforms all java.lang.JArray's constructor calls:
-    * init(length: Int32) -> init(lenght: Int32, $jniType: String)
+    * init(length: Int32) -> init(length: Int32, $jniType: String)
     *
     * example:
     * let u = JArray<User>(1) -> let u = JArray<User>(1, "Lutils/User;")
     *
-    * Note: original constructor init(lenght: Int32) must throw Exception
+    * Note: original constructor init(length: Int32) must throw Exception
     */
     void TransformConstructorCallsToPassJNIParam(AST::File& file) const;
 
@@ -92,4 +91,4 @@ private:
 
 } // namespace Cangjie::Native::FFI::Java
 
-#endif // CANGJIE_SEMA_AFTER_TYPECHECK_NATIVE_FFI_JAVA_DESUGAR_JARRAY_CALL_SITE
+#endif // CANGJIE_SEMA_AFTER_TYPECHECK_NATIVE_FFI_JAVA_DESUGAR_JARRAY

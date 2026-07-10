@@ -18,7 +18,7 @@
 
 namespace Cangjie::Native::FFI::Java {
 
-OwnedPtr<AST::FuncDecl> GenerateJavaImplWrappingConstructorStub::CreateWrappingConstructorStub(
+OwnedPtr<AST::FuncDecl> GenerateJavaImplApiStub::CreateWrappingConstructorStub(
     ClassDecl& refWrapper) const
 {
     auto ctor = CreateFuncDecl("init", CreateFuncBody({}, CreateRefType(refWrapper), CreateBlock({})));
@@ -55,7 +55,7 @@ OwnedPtr<AST::FuncDecl> GenerateJavaImplWrappingConstructorStub::CreateWrappingC
     return ctor;
 }
 
-FuncDecl& GenerateJavaImplWrappingConstructorStub::InsertWrappingConstructor(ClassDecl& refWrapper) const
+FuncDecl& GenerateJavaImplApiStub::InsertWrappingConstructor(ClassDecl& refWrapper) const
 {
     auto ctor = WithinFile(CreateWrappingConstructorStub(refWrapper), refWrapper.curFile);
     auto& res = *ctor;
@@ -70,12 +70,12 @@ FuncDecl& GenerateJavaImplWrappingConstructorStub::InsertWrappingConstructor(Cla
     return res;
 }
 
-GenerateJavaImplWrappingConstructorStub::GenerateJavaImplWrappingConstructorStub(
+GenerateJavaImplApiStub::GenerateJavaImplApiStub(
     TypeManager& typeManager, InteropLibBridge& ilib, JniBridge& jni) : typeManager(typeManager), ilib(ilib), jni(jni)
 {
 }
 
-void GenerateJavaImplWrappingConstructorStub::Process(AfterTypeCheckContext& ctx)
+void GenerateJavaImplApiStub::Process(AfterTypeCheckContext& ctx)
 {
     for (auto refWrapper : ctx.GetJavaImplReferenceWrappers()) {
         auto& ctor = InsertWrappingConstructor(*refWrapper);

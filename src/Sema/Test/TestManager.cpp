@@ -776,7 +776,7 @@ bool TestManager::ShouldBeMarkedAsContainingMockCreationCall(
     }
 }
 
-void TestManager::MarkDeclsForTestIfNeeded(std::vector<Ptr<Package>> pkgs) const
+void TestManager::MarkDeclsForTestIfNeeded(const std::vector<Ptr<Package>>& pkgs) const
 {
     HandleDeclsToExportForTest(pkgs);
     for (auto& pkg : pkgs) {
@@ -826,6 +826,13 @@ bool TestManager::IsThereMockUsage(Package& pkg) const
     }
 
     return false;
+}
+
+void TestManager::PrepareToMock(const std::vector<Ptr<AST::Package>>& pkgs)
+{
+    for (auto& pkg : pkgs) {
+        PrepareToMock(*pkg);
+    }
 }
 
 void TestManager::PrepareToMock(AST::Package& pkg)

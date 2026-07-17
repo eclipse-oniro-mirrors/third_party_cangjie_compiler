@@ -12,7 +12,8 @@
  * This file implements generating Objective-C glue code.
  */
 
-#include "NativeFFI/ObjC/ObjCCodeGenerator/ObjCGenerator.h"
+#include "NativeFFI/ObjC/ObjCCodeTranspiler/Transpiler.h"
+#include "NativeFFI/ObjC/ObjCCodeTranspiler/ObjCTranspilerCJMapping.h"
 #include "Handlers.h"
 
 using namespace Cangjie::AST;
@@ -24,7 +25,15 @@ void GenerateGlueCode::HandleImpl(InteropContext& ctx)
         if (decl.TestAnyAttr(Attribute::IS_BROKEN, Attribute::HAS_BROKEN)) {
             return;
         }
-        auto codegen = ObjCGenerator(ctx, &decl, ctx.outputObjCGenDir, ctx.cjLibOutputPath, this->interopType);
+        // depending of interop type we chose between two versions of codegen
+        // cj mapping transpiler or regular transpiler
+        if (interopType != InteropType::ObjC_Mirror) {
+            auto codegen = ObjCTranspilerCJMapping(ctx, &decl, ctx.outputObjCGenDir,
+                ctx.cjLibOutputPath, this->interopType);
+            codegen.Generate();
+            return;
+        }
+        auto codegen = Transpiler(ctx, &decl, ctx.outputObjCGenDir, ctx.cjLibOutputPath, this->interopType);
         codegen.Generate();
     };
 
@@ -34,7 +43,7 @@ void GenerateGlueCode::HandleImpl(InteropContext& ctx)
         if (decl.TestAnyAttr(Attribute::IS_BROKEN, Attribute::HAS_BROKEN)) {
             return;
         }
-        auto codegen = ObjCGenerator(
+        auto codegen = ObjCTranspilerCJMapping(
             ctx,
             &decl,
             ctx.outputObjCGenDir,
@@ -44,6 +53,7 @@ void GenerateGlueCode::HandleImpl(InteropContext& ctx)
             isGenericGlueCode
         );
         codegen.Generate();
+        return;
     };
 
     auto processContainer = [&genGlueCode, &genGlueCodeWithGenericConfigs](auto& container) {

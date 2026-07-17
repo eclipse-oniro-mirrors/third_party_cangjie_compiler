@@ -613,9 +613,10 @@ void TypeChecker::TypeCheckerImpl::CheckAccessLegalityOfRefExpr(const ASTContext
     if (decl->IsFunc()) {
         if (re.isAlone) {
             (void)CheckFuncAccessControl(ctx, re, re.ref.targets);
-            // The unsafe function can only be called rather than as name reference
-            if (decl->TestAttr(Attribute::UNSAFE) && !re.isInFlowExpr) {
-                diag.DiagnoseRefactor(DiagKindRefactor::sema_unsafe_func_can_only_be_called, re);
+            // The unsafe or intrinsic function can only be called rather than as name reference
+            if (decl->TestAnyAttr(Attribute::UNSAFE, Attribute::INTRINSIC) && !re.isInFlowExpr) {
+                diag.DiagnoseRefactor(DiagKindRefactor::sema_func_can_only_be_called, re,
+                    decl->TestAttr(Attribute::UNSAFE) ? "unsafe" : "intrinsic");
             }
         }
     } else {
@@ -654,9 +655,10 @@ void TypeChecker::TypeCheckerImpl::CheckAccessLegalityOfMemberAccess(const ASTCo
         if (ma.isAlone) {
             std::vector<Ptr<Decl>> targets{ma.target};
             (void)CheckFuncAccessControl(ctx, ma, targets);
-            // The unsafe function can only be called rather than as name reference
-            if (decl->TestAttr(Attribute::UNSAFE) && !ma.isInFlowExpr) {
-                diag.DiagnoseRefactor(DiagKindRefactor::sema_unsafe_func_can_only_be_called, ma);
+            // The unsafe or intrinsic function can only be called rather than as name reference
+            if (decl->TestAnyAttr(Attribute::UNSAFE, Attribute::INTRINSIC) && !ma.isInFlowExpr) {
+                diag.DiagnoseRefactor(DiagKindRefactor::sema_func_can_only_be_called, ma,
+                    decl->TestAttr(Attribute::UNSAFE) ? "unsafe" : "intrinsic");
             }
         }
     } else {

@@ -96,13 +96,14 @@ llvm::Value* GenerateOverflowWrappingArithmeticOp(
     if (kind == CHIR::ExprKind::EXP) {
         return GenerateBinaryExpOperation(irBuilder, argGenValues[0], argGenValues[1]);
     }
-    return GenerateArithmeticOperation(irBuilder, kind, ty, argGenValues[0], argGenValues[1]);
+    return GenerateArithmeticOperation(
+        irBuilder, CHIR::ExprKindMgr::ToBinaryExprKind(kind), ty, argGenValues[0], argGenValues[1]);
 }
 
-llvm::Value* GenerateOverflowApply(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateOverflowApply(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
     const CHIR::IntrinsicKind intrinsicKind = intrinsic.GetIntrinsicKind();
-    std::vector<CHIR::Value*> args = intrinsic.GetOperands();
+    std::vector<CHIR::Value*> args = intrinsic.GetArgs();
     CJC_ASSERT(!args.empty());
     const CHIR::Type* retType = intrinsic.GetResult()->GetType();
     const CHIR::Type* paramType = args[0]->GetType();

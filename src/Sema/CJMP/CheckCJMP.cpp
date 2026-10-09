@@ -30,7 +30,9 @@
 #include "cangjie/Utils/CastingTemplate.h"
 #include "cangjie/Utils/CheckUtils.h"
 #include "cangjie/Utils/ProfileRecorder.h"
+#include "cangjie/Utils/Utils.h"
 #include <algorithm>
+#include <unordered_map>
 
 using namespace Cangjie;
 using namespace AST;
@@ -669,6 +671,104 @@ void MPTypeCheckerImpl::ValidateMatchedAnnotationsAndModifiers(AST::Package& pkg
 }
 
 namespace {
+struct CJMPDeclMatchKey {
+    ASTKind kind;
+    std::string identifier;
+    std::string outerMangleName;
+    size_t genericsCount;
+    bool isMember;
+
+    bool operator==(const CJMPDeclMatchKey& other) const
+    {
+        return kind == other.kind && identifier == other.identifier && outerMangleName == other.outerMangleName &&
+            genericsCount == other.genericsCount && isMember == other.isMember;
+    }
+};
+
+struct CJMPDeclMatchKeyHash {
+    size_t operator()(const CJMPDeclMatchKey& key) const
+    {
+        size_t result = 0;
+        result = hash_combine(result, key.kind);
+        result = hash_combine(result, key.identifier);
+        result = hash_combine(result, key.outerMangleName);
+        result = hash_combine(result, key.genericsCount);
+        result = hash_combine(result, key.isMember);
+        return result;
+    }
+};
+
+CJMPDeclMatchKey GetCJMPDeclMatchKey(const Decl& decl)
+{
+    const bool isMember = decl.IsMemberDecl();
+    if (isMember) {
+        CJC_NULLPTR_CHECK(decl.outerDecl);
+    }
+    return {decl.astKind, decl.identifier.GetRawText(), isMember ? decl.outerDecl->rawMangleName : std::string{},
+        decl.GetGenericsCount(), isMember};
+}
+
+using CJMPDeclCandidates = std::vector<Ptr<Decl>>;
+using CJMPDeclIndex = std::unordered_map<CJMPDeclMatchKey, CJMPDeclCandidates, CJMPDeclMatchKeyHash>;
+
+const CJMPDeclCandidates& FindCJMPDeclCandidates(
+    const CJMPDeclIndex& index, const Decl& decl, const CJMPDeclCandidates& fallback)
+{
+    auto found = index.find(GetCJMPDeclMatchKey(decl));
+    return found != index.end() ? found->second : fallback;
+}
+
+Ptr<VarWithPatternDecl> AsTuplePatternDecl(const Ptr<Decl>& decl)
+{
+    auto patternDecl = DynamicCast<VarWithPatternDecl>(decl);
+    if (!patternDecl || patternDecl->irrefutablePattern->astKind != ASTKind::TUPLE_PATTERN) {
+        return nullptr;
+    }
+    return patternDecl;
+}
+
+CJMPDeclCandidates CollectCJMPPatternCandidates(
+    const CJMPDeclIndex& index, const VarWithPatternDecl& patternDecl, const CJMPDeclCandidates& fallback)
+{
+    CJMPDeclCandidates result;
+    auto tuplePattern = StaticCast<TuplePattern>(patternDecl.irrefutablePattern.get());
+    for (auto& pattern : tuplePattern->patterns) {
+        auto varPattern = DynamicCast<VarPattern>(pattern.get());
+        if (!varPattern) {
+            continue;
+        }
+        const auto& candidates = FindCJMPDeclCandidates(index, *varPattern->varDecl, fallback);
+        result.insert(result.end(), candidates.begin(), candidates.end());
+    }
+    return result;
+}
+
+template <typename Matcher>
+void MatchSpecificNonNominalDecls(
+    std::vector<Ptr<Decl>>& commonDecls, std::vector<Ptr<Decl>>& specificDecls, Matcher&& match)
+{
+    CJMPDeclIndex commonDeclIndex;
+    for (auto commonDecl : commonDecls) {
+        if (!commonDecl->IsNominalDecl()) {
+            commonDeclIndex[GetCJMPDeclMatchKey(*commonDecl)].emplace_back(commonDecl);
+        }
+    }
+    const CJMPDeclCandidates noCandidates;
+    for (auto& specificDecl : specificDecls) {
+        CJC_ASSERT(specificDecl->TestAttr(Attribute::SPECIFIC) && !specificDecl->TestAttr(Attribute::COMMON));
+        if (specificDecl->TestAttr(Attribute::IS_BROKEN) || specificDecl->IsNominalDecl()) {
+            continue;
+        }
+        auto patternDecl = AsTuplePatternDecl(specificDecl);
+        if (patternDecl) {
+            auto candidates = CollectCJMPPatternCandidates(commonDeclIndex, *patternDecl, noCandidates);
+            match(*specificDecl, candidates);
+            continue;
+        }
+        match(*specificDecl, FindCJMPDeclCandidates(commonDeclIndex, *specificDecl, noCandidates));
+    }
+}
+
 // Collect common or specific decl.
 void CollectDecl(
     Ptr<Decl> decl, std::vector<Ptr<Decl>>& commonDecls, std::vector<Ptr<Decl>>& specificDecls)
@@ -735,8 +835,14 @@ bool MustMatchWithPlatform(const Decl& decl, const bool compilingCommon)
     }
     return true;
 }
-} // namespace
 
+/**
+ * True when `common` provides a default body (COMMON_WITH_DEFAULT, not
+ * ABSTRACT) but the matching `specific` member is declared ABSTRACT (no body).
+ * In that case `sema_specific_member_must_have_implementation`
+ * ("the member %s must have body in 'specific' %s") is reported instead of
+ * the misleading modifier-mismatch diagnostic.
+ */
 bool NeedToReportMissingBody(const Decl& common, const Decl& specific)
 {
     if (common.outerDecl && common.TestAttr(Attribute::COMMON_WITH_DEFAULT) && !common.TestAttr(Attribute::ABSTRACT) &&
@@ -746,6 +852,7 @@ bool NeedToReportMissingBody(const Decl& common, const Decl& specific)
 
     return false;
 }
+} // namespace
 
 // PostTypeCheck for CJMP
 bool MPTypeCheckerImpl::MatchCJMPDeclAttrs(
@@ -1158,13 +1265,10 @@ void MPTypeCheckerImpl::CheckCommonExtensions(std::vector<Ptr<Decl>>& commonDecl
 
 void MPTypeCheckerImpl::MatchCJMPDecls(std::vector<Ptr<Decl>>& commonDecls, std::vector<Ptr<Decl>>& specificDecls)
 {
-    for (auto& specificDecl : specificDecls) {
-        CJC_ASSERT(specificDecl->TestAttr(Attribute::SPECIFIC) && !specificDecl->TestAttr(Attribute::COMMON));
-        if (specificDecl->TestAttr(Attribute::IS_BROKEN) || specificDecl->IsNominalDecl()) {
-            continue;
-        }
-        MatchSpecificDeclWithCommonDecls(*specificDecl, commonDecls);
-    }
+    MatchSpecificNonNominalDecls(commonDecls, specificDecls,
+        [this](Decl& specificDecl, const CJMPDeclCandidates& candidates) {
+            MatchSpecificDeclWithCommonDecls(specificDecl, candidates);
+        });
     std::unordered_set<Decl*> matchedIds;
     // Report error for common decl having no matched specific decl.
     for (auto& decl : commonDecls) {

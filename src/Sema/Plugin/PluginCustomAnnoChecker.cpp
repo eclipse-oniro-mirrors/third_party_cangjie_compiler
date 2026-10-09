@@ -550,7 +550,8 @@ void PluginCustomAnnoChecker::CheckHideOfOverrideFunction(const Decl& decl, cons
     }
 
     auto overriddenFd = ci.typeManager->GetTopOverriddenFuncDecl(fd);
-    if (!overriddenFd) {
+    // Already the top-most declaration: nothing to compare against.
+    if (!overriddenFd || overriddenFd == fd) {
         return;
     }
     PluginCustomAnnoInfo overriddenAnnoInfo;

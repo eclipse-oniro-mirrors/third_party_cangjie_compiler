@@ -14,13 +14,14 @@
 
 #include "OCFFIParserImpl.h"
 #include "../../ParserImpl.h"
+#include "cangjie/AST/AttributePack.h"
 #include "cangjie/Utils/CastingTemplate.h"
 #include "cangjie/AST/Utils.h"
 
 using namespace Cangjie;
 using namespace AST;
 
-void OCFFIParserImpl::CheckAnnotation(const Annotation& anno, ScopeKind scopeKind) const
+void OCFFIParserImpl::CheckAnnotation(Annotation& anno, ScopeKind scopeKind) const
 {
     switch (anno.kind) {
         case AnnotationKind::OBJ_C_MIRROR: {
@@ -51,6 +52,7 @@ void OCFFIParserImpl::CheckMirrorSignature(ClassLikeDecl& decl, const PtrVector<
 {
     CJC_ASSERT(p.HasAnnotation(annos, AnnotationKind::OBJ_C_MIRROR));
     decl.EnableAttr(Attribute::OBJ_C_MIRROR);
+    decl.EnableAttr(Attribute::NO_REFLECT_INFO);
 
     if (decl.TestAttr(Attribute::SEALED)) {
         DiagObjCMirrorCannotBeSealed(decl);
@@ -62,6 +64,7 @@ void OCFFIParserImpl::CheckMirrorSignature(FuncDecl& decl, const PtrVector<Annot
 {
     CJC_ASSERT(p.HasAnnotation(annos, AnnotationKind::OBJ_C_MIRROR));
     decl.EnableAttr(Attribute::OBJ_C_MIRROR);
+    decl.EnableAttr(Attribute::NO_REFLECT_INFO);
 
     if (decl.TestAttr(Attribute::FOREIGN)) {
         DiagObjCMirrorFuncCannotBeForeign(decl);
@@ -97,7 +100,8 @@ void OCFFIParserImpl::CheckMirrorSignature(FuncDecl& decl, const PtrVector<Annot
 void OCFFIParserImpl::CheckImplSignature(ClassLikeDecl& decl, const PtrVector<Annotation>& annos) const
 {
     CJC_ASSERT(p.HasAnnotation(annos, AnnotationKind::OBJ_C_IMPL));
-    decl.EnableAttr(Attribute::OBJ_C_MIRROR_SUBTYPE);
+    decl.EnableAttr(Attribute::OBJ_C_IMPL);
+    decl.EnableAttr(Attribute::NO_REFLECT_INFO);
 
     if (decl.GetGeneric() != nullptr) {
         DiagObjCImplCannotBeGeneric(decl);
@@ -120,25 +124,25 @@ void OCFFIParserImpl::CheckImplSignature(ClassLikeDecl& decl, const PtrVector<An
     }
 }
 
-void OCFFIParserImpl::CheckMirrorAnnoArgs(const Annotation& anno) const
+void OCFFIParserImpl::CheckMirrorAnnoArgs(Annotation& anno) const
 {
     static const std::string OBJC_MIRROR_NAME = "@ObjCMirror";
     p.ffiParser->CheckZeroOrSingleStringLitArgAnnotation(anno, OBJC_MIRROR_NAME);
 }
 
-void OCFFIParserImpl::CheckImplAnnoArgs(const Annotation& anno) const
+void OCFFIParserImpl::CheckImplAnnoArgs(Annotation& anno) const
 {
     static const std::string OBJC_IMPL_NAME = "@ObjCImpl";
     p.ffiParser->CheckZeroOrSingleStringLitArgAnnotation(anno, OBJC_IMPL_NAME);
 }
 
-void OCFFIParserImpl::CheckInitAnnoArgs(const Annotation& anno) const
+void OCFFIParserImpl::CheckInitAnnoArgs(Annotation& anno) const
 {
     static const std::string OBJC_INIT_NAME = "@ObjCInit";
     p.ffiParser->CheckNoArgAnnotation(anno, OBJC_INIT_NAME);
 }
 
-void OCFFIParserImpl::CheckOptionalAnnoArgs(const Annotation& anno) const
+void OCFFIParserImpl::CheckOptionalAnnoArgs(Annotation& anno) const
 {
     static const std::string OBJC_OPTIONAL_NAME = "@ObjCOptional";
     p.ffiParser->CheckNoArgAnnotation(anno, OBJC_OPTIONAL_NAME);

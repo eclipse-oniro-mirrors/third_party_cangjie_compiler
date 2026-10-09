@@ -17,7 +17,6 @@
 #include <queue>
 
 #include "CjoManagerImpl.h"
-#include "cangjie/AST/ASTCasting.h"
 #include "cangjie/AST/Utils.h"
 #include "cangjie/AST/Walker.h"
 #include "cangjie/Modules/ASTSerialization.h"
@@ -483,6 +482,7 @@ OwnedPtr<ASTLoader> CjoManagerImpl::ReadCjo(
     }
     auto loader = MakeOwned<ASTLoader>(std::move(buffer), fullPackageName, typeManager, cjoManager, globalOptions);
     loader->SetImportSourceCode(importSrcCode);
+    loader->SetCjoPath(cjoPath);
     return loader;
 }
 

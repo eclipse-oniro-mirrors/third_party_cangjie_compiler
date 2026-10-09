@@ -57,7 +57,8 @@ void CHIR2BCHIR::TranslateOthersExpression(Context& ctx, const Expression& expr)
             TranslateInstanceOf(ctx, *instanceOfExpr);
             break;
         }
-        case ExprKind::TYPECAST: {
+        case ExprKind::CLASS_STATIC_CAST:
+        case ExprKind::NUMERIC_CAST: {
             TranslateTypecast(ctx, expr);
             break;
         }
@@ -95,7 +96,7 @@ void CHIR2BCHIR::TranslateOthersExpression(Context& ctx, const Expression& expr)
             TranslateBox(ctx, *boxExpr);
             break;
         }
-        case ExprKind::UNBOX: {
+        case ExprKind::UNBOX_TO_VALUE: {
             CJC_ASSERT(expr.GetNumOfOperands() == 1);
             PushOpCodeWithAnnotations(ctx, OpCode::UNBOX, expr);
             break;
@@ -110,8 +111,8 @@ void CHIR2BCHIR::TranslateOthersExpression(Context& ctx, const Expression& expr)
         case ExprKind::INVOKESTATIC:
         case ExprKind::GET_RTTI:
         case ExprKind::GET_RTTI_STATIC:
-        case ExprKind::TRANSFORM_TO_CONCRETE:
-        case ExprKind::TRANSFORM_TO_GENERIC: {
+        case ExprKind::CAST_TO_CONCRETE:
+        case ExprKind::CAST_TO_GENERIC: {
             // We currently don't support these operations. If they are reached during interpretation
             // the interpreter will terminate with exception.
             PushOpCodeWithAnnotations(ctx, OpCode::ABORT, expr);
@@ -133,8 +134,8 @@ void CHIR2BCHIR::TranslateField(Context& ctx, const Expression& expr)
     if (indexes.size() == 1) {
         PushOpCodeWithAnnotations(ctx, OpCode::FIELD, expr, static_cast<unsigned>(indexes[0]));
     } else {
-        CJC_ASSERT(fieldExpr->GetOperands()[0]->GetType()->IsStruct() ||
-            fieldExpr->GetOperands()[0]->GetType()->IsEnum() || fieldExpr->GetOperands()[0]->GetType()->IsTuple());
+        auto baseType = fieldExpr->GetBase()->GetType();
+        CJC_ASSERT(baseType->IsStruct() || baseType->IsEnum() || baseType->IsTuple());
         PushOpCodeWithAnnotations(ctx, OpCode::FIELD_TPL, expr, static_cast<Bchir::ByteCodeContent>(indexes.size()));
         for (auto i : indexes) {
             ctx.def.Push(static_cast<Bchir::ByteCodeContent>(i));
@@ -144,13 +145,14 @@ void CHIR2BCHIR::TranslateField(Context& ctx, const Expression& expr)
 
 void CHIR2BCHIR::TranslateInvoke(Context& ctx, const Expression& expr)
 {
-    CJC_ASSERT(expr.GetNumOfOperands() > 0);
-    CJC_ASSERT(expr.GetNumOfOperands() <= static_cast<size_t>(Bchir::BYTECODE_CONTENT_MAX));
     auto invokeExpr = StaticCast<const Invoke*>(&expr);
+    auto numberArgs = invokeExpr->GetArgs().size();
+    CJC_ASSERT(numberArgs > 0);
+    CJC_ASSERT(numberArgs <= static_cast<size_t>(Bchir::BYTECODE_CONTENT_MAX));
     auto idx = ctx.def.NextIndex();
     // we dont store mangled name here
     PushOpCodeWithAnnotations<false, true>(
-        ctx, OpCode::INVOKE, expr, static_cast<unsigned>(expr.GetNumOfOperands()), 0u);
+        ctx, OpCode::INVOKE, expr, static_cast<unsigned>(numberArgs), 0u);
     auto methodName = MangleMethodName<true>(invokeExpr->GetMethodName(), *invokeExpr->GetMethodType());
     ctx.def.AddMangledNameAnnotation(idx, methodName);
 }
@@ -159,13 +161,17 @@ void CHIR2BCHIR::TranslateTypecast(Context& ctx, const Expression& expr)
 {
     CJC_ASSERT(expr.GetNumOfOperands() == 1);
     auto typeCastExpr = StaticCast<const TypeCast*>(&expr);
-    auto srcTy = typeCastExpr->GetSourceTy();
-    auto dstTy = typeCastExpr->GetTargetTy();
+    auto srcTy = typeCastExpr->GetSourceType();
+    auto dstTy = typeCastExpr->GetTargetType();
     if (srcTy->IsPrimitive() && dstTy->IsPrimitive()) {
         auto srcTyIdx = srcTy->GetTypeKind();
         auto dstTyIdx = dstTy->GetTypeKind();
-        auto overflowStrat = static_cast<Bchir::ByteCodeContent>(typeCastExpr->GetOverflowStrategy());
-        PushOpCodeWithAnnotations(ctx, OpCode::TYPECAST, expr, srcTyIdx, dstTyIdx, overflowStrat);
+        OverflowStrategy overflowStrat = OverflowStrategy::NA;
+        if (auto numericCast = DynamicCast<const NumericCastBase*>(typeCastExpr)) {
+            overflowStrat = numericCast->GetOverflowStrategy();
+        }
+        PushOpCodeWithAnnotations(ctx, OpCode::TYPECAST, expr, srcTyIdx, dstTyIdx,
+            static_cast<Bchir::ByteCodeContent>(overflowStrat));
     } else {
         CJC_ASSERT((!srcTy->IsPrimitive() && !dstTy->IsPrimitive()) ||
             (srcTy->IsEnum() && IsEnumSelectorType(*dstTy)) || (IsEnumSelectorType(*srcTy) && dstTy->IsEnum()));
@@ -199,7 +205,7 @@ void CHIR2BCHIR::TranslateBox(Context& ctx, const Box& expr)
     auto opIdx = ctx.def.Size();
     CJC_ASSERT(opIdx <= static_cast<size_t>(Bchir::BYTECODE_CONTENT_MAX));
     PushOpCodeWithAnnotations<false>(ctx, OpCode::BOX, expr, 0u);
-    auto ty = expr.GetSourceTy();
+    auto ty = expr.GetSourceType();
     if (ty->IsStruct()) {
         auto structTy = StaticCast<const StructType*>(ty);
         auto structDef = structTy->GetStructDef();
@@ -221,7 +227,7 @@ void CHIR2BCHIR::TranslateCApplyExpression(Context& ctx, const Apply& apply, con
     // bchir :: CAPPLY
     // :: CFUNC_NUMBER_OF_ARGS :: CFUNC_RESULT_TY :: CFUNC_ARG1_TY :: ... :: CFUNC_ARGN_TY
     // The number of funcTy and GetNumOfOperands
-    size_t numberArgs = apply.GetNumOfOperands() - 1; // remove param 0 func;
+    size_t numberArgs = apply.GetArgs().size(); // remove param 0 func;
     CJC_ASSERT(numberArgs == funcTy.GetParamTypes().size());
     CJC_ASSERT(numberArgs <= static_cast<size_t>(Bchir::BYTECODE_CONTENT_MAX));
     PushOpCodeWithAnnotations<false, true>(
@@ -235,8 +241,7 @@ void CHIR2BCHIR::TranslateCApplyExpression(Context& ctx, const Apply& apply, con
 
 void CHIR2BCHIR::TranslateApplyExpression(Context& ctx, const Apply& apply)
 {
-    auto operands = apply.GetOperands();
-    auto funcExpr = operands[0];
+    auto funcExpr = apply.GetCallee();
     auto funcTy = funcExpr->GetType();
     if ((funcExpr->IsImportedFunc() && funcExpr->GetAttributeInfo().TestAttr(Attribute::FOREIGN)) ||
         funcExpr->GetSrcCodeIdentifier() == "std.core:CJ_CORE_CanUseSIMD") {
@@ -253,15 +258,15 @@ void CHIR2BCHIR::TranslateApplyExpression(Context& ctx, const Apply& apply)
         // bchir :: SYSCALL :: syscallName_STRING_IDX :: NUMBER_OF_ARGS
         // :: ANNOTATION_RESULT_TY :: ANNOTATION_ARG1_TY :: ... :: ANNOTATION_ARGN_TY
         auto strIdx = GetStringIdx(funcExpr->GetSrcCodeIdentifier());
-        auto numberArgs = apply.GetNumOfOperands() - 1;
+        auto args = apply.GetArgs();
+        auto numberArgs = args.size();
         CJC_ASSERT(numberArgs <= static_cast<size_t>(Bchir::BYTECODE_CONTENT_MAX));
         PushOpCodeWithAnnotations<false, true>(
             ctx, OpCode::SYSCALL, apply, strIdx, static_cast<Bchir::ByteCodeContent>(numberArgs));
         auto addTyAnnotation = [this, &ctx](CHIR::Type& type) { ctx.def.Push(GetTypeIdx(type)); };
         addTyAnnotation(*apply.GetResult()->GetType());
-        // skip the first operand which is the function
-        for (size_t i = 1; i < operands.size(); ++i) {
-            addTyAnnotation(*operands[i]->GetType());
+        for (auto arg : args) {
+            addTyAnnotation(*arg->GetType());
         }
         return;
     } else if (StaticCast<const FuncType&>(*funcTy).IsCFunc()) {

@@ -1174,7 +1174,7 @@ void TypeChecker::TypeCheckerImpl::AddSuperClassObjectForClassDecl(ASTContext& c
             continue;
         }
 
-        if (cd->TestAnyAttr(Attribute::JAVA_MIRROR, Attribute::JAVA_MIRROR_SUBTYPE)) {
+        if (cd->IsJavaMirror() || cd->IsJavaImpl()) {
             if (!AddJObjectSuperClassJavaInterop(ctx, *cd)) {
                 AddObjectSuperClass(ctx, *cd);
             }
@@ -1190,10 +1190,10 @@ void TypeChecker::TypeCheckerImpl::AddSuperInterfaceForClassLikeDecl(ASTContext&
     std::vector<Symbol*> syms = SearchSymbol::GetAllDecls(ctx);
     for (auto& sym : syms) {
         CJC_ASSERT(sym && sym->node);
-        if (!sym->node->TestAnyAttr(Attribute::OBJ_C_MIRROR, Attribute::OBJ_C_MIRROR_SUBTYPE)) {
+        if (!sym->node->TestAnyAttr(Attribute::OBJ_C_MIRROR, Attribute::OBJ_C_IMPL)) {
             continue;
         }
-        
+
         if (auto classLikeDecl = As<ASTKind::CLASS_LIKE_DECL>(sym->node); classLikeDecl) {
             AddObjCIdSuperInterfaceObjCInterop(ctx, *classLikeDecl);
         }
@@ -1997,7 +1997,7 @@ void TypeChecker::TypeCheckerImpl::PreCheck(const std::vector<Ptr<ASTContext>>& 
         CheckRedefinition(*ctx);
     }
     Utils::ProfileRecorder::Stop("PreCheck", "CheckRedefinition");
- 	 
+
     Utils::ProfileRecorder::Start("PreCheck", "ResolveDecls");
     for (auto& ctx : contexts) {
         // Stage 2: Set decl sema type without checking inside the decl body.

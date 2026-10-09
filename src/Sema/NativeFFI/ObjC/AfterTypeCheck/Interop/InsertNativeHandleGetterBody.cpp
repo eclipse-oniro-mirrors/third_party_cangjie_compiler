@@ -13,7 +13,7 @@
  */
 
 #include "Handlers.h"
-#include "NativeFFI/ObjC/Utils/Common.h"
+#include "NativeFFI/ObjC/Utils/ASTQuery.h"
 #include "NativeFFI/Utils.h"
 #include "cangjie/AST/Create.h"
 
@@ -23,27 +23,8 @@ using namespace Cangjie::Native::FFI;
 
 void InsertNativeHandleGetterBody::HandleImpl(InteropContext& ctx)
 {
-    if (interopType == InteropType::Fwd_Class) {
-        for (auto& fwdClass : ctx.fwdClasses) {
-            if (fwdClass->TestAttr(Attribute::IS_BROKEN)) {
-                continue;
-            }
-
-            auto getterDecl = GetNativeHandleGetter(*fwdClass);
-            CJC_NULLPTR_CHECK(getterDecl);
-            auto nativeHandleFieldExpr = ctx.factory.CreateNativeHandleFieldExpr(*fwdClass);
-            CJC_NULLPTR_CHECK(getterDecl->funcBody->body);
-            getterDecl->funcBody->body->body.emplace_back(std::move(nativeHandleFieldExpr));
-        }
-        return;
-    }
-
     for (auto& mirror : ctx.mirrors) {
         if (mirror->TestAttr(Attribute::IS_BROKEN)) {
-            continue;
-        }
-
-        if (HasMirrorSuperClass(*mirror)) {
             continue;
         }
 
@@ -52,34 +33,18 @@ void InsertNativeHandleGetterBody::HandleImpl(InteropContext& ctx)
             continue;
         }
 
+        if (HasObjCMirrorSuperClass(*mirrorClass)) {
+            continue;
+        }
+
         auto getterDecl = GetNativeHandleGetter(*mirrorClass);
-        CJC_NULLPTR_CHECK(getterDecl);
         auto nativeHandleFieldExpr = ctx.factory.CreateNativeHandleFieldExpr(*mirrorClass);
         getterDecl->funcBody->body->body.emplace_back(std::move(nativeHandleFieldExpr));
     }
 
-    for (auto& wrapper : ctx.synWrappers) {
-        if (wrapper->TestAttr(Attribute::IS_BROKEN)) {
-            continue;
-        }
+    for (auto& wrapper : ctx.mirrorInterfaceHandleWrappers) {
         auto getterDecl = GetNativeHandleGetter(*wrapper);
-        CJC_NULLPTR_CHECK(getterDecl);
         auto nativeHandleFieldExpr = ctx.factory.CreateNativeHandleFieldExpr(*wrapper);
-        getterDecl->funcBody->body->body.emplace_back(std::move(nativeHandleFieldExpr));
-    }
-
-    for (auto& impl : ctx.impls) {
-        if (impl->TestAttr(Attribute::IS_BROKEN)) {
-            continue;
-        }
-
-        if (HasMirrorSuperClass(*impl)) {
-            continue;
-        }
-
-        auto getterDecl = GetNativeHandleGetter(*impl);
-        CJC_NULLPTR_CHECK(getterDecl);
-        auto nativeHandleFieldExpr = ctx.factory.CreateNativeHandleFieldExpr(*impl);
         getterDecl->funcBody->body->body.emplace_back(std::move(nativeHandleFieldExpr));
     }
 }

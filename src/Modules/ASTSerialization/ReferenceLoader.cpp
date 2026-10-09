@@ -13,7 +13,7 @@
 
 #include "ASTLoaderImpl.h"
 
-#include "flatbuffers/ModuleFormat_generated.h"
+#include "flatbuffers/CjoFormat_generated.h"
 
 #include "cangjie/AST/ASTCasting.h"
 #include "cangjie/AST/Utils.h"
@@ -213,6 +213,12 @@ void ASTLoader::SetIsChirNow(bool isChirNow)
 {
     CJC_NULLPTR_CHECK(pImpl);
     pImpl->isChirNow = isChirNow;
+}
+
+void ASTLoader::SetCjoPath(std::string path)
+{
+    CJC_NULLPTR_CHECK(pImpl);
+    pImpl->SetCjoPath(std::move(path));
 }
 
 void ASTLoader::ASTLoaderImpl::InitializeTypeLoader()

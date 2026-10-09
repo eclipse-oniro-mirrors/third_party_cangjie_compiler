@@ -9,7 +9,7 @@
 #include "DiagsInterop.h"
 #include "Diags.h"
 #include "Utils.h"
-#include "cangjie/AST/Utils.h"
+#include "NativeFFI/Java/Utils.h"
 
 namespace Cangjie::Interop::Java {
 using namespace Sema;
@@ -34,6 +34,7 @@ Range MakeJavaImplJavaNameRange(const ClassLikeDecl& decl)
 
 void DiagJavaImplRedefinitionInJava(DiagnosticEngine& diag, const ClassLikeDecl& decl, const ClassLikeDecl& prevDecl)
 {
+    using namespace Native::FFI::Java;
     if (decl.TestAttr(Attribute::IS_BROKEN)) {
         return;
     }
@@ -58,7 +59,7 @@ void DiagJavaMirrorChildMustBeAnnotated(DiagnosticEngine& diag, const ClassLikeD
         } else if (auto parentI = DynamicCast<InterfaceTy>(pty)) {
             parentDecl = parentI->decl;
         }
-        if (parentDecl && IsMirror(*parentDecl)) {
+        if (parentDecl && parentDecl->IsJavaMirror()) {
             break;
         }
     }
@@ -68,17 +69,18 @@ void DiagJavaMirrorChildMustBeAnnotated(DiagnosticEngine& diag, const ClassLikeD
 
 void DiagJavaDeclCannotInheritPureCangjieType(DiagnosticEngine& diag, ClassLikeDecl& decl)
 {
-    CJC_ASSERT(IsMirror(decl) || IsImpl(decl));
+    CJC_ASSERT(decl.IsJavaMirror() || decl.IsJavaImpl());
 
-    auto kind = IsMirror(decl) ? DiagKindRefactor::sema_java_mirror_cannot_inherit_pure_cangjie_type
-                               : DiagKindRefactor::sema_java_impl_cannot_inherit_pure_cangjie_type;
+    auto kind = decl.IsJavaMirror()
+        ? DiagKindRefactor::sema_java_mirror_cannot_inherit_pure_cangjie_type
+        : DiagKindRefactor::sema_java_impl_cannot_inherit_pure_cangjie_type;
 
     auto builder = diag.DiagnoseRefactor(kind, decl);
 
     for (const auto& superType : decl.inheritedTypes) {
         auto superDecl = Ty::GetDeclOfTy(superType->GetTy());
         CJC_ASSERT(superDecl);
-        if (!IsMirror(*superDecl) && !IsImpl(*superDecl) && !superDecl->GetTy()->IsObject() &&
+        if (!superDecl->IsJavaMirror() && !superDecl->IsJavaImpl() && !superDecl->GetTy()->IsObject() &&
             !superDecl->GetTy()->IsAny()) {
             builder.AddNote(*superType, "'" + superType->ToString() + "'" + " is not a java-compatible type");
         }

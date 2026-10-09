@@ -123,8 +123,8 @@ private:
     void TranslateIntValue(Context& ctx, const IntLiteral& value);
     void TranslateFloatValue(Context& ctx, const FloatLiteral& value);
     void TranslateTerminatorExpression(Context& ctx, const Expression& expr);
-    void TranslateUnaryExpression(Context& ctx, const Expression& expr);
-    void TranslateBinaryExpression(Context& ctx, const Expression& expr);
+    void TranslateUnaryExpression(Context& ctx, const UnaryExpressionBase& expr);
+    void TranslateBinaryExpression(Context& ctx, const BinaryExpressionBase& expr);
     void TranslateMemoryExpression(Context& ctx, const Expression& expr);
     void TranslateOthersExpression(Context& ctx, const Expression& expr);
     void TranslateField(Context& ctx, const Expression& expr);
@@ -133,10 +133,9 @@ private:
     template <typename T> void TranslateIntrinsicExpression(Context& ctx, const T& intrinsic);
     void TranslateCApplyExpression(Context& ctx, const Apply& apply, const Cangjie::CHIR::FuncType& funcTy);
     void TranslateApplyExpression(Context& ctx, const Apply& apply);
-    void TranslateApplyWithExceptionExpression(Context& ctx, const ApplyWithException& apply);
+    void TranslateTryApplyExpression(Context& ctx, const TryApply& apply);
     void TranslateMultiBranch(Context& ctx, const MultiBranch& branch);
-    void TranslateAllocate(Context& ctx, const Expression& expr);
-    void TranslateIntOpWithException(Context& ctx, const IntOpWithException& expr);
+    void TranslateAllocate(Context& ctx, const AllocateBase& expr);
     void TranslateBox(Context& ctx, const Box& expr);
     void TranslateInstanceOf(Context& ctx, const InstanceOf& expr);
 
@@ -150,8 +149,8 @@ private:
     Bchir::ByteCodeContent LVarId(Context& ctx, const Value& value);
 
     /** @brief generate bytecode for setting the result variable and jump indexes for
-     * x_WITH_EXCEPTION operations */
-    void TranslateTryTerminatorJumps(Context& ctx, const Terminator& expr);
+     * TRY_* operations */
+    void TranslateTryTerminatorJumps(Context& ctx, const Expression& expr);
 
     inline void PushArgs(Context&) const
     {

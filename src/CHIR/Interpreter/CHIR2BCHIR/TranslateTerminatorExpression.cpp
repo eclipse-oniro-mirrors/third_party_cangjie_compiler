@@ -22,7 +22,7 @@ void CHIR2BCHIR::TranslateTerminatorExpression(Context& ctx, const Expression& e
 {
     switch (expr.GetExprKind()) {
         case ExprKind::GOTO: {
-            CJC_ASSERT(expr.GetNumOfOperands() == 0);
+            CJC_ASSERT(expr.GetNumOfNonSuccessorOperands() == 0);
             auto gotoExpr = StaticCast<const GoTo*>(&expr);
             CJC_ASSERT(gotoExpr->GetNumOfSuccessor() == 1);
             auto dest = gotoExpr->GetSuccessor(0);
@@ -32,7 +32,7 @@ void CHIR2BCHIR::TranslateTerminatorExpression(Context& ctx, const Expression& e
             break;
         }
         case ExprKind::BRANCH: {
-            CJC_ASSERT(expr.GetNumOfOperands() == 1);
+            CJC_ASSERT(expr.GetNumOfNonSuccessorOperands() == 1);
             auto branchExpr = StaticCast<const Branch*>(&expr);
             CJC_ASSERT(branchExpr->GetNumOfSuccessor() == Bchir::FLAG_TWO);
             PushOpCodeWithAnnotations(ctx, OpCode::BRANCH, expr);
@@ -50,7 +50,7 @@ void CHIR2BCHIR::TranslateTerminatorExpression(Context& ctx, const Expression& e
             break;
         }
         case ExprKind::EXIT: {
-            CJC_ASSERT(expr.GetNumOfOperands() == 0);
+            CJC_ASSERT(expr.GetNumOfNonSuccessorOperands() == 0);
             CJC_ASSERT(expr.GetTopLevelFunc() != nullptr);
             auto ret = expr.GetTopLevelFunc()->GetReturnValue();
             if (ret == nullptr) {
@@ -65,7 +65,7 @@ void CHIR2BCHIR::TranslateTerminatorExpression(Context& ctx, const Expression& e
             break;
         }
         case ExprKind::RAISE_EXCEPTION: {
-            CJC_ASSERT(expr.GetNumOfOperands() == 1);
+            CJC_ASSERT(expr.GetNumOfNonSuccessorOperands() == 1);
             auto raise = StaticCast<const RaiseException*>(&expr);
             if (raise->GetNumOfSuccessor() == 0) {
                 PushOpCodeWithAnnotations(ctx, OpCode::RAISE, expr);
@@ -77,42 +77,56 @@ void CHIR2BCHIR::TranslateTerminatorExpression(Context& ctx, const Expression& e
             }
             break;
         }
-        case ExprKind::APPLY_WITH_EXCEPTION: {
+        case ExprKind::TRY_APPLY: {
             // :: APPLY_EXC :: number_of_args :: idx_when_exception :: LVAR_SET :: lvar_id
             // :: JUMP :: idx_when_normal_return
-            auto apply = StaticCast<const ApplyWithException*>(&expr);
-            TranslateApplyWithExceptionExpression(ctx, *apply);
+            auto apply = StaticCast<const TryApply*>(&expr);
+            TranslateTryApplyExpression(ctx, *apply);
             break;
         }
-        case ExprKind::INVOKE_WITH_EXCEPTION: {
+        case ExprKind::TRY_INVOKE: {
             // :: INVOKE_EXC :: number_of_args :: method_name :: idx_when_exception :: LVAR_SET :: lvar_id
             // :: JUMP :: idx_when_normal_return
-            CJC_ASSERT(expr.GetNumOfOperands() > 0);
-            CJC_ASSERT(expr.GetNumOfOperands() <= static_cast<size_t>(Bchir::BYTECODE_CONTENT_MAX));
-            auto invoke = StaticCast<const InvokeWithException*>(&expr);
+            auto invoke = StaticCast<const TryInvoke*>(&expr);
+            auto numberArgs = invoke->GetArgs().size();
+            CJC_ASSERT(numberArgs > 0);
+            CJC_ASSERT(numberArgs <= static_cast<size_t>(Bchir::BYTECODE_CONTENT_MAX));
             auto idx = ctx.def.NextIndex();
             // we dont store mangled name here
             PushOpCodeWithAnnotations<false, true>(
-                ctx, OpCode::INVOKE_EXC, expr, static_cast<unsigned>(expr.GetNumOfOperands()), 0u);
+                ctx, OpCode::INVOKE_EXC, expr, static_cast<unsigned>(numberArgs), 0u);
             auto methodName = MangleMethodName<true>(invoke->GetMethodName(), *invoke->GetMethodType());
             ctx.def.AddMangledNameAnnotation(idx, methodName);
             TranslateTryTerminatorJumps(ctx, *invoke);
             break;
         }
-        case ExprKind::INVOKESTATIC_WITH_EXCEPTION: {
+        case ExprKind::TRY_INVOKESTATIC: {
             PushOpCodeWithAnnotations(ctx, OpCode::ABORT, expr);
             break;
         }
-        case ExprKind::INT_OP_WITH_EXCEPTION: {
-            auto intOpWithException = StaticCast<const IntOpWithException*>(&expr);
-            TranslateIntOpWithException(ctx, *intOpWithException);
-            TranslateTryTerminatorJumps(ctx, *intOpWithException);
+        case ExprKind::TRY_NEG: {
+            auto& tryUnary = StaticCast<const TryUnaryExpression&>(expr);
+            TranslateUnaryExpression(ctx, tryUnary);
+            TranslateTryTerminatorJumps(ctx, tryUnary);
             break;
         }
-        case ExprKind::ALLOCATE_WITH_EXCEPTION: {
-            CJC_ASSERT(expr.GetNumOfOperands() == 0);
-            TranslateAllocate(ctx, expr);
-            TranslateTryTerminatorJumps(ctx, *StaticCast<const Terminator*>(&expr));
+        case ExprKind::TRY_ADD:
+        case ExprKind::TRY_SUB:
+        case ExprKind::TRY_MUL:
+        case ExprKind::TRY_DIV:
+        case ExprKind::TRY_MOD:
+        case ExprKind::TRY_EXP:
+        case ExprKind::TRY_LSHIFT:
+        case ExprKind::TRY_RSHIFT: {
+            auto& tryBinary = StaticCast<const TryBinaryExpression&>(expr);
+            TranslateBinaryExpression(ctx, tryBinary);
+            TranslateTryTerminatorJumps(ctx, tryBinary);
+            break;
+        }
+        case ExprKind::TRY_ALLOCATE: {
+            CJC_ASSERT(expr.GetNumOfNonSuccessorOperands() == 0);
+            TranslateAllocate(ctx, StaticCast<const TryAllocate&>(expr));
+            TranslateTryTerminatorJumps(ctx, expr);
             break;
         }
         default: {
@@ -124,14 +138,14 @@ void CHIR2BCHIR::TranslateTerminatorExpression(Context& ctx, const Expression& e
     }
 }
 
-void CHIR2BCHIR::TranslateApplyWithExceptionExpression(Context& ctx, const ApplyWithException& apply)
+void CHIR2BCHIR::TranslateTryApplyExpression(Context& ctx, const TryApply& apply)
 {
     PushOpCodeWithAnnotations<false, true>(
-        ctx, OpCode::APPLY_EXC, apply, static_cast<unsigned>(apply.GetNumOfOperands()));
+        ctx, OpCode::APPLY_EXC, apply, static_cast<unsigned>(apply.GetNumOfNonSuccessorOperands()));
     TranslateTryTerminatorJumps(ctx, apply);
 }
 
-void CHIR2BCHIR::TranslateTryTerminatorJumps(Context& ctx, const Terminator& expr)
+void CHIR2BCHIR::TranslateTryTerminatorJumps(Context& ctx, const Expression& expr)
 {
     CJC_ASSERT(expr.GetNumOfSuccessor() == Bchir::FLAG_TWO);
     auto exceptionBB = expr.GetSuccessor(1);
@@ -157,7 +171,7 @@ void CHIR2BCHIR::TranslateMultiBranch(Context& ctx, const MultiBranch& branch)
     // default_target :: case_1_target :: ... :: case_n_target
 
     auto& cases = branch.GetCaseVals();
-    auto& successors = branch.GetSuccessors();
+    auto successors = branch.GetSuccessors();
     auto ty = branch.GetOperand(0)->GetType();
     auto tyKind = ty->IsEnum() ? CHIR::Type::TypeKind::TYPE_UINT64 : ty->GetTypeKind();
 
@@ -183,25 +197,5 @@ void CHIR2BCHIR::TranslateMultiBranch(Context& ctx, const MultiBranch& branch)
         // These are sorted
         auto bbIndex = BlockIndex(ctx, *it->second, ctx.def.NextIndex());
         ctx.def.Push(bbIndex);
-    }
-}
-
-void CHIR2BCHIR::TranslateIntOpWithException(Context& ctx, const IntOpWithException& expr)
-{
-    auto opCode = Cangjie::CHIR::Interpreter::BinExprKindWitException2OpCode(expr.GetOpKind());
-    auto typeKind = expr.GetOperand(0)->GetType()->GetTypeKind();
-    auto overflowStrat = static_cast<Bchir::ByteCodeContent>(Cangjie::OverflowStrategy::THROWING);
-
-    if (opCode == OpCode::UN_NEG_EXC) {
-        CJC_ASSERT(expr.GetNumOfOperands() == 1);
-    } else {
-        CJC_ASSERT(expr.GetNumOfOperands() == Bchir::FLAG_TWO);
-        CJC_ASSERT(opCode == OpCode::BIN_ADD_EXC || opCode == OpCode::BIN_SUB_EXC || opCode == OpCode::BIN_MUL_EXC ||
-            opCode == OpCode::BIN_DIV_EXC || opCode == OpCode::BIN_MOD_EXC || opCode == OpCode::BIN_EXP_EXC ||
-            opCode == OpCode::BIN_LSHIFT_EXC || opCode == OpCode::BIN_RSHIFT_EXC);
-    }
-    PushOpCodeWithAnnotations<false, true>(ctx, opCode, expr, typeKind, overflowStrat);
-    if (opCode == OpCode::BIN_LSHIFT_EXC || opCode == OpCode::BIN_RSHIFT_EXC) {
-        ctx.def.Push(static_cast<Bchir::ByteCodeContent>(expr.GetOperand(1)->GetType()->GetTypeKind()));
     }
 }

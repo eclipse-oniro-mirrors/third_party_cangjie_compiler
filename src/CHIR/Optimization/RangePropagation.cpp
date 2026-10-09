@@ -9,6 +9,7 @@
 #include "cangjie/CHIR/Optimization/RangePropagation.h"
 #include "cangjie/CHIR/Analysis/ConstAnalysis.h"
 #include "cangjie/CHIR/Analysis/Engine.h"
+#include "cangjie/CHIR/Utils/CHIRCasting.h"
 
 #include <optional>
 
@@ -70,16 +71,16 @@ void RangePropagation::RunOnFunc(const Ptr<const Function>& func, bool isDebug)
     const auto actionAfterVisitExpr = [this, &toBeRewrited, func](
                                           const RangeDomain& state, Expression* expr, size_t index) {
         auto exprType = expr->GetResult()->GetType();
-        if (expr->IsBinaryExpr()) {
+        if (Is<BinaryExpression>(expr)) {
             if (auto absVal = state.CheckAbstractValue(expr->GetResult()); absVal) {
                 return (void)toBeRewrited.emplace_back(expr, index, GenerateConstExpr(exprType, absVal));
             }
-        } else if (expr->IsUnaryExpr()) {
+        } else if (Is<UnaryExpression>(expr)) {
             if (auto absVal = state.CheckAbstractValue(expr->GetResult()); absVal) {
                 return (void)toBeRewrited.emplace_back(expr, index, GenerateConstExpr(exprType, absVal));
             }
         } else if ((exprType->IsInteger() || exprType->IsBoolean()) &&
-            (expr->IsLoad() || expr->IsTypeCast() || expr->IsField())) {
+            (Is<Load>(expr) || Is<NumericCast>(expr) || Is<Field>(expr))) {
             if (auto absVal = state.CheckAbstractValue(expr->GetResult()); absVal && !exprType->IsString()) {
                 toBeRewrited.emplace_back(expr, index, GenerateConstExpr(exprType, absVal));
                 RecordEffectMap(expr, func);
@@ -93,7 +94,7 @@ void RangePropagation::RunOnFunc(const Ptr<const Function>& func, bool isDebug)
         }
     };
     bool doBlockElimination = false;
-    const auto actionOnTerminator = [this, isDebug, &doBlockElimination](const RangeDomain&, Terminator* terminator,
+    const auto actionOnTerminator = [this, isDebug, &doBlockElimination](const RangeDomain&, Expression* terminator,
                                         std::optional<Block*> targetSucc) {
         switch (terminator->GetExprKind()) {
             case ExprKind::BRANCH:
@@ -157,7 +158,7 @@ void RangePropagation::RewriteToConstExpr(const RewriteInfo& rewriteInfo, bool i
 }
 
 void RangePropagation::RewriteBranchTerminator(
-    const Ptr<Terminator>& branch, const Ptr<Block>& targetSucc, bool isDebug)
+    const Ptr<Expression>& branch, const Ptr<Block>& targetSucc, bool isDebug)
 {
     auto parentBlock = branch->GetParentBlock();
     branch->RemoveSelfFromBlock();
@@ -184,7 +185,7 @@ GlobalVar* RecordLoadEffectMap(const Ptr<const Load>& load)
         // %0 = GetElementRef(gv_sa); %1 = Load(%0)
         auto locExpr = StaticCast<LocalVar*>(loc)->GetExpr();
         if (locExpr->GetExprKind() == ExprKind::GET_ELEMENT_REF) {
-            auto base = StaticCast<GetElementRef*>(locExpr)->GetLocation();
+            auto base = StaticCast<GetElementRef*>(locExpr)->GetBase();
             if (base->IsGlobalVarWithInitializer()) {
                 gv = StaticCast<GlobalVar*>(base);
             }
@@ -239,7 +240,7 @@ std::vector<size_t> GetVArraySizeList(const Ptr<Type>& type)
     }
     while (indexType->GetTypeKind() == Type::TypeKind::TYPE_VARRAY) {
         auto vArrayType = StaticCast<const VArrayType*>(indexType);
-        size.push_back(vArrayType->GetSize());
+        size.push_back(static_cast<size_t>(vArrayType->GetSize()));
         indexType = vArrayType->GetElementType();
     }
     return size;
@@ -249,7 +250,7 @@ void RangePropagation::CheckVarrayIndex(const Ptr<Intrinsic>& intrin, const Rang
 {
     CJC_ASSERT(intrin->GetIntrinsicKind() == CHIR::IntrinsicKind::VARRAY_GET ||
         intrin->GetIntrinsicKind() == CHIR::IntrinsicKind::VARRAY_SET);
-    auto& args = intrin->GetArgs();
+    auto args = intrin->GetArgs();
     CJC_ASSERT(args.size() >= 2U);
     size_t begin = intrin->GetIntrinsicKind() == CHIR::IntrinsicKind::VARRAY_GET ? 1U : 2U;
     auto sizes = GetVArraySizeList(args[0]->GetType());
@@ -263,8 +264,8 @@ void RangePropagation::CheckVarrayIndex(const Ptr<Intrinsic>& intrin, const Rang
         }
         SIntDomain varraySizeNode{ConstantRange{SInt{IntWidth::I64, static_cast<uint64_t>(size)}}, false};
         SIntDomain zeroNode{ConstantRange{SInt::Zero(IntWidth::I64)}, false};
-        auto ltUpperBound{ComputeRelIntBinop({indexRange, varraySizeNode, index, nullptr, ExprKind::LT, false})};
-        auto geLowerBound{ComputeRelIntBinop({indexRange, zeroNode, index, nullptr, ExprKind::GE, false})};
+        auto ltUpperBound{ComputeRelIntBinop({indexRange, varraySizeNode, index, nullptr, BinaryExprKind::LT, false})};
+        auto geLowerBound{ComputeRelIntBinop({indexRange, zeroNode, index, nullptr, BinaryExprKind::GE, false})};
         if (ltUpperBound.IsFalse() || geLowerBound.IsFalse()) {
             auto bd =
                 diag.DiagnoseRefactor(DiagKindRefactor::chir_idx_out_of_bounds, ToRange(intrin->GetDebugLocation()));

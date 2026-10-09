@@ -41,7 +41,6 @@ void Translator::UpdateDelayExitSignal(int64_t level)
 Ptr<Value> Translator::Visit(const AST::JumpExpr& jumpExpr)
 {
     const auto& loc = TranslateLocation(jumpExpr);
-    Ptr<Terminator> terminator = nullptr;
     DebugLocation loopLocInfo;
     // If there are other blockGroup exprs, please modify the condition here.
     // for example: WHILE, LOOP...
@@ -72,16 +71,16 @@ Ptr<Value> Translator::Visit(const AST::JumpExpr& jumpExpr)
         } else {
             UpdateDelayExitSignal(CalculateDelayExitLevelForContinue());
         }
-        terminator = CreateAndAppendTerminator<Exit>(loc, currentBlock);
+        CreateAndAppendTerminator<Exit>(loc, currentBlock);
     } else {
         const auto [conditionBlock, falseBlock] = *terminatorSymbolTable.Get(*jumpExpr.refLoop);
         if (jumpExpr.isBreak) {
-            terminator = CreateAndAppendTerminator<GoTo>(loc, falseBlock, currentBlock);
+            CreateAndAppendTerminator<GoTo>(loc, falseBlock, currentBlock);
         } else {
-            terminator = CreateAndAppendTerminator<GoTo>(loc, conditionBlock, currentBlock);
+            CreateAndAppendTerminator<GoTo>(loc, conditionBlock, currentBlock);
         }
     }
     currentBlock = CreateBlock();
-    maybeUnreachable.emplace(currentBlock, terminator);
+    currentBlock->SetDebugLocation(loc);
     return nullptr;
 }

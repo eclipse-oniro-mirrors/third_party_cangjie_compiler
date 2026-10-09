@@ -6,6 +6,7 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+#include <algorithm>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -3206,8 +3207,13 @@ TEST_F(ParserTest, LSP)
     OwnedPtr<File> file = parser.ParseTopLevel();
     auto p = diag.GetCategoryDiagnostic(DiagCategory::LEX);
     ASSERT_EQ(p.size(), 2);
-    ASSERT_EQ(p[0].errorMessage, std::string{"illegal integer suffix 'i'"});
-    ASSERT_EQ(p[1].errorMessage, std::string{"unexpected digit 'd' in decimal"});
+    // Diagnostics are stored in an unordered container, so GetCategoryDiagnostic
+    // returns them in an unspecified order. Sort by position to make the
+    // subsequent index assertions deterministic across libstdc++/libc++.
+    std::sort(p.begin(), p.end(),
+        [](const auto& a, const auto& b) { return a.mainHint.range.begin < b.mainHint.range.begin; });
+    ASSERT_EQ(p[0].errorMessage, std::string{"unexpected digit 'd' in decimal"});
+    ASSERT_EQ(p[1].errorMessage, std::string{"illegal integer suffix 'i'"});
 }
 
 TEST(PositionTest, Attribute)
@@ -3417,4 +3423,21 @@ TEST(ParserTest2, UnicodeOver255Test)
     Parser parser(code, diag, sm, Position{0, 1, 1}, true, true);
     auto file = parser.ParseTopLevel();
     ASSERT_GT(diag.GetErrorCount(), 0); // assert no core dumped here
+}
+
+TEST(ParserTest2, SynchronizedBodyRejectsClassDeclaration)
+{
+    std::string code = R"(
+main(): Int64 {
+    synchronized(Mutex()) { class L {} }
+    0
+}
+)";
+    DiagnosticEngine diag{};
+    SourceManager sm;
+    diag.SetSourceManager(&sm);
+    Parser parser(code, diag, sm);
+    auto file = parser.ParseTopLevel();
+    ASSERT_NE(file, nullptr);
+    EXPECT_EQ(diag.GetErrorCount(), 1);
 }

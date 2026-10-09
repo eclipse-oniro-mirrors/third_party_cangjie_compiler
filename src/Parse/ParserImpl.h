@@ -243,8 +243,6 @@ private:
     bool parseDeclFile{false};
 
     bool enableEH{false};
-    bool enableInteropCJMapping{false};
-    GlobalOptions::InteropLanguage targetInteropLanguage{GlobalOptions::InteropLanguage::NA};
     Triple::BackendType backend{Triple::BackendType::CJNATIVE};
     bool calculateLineNum{false};
     // we store line number info from all tokens
@@ -494,6 +492,8 @@ private:
     }
     std::vector<OwnedPtr<AST::Decl>> ParseForeignDecls(
         const std::set<AST::Modifier>& modifiers, PtrVector<AST::Annotation>& annos);
+    void ParseForeignNodes(const std::set<AST::Modifier>& modifiers, PtrVector<AST::Annotation>& annos,
+        std::vector<OwnedPtr<AST::Node>>& nodes);
     void AssignCurFile(const OwnedPtr<AST::File>& file) const;
     void ParseWhenModifierHandler(std::vector<OwnedPtr<AST::Decl>>& ret, std::vector<OwnedPtr<AST::Annotation>>& annos);
 
@@ -1028,7 +1028,7 @@ private:
     void DiagAnnotationShouldNotHaveArgs(const Annotation& node, const std::string& annotationName);
 
     // Cangjie Native & Java/ObjC FFI
-    void CheckObjCMirrorAnnotation(const AST::Annotation& anno) const;
+    void CheckObjCMirrorAnnotation(AST::Annotation& anno) const;
     // Check whether member decl can be abstract
     bool CanBeAbstract(const AST::Decl& decl, ScopeKind scopeKind) const;
     void CheckConstructorBody(AST::FuncDecl& ctor, ScopeKind scopeKind, bool inMacro = false);
@@ -1045,7 +1045,6 @@ private:
     void CheckPrimaryCtorDeclJavaMirror(AST::PrimaryCtorDecl& ctor);
     void CheckMemberFuncJavaMirror(AST::FuncDecl& decl);
     void CheckMemberFuncObjCMirror(AST::FuncDecl& func);
-    void CheckCJMappingAttr(Decl& decl) const;
     void CheckInitCtorDeclBody(AST::FuncDecl& ctor);
     void CheckInitCtorDeclJavaMirror(AST::FuncDecl& ctor);
     void CheckInitCtorDeclObjCMirror(AST::FuncDecl& ctor);

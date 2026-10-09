@@ -17,6 +17,7 @@
 
 #include "ExtendBoxMarker.h"
 #include "ImplUtils.h"
+#include "OverrideFunctionResolver.h"
 #include "TypeCheckUtil.h"
 
 #include "cangjie/AST/Match.h"
@@ -139,17 +140,17 @@ void GenericInstantiationManager::InstantiatedExtendRecorder::RecordExtendForMem
 void GenericInstantiationManager::InstantiatedExtendRecorder::RecordImplExtendDecl(
     Ty& ty, FuncDecl& fd, Ptr<Ty> upperTy)
 {
-    auto baseTy = typeManager.GetTyForExtendMap(ty);
-    auto genericFd = RawStaticCast<FuncDecl*>(gim.GetGeneralDecl(fd));
-    CJC_ASSERT(genericFd->astKind == AST::ASTKind::FUNC_DECL);
-
-    auto declMap = gim.abstractFuncToDeclMap.find(std::make_pair(baseTy, genericFd));
-    if (declMap == gim.abstractFuncToDeclMap.end()) {
-        return;
-    }
+    OverrideFunctionResolver resolver(typeManager);
+    MemberFuncsWithInstTys funcs = resolver.GetInstMemberFuncWithInstTy(ty, fd.identifier);
     Ptr<Decl> extend = nullptr;
     // All candidates have satisfied functions, choose most matched decl.
-    for (auto [baseDecl, _] : declMap->second) {
+    auto baseTy = Ty::IsTyCorrect(upperTy) ? upperTy : Ptr(&ty);
+    for (MemberFuncWithInstTys func : funcs) {
+        auto matchedInstTy = resolver.GetMatchedFuncInstTyByGivenTarget(func, fd, baseTy);
+        if (!Ty::IsTyCorrect(matchedInstTy)) {
+            continue;
+        }
+        auto baseDecl = func.first->outerDecl;
         CJC_ASSERT(baseDecl);
         if (baseDecl->astKind != ASTKind::EXTEND_DECL) {
             continue; // Function implemented in origin decl, ignored.

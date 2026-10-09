@@ -113,7 +113,7 @@ void Translator::TranslateAnnotationsArrayBody(const Decl& decl, Function& func)
         auto gv = annoInsts[i];
         auto load =
             CreateAndAppendExpression<Load>(StaticCast<RefType>(gv->GetType())->GetBaseType(), gv, currentBlock);
-        auto typecast = CreateAndAppendExpression<TypeCast>(objectTy, load->GetResult(), currentBlock);
+        auto typecast = CreateAndAppendExpression<ClassStaticCast>(objectTy, load->GetResult(), currentBlock);
         CreateAndAppendExpression<StoreElementRef>(
             builder.GetUnitTy(), typecast->GetResult(), rawArray->GetResult(), std::vector<uint64_t>{i}, currentBlock);
     }
@@ -203,7 +203,10 @@ AnnoInfo Translator::CreateAnnoFactoryFuncSig(const AST::Decl& decl, CustomTypeD
     auto gvs = TranslateAnnotationsArraySig(*annosArray, *func);
     func->Set<AnnoFactoryInfo>(std::move(gvs));
     // Collect annotations whose parameter values are literal constants.
+    // Non-literal args leave annoInstances empty; still register the factory so
+    // property getters/setters (same PropDecl) share one entry.
     std::vector<CustomAnnoInstance> annoInstances;
+    bool allLiteralArgs = true;
     for (auto& elem : annosArray->children) {
         auto callExpr = StaticCast<AST::CallExpr*>(elem.get().get());
         auto& callee = callExpr->resolvedFunction->funcBody;
@@ -216,8 +219,13 @@ AnnoInfo Translator::CreateAnnoFactoryFuncSig(const AST::Decl& decl, CustomTypeD
                 auto lit = StaticCast<AST::LitConstExpr*>(argVal.get().get());
                 paramValues.emplace_back(lit->rawString);
             } else {
-                return {mangledName, {}};
+                allLiteralArgs = false;
+                break;
             }
+        }
+        if (!allLiteralArgs) {
+            annoInstances.clear();
+            break;
         }
         auto annoLoc = TranslateLocation(*elem);
         annoInstances.emplace_back(annoClassDeclName, paramValues, annoLoc);

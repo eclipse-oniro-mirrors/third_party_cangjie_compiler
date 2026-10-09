@@ -52,7 +52,7 @@ std::vector<ClassType*> GetAllFathers(ClassType* clsTy, CHIRBuilder* builder)
 }
 } // namespace
 
-bool IsUnsignedArithmetic(const BinaryExpression& expr)
+bool IsUnsignedArithmetic(const BinaryExpressionBase& expr)
 {
     auto ty = expr.GetLHSOperand()->GetType();
     return ty->IsUnsignedInteger() || IsStructEnum(ty);
@@ -88,7 +88,7 @@ std::string ToPosInfo(const DebugLocation& loc, bool isPrintFileName)
 
 std::optional<size_t> IsInitialisingMemberVar(const Function& func, const StoreElementRef& store)
 {
-    auto location = store.GetLocation();
+    auto location = store.GetBase();
     if ((func.IsConstructor() || func.GetFuncKind() == FuncKind::INSTANCEVAR_INIT) && location->IsParameter()) {
         auto& paths = store.GetPath();
         // func->GetParam(0) is the `this` arugment.
@@ -102,15 +102,15 @@ std::optional<size_t> IsInitialisingMemberVar(const Function& func, const StoreE
 const Lambda* IsApplyToLambda(const Expression* expr)
 {
     CJC_NULLPTR_CHECK(expr);
-    if (expr->GetExprKind() != ExprKind::APPLY && expr->GetExprKind() != ExprKind::APPLY_WITH_EXCEPTION) {
+    if (!Is<ApplyBase>(expr)) {
         return nullptr;
     }
-    CJC_ASSERT(expr->GetNumOfOperands() > 0);
+    CJC_ASSERT(expr->GetNumOfNonSuccessorOperands() > 0);
     if (!expr->GetOperand(0)->IsLocalVar()) {
         return nullptr;
     }
     auto callee = StaticCast<const LocalVar*>(expr->GetOperand(0))->GetExpr();
-    if (callee->GetExprKind() != ExprKind::LAMBDA) {
+    if (!Is<Lambda>(callee)) {
         return nullptr;
     }
     return StaticCast<const Lambda*>(callee);
@@ -190,20 +190,12 @@ std::unordered_set<Value*> GetLambdaCapturedVarsRecursively(const Lambda& lambda
         [&allCapturedVars, &collectRecursively](const Lambda& lambda, std::unordered_set<const Lambda*>& visited) {
         visited.emplace(&lambda);
         auto visitAction = [&visited, &collectRecursively](Expression& expr) {
-            if (expr.IsApply()) {
-                auto callee = DynamicCast<LocalVar*>(StaticCast<Apply&>(expr).GetCallee());
-                if (callee != nullptr && callee->GetExpr()->IsLambda()) {
-                    auto child = StaticCast<const Lambda*>(callee->GetExpr());
-                    if (visited.find(child) == visited.end()) {
-                        collectRecursively(*child, visited);
-                    }
-                }
-            } else if (expr.IsApplyWithException()) {
-                auto callee = DynamicCast<LocalVar*>(StaticCast<ApplyWithException&>(expr).GetCallee());
-                if (callee != nullptr && callee->GetExpr()->IsLambda()) {
-                    auto child = StaticCast<const Lambda*>(callee->GetExpr());
-                    if (visited.find(child) == visited.end()) {
-                        collectRecursively(*child, visited);
+            if (auto apply = DynamicCast<ApplyBase*>(&expr)) {
+                if (auto callee = DynamicCast<LocalVar*>(apply->GetCallee())) {
+                    if (auto child = DynamicCast<const Lambda*>(callee->GetExpr())) {
+                        if (visited.find(child) == visited.end()) {
+                            collectRecursively(*child, visited);
+                        }
                     }
                 }
             }

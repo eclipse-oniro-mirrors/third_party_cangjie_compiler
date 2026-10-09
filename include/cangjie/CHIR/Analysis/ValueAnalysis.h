@@ -871,25 +871,25 @@ public:
      * @return blocks may goto after analysing.
      */
     std::optional<Block*> PropagateTerminatorEffect(
-        State<ValueDomain, ValueStatePool>& state, const Terminator* terminator) override
+        State<ValueDomain, ValueStatePool>& state, const Expression* terminator) override
     {
         switch (terminator->GetExprKind()) {
-            case ExprKind::APPLY_WITH_EXCEPTION: {
-                return PreHandleApplyExpr(state, StaticCast<const ApplyWithException*>(terminator));
+            case ExprKind::TRY_APPLY: {
+                return PreHandleApplyExpr(state, StaticCast<const ApplyBase*>(terminator));
             }
-            case ExprKind::INVOKE_WITH_EXCEPTION: {
-                return PreHandleInvokeExpr(state, StaticCast<const InvokeWithException*>(terminator));
+            case ExprKind::TRY_INVOKE: {
+                return PreHandleInvokeExpr(state, StaticCast<const InvokeBase*>(terminator));
             }
-            case ExprKind::ALLOCATE_WITH_EXCEPTION: {
-                auto allocate = StaticCast<const AllocateWithException*>(terminator);
+            case ExprKind::TRY_ALLOCATE: {
+                auto allocate = StaticCast<const TryAllocate*>(terminator);
                 auto refObj = PreHandleAllocateExpr(state, allocate);
-                return HandleAllocateWithExceptionTerminator(state, allocate, refObj);
+                return HandleTryAllocateTerminator(state, allocate, refObj);
             }
-            case ExprKind::RAW_ARRAY_ALLOCATE_WITH_EXCEPTION: {
-                return PreHandleRawArrayAllocate(state, StaticCast<const RawArrayAllocateWithException*>(terminator));
+            case ExprKind::TRY_RAW_ARRAY_ALLOCATE: {
+                return PreHandleRawArrayAllocate(state, StaticCast<const TryRawArrayAllocate*>(terminator));
             }
-            case ExprKind::INTRINSIC_WITH_EXCEPTION: {
-                auto intrinsic = StaticCast<const IntrinsicWithException*>(terminator);
+            case ExprKind::TRY_INTRINSIC: {
+                auto intrinsic = StaticCast<const TryIntrinsic*>(terminator);
                 if (intrinsic->GetIntrinsicKind() == CHIR::IntrinsicKind::INOUT_PARAM) {
                     return PreHandleInoutIntrinsic(state, intrinsic);
                 } else {
@@ -1005,14 +1005,15 @@ private:
                 return true;
             }
             case ExprKind::APPLY: {
-                PreHandleApplyExpr(state, StaticCast<const Apply*>(expression));
+                PreHandleApplyExpr(state, StaticCast<const ApplyBase*>(expression));
                 return true;
             }
             case ExprKind::INVOKE: {
-                PreHandleInvokeExpr(state, StaticCast<const Invoke*>(expression));
+                PreHandleInvokeExpr(state, StaticCast<const InvokeBase*>(expression));
                 return true;
             }
-            case ExprKind::TYPECAST: {
+            case ExprKind::NUMERIC_CAST:
+            case ExprKind::CLASS_STATIC_CAST: {
                 auto cast = StaticCast<TypeCast*>(expression);
                 if (!cast->Get<NeedCheckCast>()) {
                     return PreHandleNonCheckedTypeCast(state, cast);
@@ -1058,7 +1059,7 @@ private:
     template <typename TElemRef> AbstractObject* FindTargetElement(
         State<ValueDomain, ValueStatePool>& state, const TElemRef* elemRef)
     {
-        auto loc = elemRef->GetLocation();
+        auto loc = elemRef->GetBase();
         if (loc->IsGlobal() || loc->TestAttr(Attribute::STATIC)) {
             return AbstractObject::GetTopObjInstance();
         }
@@ -1345,8 +1346,7 @@ private:
         state.PropagateWithoutChildren(value, targetObj);
     }
 
-    template <typename TAllocate>
-    Value* PreHandleAllocateExpr(State<ValueDomain, ValueStatePool>& state, const TAllocate* allocate)
+    Value* PreHandleAllocateExpr(State<ValueDomain, ValueStatePool>& state, const AllocateBase* allocate)
     {
         // In our framework, we associate a *single* memory location with every static allocation site.
         // That is, when we meet an Allocation expression again, we won't come up with a new Ref, instead
@@ -1383,8 +1383,7 @@ private:
         }
     }
 
-    template <typename TApply> std::optional<Block*>
-    PreHandleApplyExpr(State<ValueDomain, ValueStatePool>& state, const TApply* apply)
+    std::optional<Block*> PreHandleApplyExpr(State<ValueDomain, ValueStatePool>& state, const ApplyBase* apply)
     {
         // check if this apply is a call to a mut func of a struct
         if (auto callee = apply->GetCallee(); callee->TestAttr(Attribute::MUT)) {
@@ -1402,29 +1401,24 @@ private:
         }
 
         auto refObj = PreHandleFuncCall(state, apply);
-        if constexpr (std::is_same_v<Apply, TApply>) {
-            HandleApplyExpr(state, apply, refObj);
-            return std::nullopt;
-        } else {
-            return HandleApplyWithExceptionTerminator(state, apply, refObj);
+        if (apply->IsTerminator()) {
+            return HandleTryApplyTerminator(state, StaticCast<const TryApply*>(apply), refObj);
         }
+        HandleApplyExpr(state, StaticCast<const Apply*>(apply), refObj);
+        return std::nullopt;
     }
 
-    template <typename TInvoke>
-    std::optional<Block*> PreHandleInvokeExpr(State<ValueDomain, ValueStatePool>& state, const TInvoke* invoke)
+    std::optional<Block*> PreHandleInvokeExpr(State<ValueDomain, ValueStatePool>& state, const InvokeBase* invoke)
     {
         auto refObj = PreHandleFuncCall(state, invoke);
-
-        if constexpr (std::is_same_v<Invoke, TInvoke>) {
-            HandleInvokeExpr(state, invoke, refObj);
-            return std::nullopt;
-        } else {
-            return HandleInvokeWithExceptionTerminator(state, invoke, refObj);
+        if (invoke->IsTerminator()) {
+            return HandleTryInvokeTerminator(state, StaticCast<const TryInvoke*>(invoke), refObj);
         }
+        HandleInvokeExpr(state, StaticCast<const Invoke*>(invoke), refObj);
+        return std::nullopt;
     }
 
-    template <typename T>
-    Value* PreHandleFuncCall(State<ValueDomain, ValueStatePool>& state, const T* apply)
+    Value* PreHandleFuncCall(State<ValueDomain, ValueStatePool>& state, const Expression* apply)
     {
         auto dest = apply->GetResult();
         auto ty = dest->GetType();
@@ -1485,7 +1479,7 @@ private:
     {
         state.SetToBound(tuple->GetResult(), /* isTop = */ true);
 
-        auto operands = tuple->GetOperands();
+        auto operands = tuple->GetElementValues();
         auto operandNum = tuple->GetResult()->GetType()->IsEnum() ? 1 : operands.size();
         if (auto it = childrenMap.find(tuple->GetResult()); it != childrenMap.end()) {
             auto& children = it->second;
@@ -1525,7 +1519,7 @@ private:
             auto targetClassDef = getClassDef(*ty);
             bool isCollection = targetClassDef && targetClassDef->GetSrcCodeIdentifier() == "Collection" &&
                 targetClassDef->GetPackageName() == Cangjie::CORE_PACKAGE_NAME;
-            auto sourceClassDef = getClassDef(*cast->GetSourceTy());
+            auto sourceClassDef = getClassDef(*cast->GetSourceType());
             bool isBoxArray = sourceClassDef &&
                 sourceClassDef->GetSrcCodeIdentifier().find(Cangjie::BOX_DECL_PREFIX) == 0 &&
                 sourceClassDef->GetAllInstanceVarNum() == 1 && sourceClassDef->GetInstanceVar(0).type->IsStructArray();
@@ -1541,17 +1535,15 @@ private:
         return true;
     }
 
-    template <typename TRawArrayAllocate>
     std::optional<Block*> PreHandleRawArrayAllocate(
-        State<ValueDomain, ValueStatePool>& state, const TRawArrayAllocate* allocate)
+        State<ValueDomain, ValueStatePool>& state, const RawArrayAllocateBase* allocate)
     {
         state.GetReferencedObjAndSetToTop(allocate->GetResult(), allocate);
         return std::nullopt;
     }
 
-    template <typename TIntrinsic>
     std::optional<Block*> PreHandleInoutIntrinsic(
-        State<ValueDomain, ValueStatePool>& state, const TIntrinsic* intrinsic)
+        State<ValueDomain, ValueStatePool>& state, const Expression* intrinsic)
     {
         auto param = intrinsic->GetOperand(0);
         if (!param->IsLocalVar()) {
@@ -1577,8 +1569,8 @@ private:
         (void)refObj;
     }
 
-    virtual std::optional<Block*> HandleAllocateWithExceptionTerminator(
-        State<ValueDomain, ValueStatePool>& state, const AllocateWithException* allocate, Value* refObj)
+    virtual std::optional<Block*> HandleTryAllocateTerminator(
+        State<ValueDomain, ValueStatePool>& state, const TryAllocate* allocate, Value* refObj)
     {
         (void)state;
         (void)allocate;
@@ -1593,8 +1585,8 @@ private:
         (void)refObj;
     }
 
-    virtual std::optional<Block*> HandleApplyWithExceptionTerminator(
-        State<ValueDomain, ValueStatePool>& state, const ApplyWithException* apply, Value* refObj)
+    virtual std::optional<Block*> HandleTryApplyTerminator(
+        State<ValueDomain, ValueStatePool>& state, const TryApply* apply, Value* refObj)
     {
         (void)state;
         (void)apply;
@@ -1609,8 +1601,8 @@ private:
         (void)refObj;
     }
 
-    virtual std::optional<Block*> HandleInvokeWithExceptionTerminator(
-        State<ValueDomain, ValueStatePool>& state, const InvokeWithException* invoke, Value* refObj)
+    virtual std::optional<Block*> HandleTryInvokeTerminator(
+        State<ValueDomain, ValueStatePool>& state, const TryInvoke* invoke, Value* refObj)
     {
         (void)state;
         (void)invoke;
@@ -1625,7 +1617,7 @@ private:
     }
 
     virtual std::optional<Block*> HandleTerminatorEffect(
-        State<ValueDomain, ValueStatePool>& state, const Terminator* terminator)
+        State<ValueDomain, ValueStatePool>& state, const Expression* terminator)
     {
         (void)state;
         (void)terminator;

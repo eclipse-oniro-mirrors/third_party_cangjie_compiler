@@ -14,11 +14,10 @@
 
 #include "Base/SpawnExprImpl.h"
 
-#include "Base/CHIRExprWrapper.h"
 #include "CGModule.h"
 #include "IRBuilder.h"
 #include "Utils/CGUtils.h"
-#include "cangjie/CHIR/IR/Expression/Terminator.h"
+#include "cangjie/CHIR/IR/Expression/Expression.h"
 #include "cangjie/CHIR/IR/Type/ClassDef.h"
 #include "cangjie/CHIR/IR/Type/Type.h"
 #include "cangjie/CHIR/IR/Value/Value.h"
@@ -46,7 +45,7 @@ void GenerateCheckSpawnResult(IRBuilder2& irBuilder, llvm::Value* result)
 #endif
 }
 
-llvm::Value* GenerateSpawnWithExecuteFuture(IRBuilder2& irBuilder, const CHIRSpawnWrapper& spawn)
+llvm::Value* GenerateSpawnWithExecuteFuture(IRBuilder2& irBuilder, const CHIR::SpawnBase& spawn)
 {
     auto& cgMod = irBuilder.GetCGModule();
     auto futureObj = cgMod | spawn.GetFuture();
@@ -81,7 +80,7 @@ llvm::Value* GenerateSpawnWithExecuteFuture(IRBuilder2& irBuilder, const CHIRSpa
     return futureObj->GetRawValue();
 }
 
-llvm::Value* GenerateSpawnWithExecuteClosure(IRBuilder2& irBuilder, const CHIRSpawnWrapper& spawn)
+llvm::Value* GenerateSpawnWithExecuteClosure(IRBuilder2& irBuilder, const CHIR::SpawnBase& spawn)
 {
     auto& cgMod = irBuilder.GetCGModule();
     auto closureNode = spawn.GetClosure();
@@ -116,7 +115,7 @@ llvm::Value* GenerateSpawnWithExecuteClosure(IRBuilder2& irBuilder, const CHIRSp
  *   the thread entry function is `Future.executeClosure`.
  * A spawn expression may contains a thread context, like `spawn(ctx) { ... }`.
  */
-llvm::Value* CodeGen::GenerateSpawn(IRBuilder2& irBuilder, const CHIRSpawnWrapper& spawn)
+llvm::Value* CodeGen::GenerateSpawn(IRBuilder2& irBuilder, const CHIR::SpawnBase& spawn)
 {
     if (!spawn.IsExecuteClosure()) {
         return GenerateSpawnWithExecuteFuture(irBuilder, spawn);

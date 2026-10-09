@@ -53,6 +53,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <variant>
@@ -128,20 +129,49 @@ bool IsSealedLike(const Ty& ty)
     return true;
 }
 
-Ptr<ClassLikeTy> AsSealedLikeClassLikeTy(Ty& ty)
+bool IsCurrentPackageDecl(const ClassLikeDecl& decl, const Package& currentPackage)
 {
-    if (!ty.IsClassLike()) {
-        return nullptr;
+    return decl.curFile && decl.curFile->curPackage == &currentPackage &&
+        decl.fullPackageName == currentPackage.fullPackageName;
+}
+
+bool IsClosedSealedRoot(const ClassLikeTy& ty, const ClassLikeDecl& decl)
+{
+    // A root must be sealed. A sealed class must also be abstract: otherwise instances of the root itself are a
+    // runtime case that is not represented by its direct subtypes. The class check is retained for error recovery.
+    if (!decl.TestAttr(Attribute::SEALED)) {
+        return false;
     }
-    ClassLikeTy& clt = StaticCast<ClassLikeTy&>(ty);
-    // Generic types are not supported so far.
-    if (!clt.typeArgs.empty()) {
-        return nullptr;
+    return !ty.IsClass() || decl.TestAttr(Attribute::ABSTRACT);
+}
+
+bool IsClosedSealedLeaf(const ClassLikeTy& ty, const ClassLikeDecl& decl)
+{
+    // A closed hierarchy may only contain concrete, non-extensible class leaves. Interfaces and leaves marked open,
+    // sealed, or abstract can introduce further runtime subtypes or cannot serve as terminal concrete cases.
+    return !ty.IsInterface() && !decl.TestAnyAttr(Attribute::OPEN, Attribute::SEALED, Attribute::ABSTRACT);
+}
+
+bool IsClosedSealedHierarchy(const ClassLikeTy& ty, const Package& currentPackage, bool isRoot)
+{
+    // Closure is valid only for declarations fully owned by this package. Generic, FFI, and common/specific
+    // declarations are excluded because their complete subtype set may not be visible here.
+    if (!ty.commonDecl || !ty.typeArgs.empty() || IsSuperTypeForFFI(ty)) {
+        return false;
     }
-    if (IsSealedLike(clt)) {
-        return &clt;
+    const ClassLikeDecl& decl = *ty.commonDecl;
+    if (decl.TestAnyAttr(Attribute::COMMON, Attribute::SPECIFIC, Attribute::FROM_COMMON_PART) ||
+        !IsCurrentPackageDecl(decl, currentPackage) || decl.TestAttr(Attribute::FOREIGN) ||
+        (isRoot ? !IsClosedSealedRoot(ty, decl) : !IsClosedSealedLeaf(ty, decl))) {
+        return false;
     }
-    return nullptr;
+    for (Ptr<Ty> subTy : ty.directSubtypes) {
+        if (!Ty::IsTyCorrect(subTy) || !subTy->IsClassLike() ||
+            !IsClosedSealedHierarchy(StaticCast<ClassLikeTy&>(*subTy), currentPackage, false)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool LitConstExprEq(const LitConstExpr& left, const LitConstExpr& right)
@@ -416,7 +446,7 @@ public:
             // And we don't care about the name for binding.
             case ASTKind::WILDCARD_PATTERN:
             case ASTKind::VAR_PATTERN: {
-                return {Constructor::Wildcard(), {}, *pattern.GetTy(), &pattern};
+                return {Constructor::Wildcard(), {}, *goal, &pattern};
             }
             case ASTKind::VAR_OR_ENUM_PATTERN: {
                 return FromPattern(typeManager, *goal, *static_cast<VarOrEnumPattern&>(pattern).pattern);
@@ -707,6 +737,16 @@ public:
         return stack.back();
     }
 
+    /** Replace the current head while preserving the remaining pattern columns. */
+    PatternStack ReplaceHead(const DestructedPattern& newHead) const
+    {
+        CJC_ASSERT(!stack.empty());
+        std::vector<DestructedPattern> newStack;
+        std::copy(stack.cbegin(), stack.cend() - 1, std::back_inserter(newStack));
+        newStack.emplace_back(newHead);
+        return PatternStack(std::move(newStack));
+    }
+
     PatternStack Specialize(const Constructor& ctor)
     {
         std::vector<DestructedPattern> newStack;
@@ -749,12 +789,7 @@ public:
         CJC_ASSERT(Head().Ctor().Kind() == ConstructorKind::OR);
         std::vector<PatternStack> results;
         std::transform(Head().SubPatterns().cbegin(), Head().SubPatterns().cend(), std::back_inserter(results),
-            [this](const DestructedPattern& newHead) {
-                std::vector<DestructedPattern> newStack;
-                std::copy(this->stack.cbegin(), this->stack.cend() - 1, std::back_inserter(newStack));
-                newStack.emplace_back(newHead);
-                return PatternStack(std::move(newStack));
-            });
+            [this](const DestructedPattern& newHead) { return ReplaceHead(newHead); });
         return results;
     }
 
@@ -823,11 +858,12 @@ private:
 
 class UsefulnessChecker {
 public:
-    UsefulnessChecker(DiagnosticEngine& diag, TypeManager& typeManager) : diag(diag), typeManager_(typeManager)
+    UsefulnessChecker(DiagnosticEngine& diag, TypeManager& typeManager, const Package* currentPackage)
+        : diag(diag), typeManager_(typeManager), currentPackage_(currentPackage)
     {
     }
-    UsefulnessChecker(DiagnosticEngine& diag, TypeManager& typeManager, Matrix&& matrix)
-        : diag(diag), typeManager_(typeManager), matrix_(matrix)
+    UsefulnessChecker(DiagnosticEngine& diag, TypeManager& typeManager, Matrix&& matrix, const Package* currentPackage)
+        : diag(diag), typeManager_(typeManager), matrix_(matrix), currentPackage_(currentPackage)
     {
     }
 
@@ -862,7 +898,7 @@ public:
         }
         if (head.Ctor().Kind() == ConstructorKind::TYPE) {
             PatternStack wildcard =
-                PatternStack(DestructedPattern(Constructor::Wildcard(), {}, head.GoalTy(), nullptr));
+                vec.ReplaceHead(DestructedPattern(Constructor::Wildcard(), {}, head.GoalTy(), nullptr));
             if (FindWitnessesForWildcard(wildcard).empty()) {
                 return {};
             }
@@ -876,6 +912,17 @@ public:
     }
 
 private:
+    static std::vector<Constructor> SplitWildcardForClosedSealed(ClassLikeTy& sealedTy)
+    {
+        std::set<Ptr<Ty>, CmpTyByName> directSubtypes(
+            sealedTy.directSubtypes.cbegin(), sealedTy.directSubtypes.cend());
+        std::vector<Constructor> ctors;
+        for (Ptr<Ty> subTy : directSubtypes) {
+            ctors.emplace_back(Constructor::Type(*subTy));
+        }
+        return ctors;
+    }
+
     /**
      * Split the wildcard into a vector of possible constructors.
      *
@@ -884,15 +931,15 @@ private:
      *     }
      * The missing cases are `Some(true)` and `Some(false)`, but `Some(_)` is preferred.
      */
-    static std::vector<Constructor> SplitWildcard(TypeManager& typeManager, Ty& ty, Matrix& matrix, bool isABIStable)
+    static std::vector<Constructor> SplitWildcard(
+        TypeManager& typeManager, Ty& ty, Matrix& matrix, const Package* currentPackage)
     {
         if (matrix.MissingAll()) {
             return {Constructor::Wildcard()};
         }
-        if (auto sealedTy = AsSealedLikeClassLikeTy(ty); sealedTy && !IsSuperTypeForFFI(ty) && !isABIStable) {
-            std::vector<Constructor> ctors;
-            SplitWildcardForSealed(ctors, *sealedTy);
-            return ctors;
+        if (ty.IsClassLike() && currentPackage &&
+            IsClosedSealedHierarchy(StaticCast<ClassLikeTy&>(ty), *currentPackage, true)) {
+            return SplitWildcardForClosedSealed(StaticCast<ClassLikeTy&>(ty));
         }
         if (!Ty::IsTyCorrect(&ty)) {
             return {Constructor::Missing()};
@@ -927,26 +974,6 @@ private:
         return {Constructor::Missing()};
     }
 
-    static void SplitWildcardForSealed(std::vector<Constructor>& ctors, ClassLikeTy& sealedTy)
-    {
-        std::set<Ptr<Ty>, CmpTyByName> directSubtypes(sealedTy.directSubtypes.cbegin(), sealedTy.directSubtypes.cend());
-        for (Ptr<Ty> subTy : directSubtypes) {
-            CJC_ASSERT(Ty::IsTyCorrect(subTy));
-            if (auto subSealed = AsSealedLikeClassLikeTy(*subTy); subSealed && !IsSuperTypeForFFI(*subTy)) {
-                SplitWildcardForSealed(ctors, *subSealed);
-            } else {
-                (void)ctors.emplace_back(Constructor::Type(*subTy));
-            }
-        }
-        if (sealedTy.IsClass()) {
-            auto& ct = StaticCast<ClassTy&>(sealedTy);
-            CJC_NULLPTR_CHECK(ct.declPtr);
-            if (!ct.declPtr->TestAttr(Attribute::ABSTRACT)) {
-                ctors.emplace_back(Constructor::Type(sealedTy));
-            }
-        }
-    }
-
     std::vector<PatternStack> FindWitnessesForWildcard(PatternStack& vec)
     {
         DestructedPattern& head = vec.Head();
@@ -966,7 +993,7 @@ private:
         // Split the wildcard into a series of constructors, call FindWitnesses for each constructor and concatenate
         // the witnesses together.
         std::vector<PatternStack> witnesses;
-        auto ctors = SplitWildcard(typeManager_, goalTy, matrix_, keepABIStable);
+        auto ctors = SplitWildcard(typeManager_, goalTy, matrix_, currentPackage_);
         for (const Constructor& ctor : ctors) {
             for (const PatternStack& witness : FindWitnessesBySpecialization(vec, ctor)) {
                 witnesses.emplace_back(witness);
@@ -979,7 +1006,7 @@ private:
     {
         CJC_ASSERT(!vec.IsEmpty());
         std::vector<PatternStack> witnesses;
-        UsefulnessChecker newChecker(diag, typeManager_, matrix_.Specialize(typeManager_, ctor));
+        UsefulnessChecker newChecker(diag, typeManager_, matrix_.Specialize(typeManager_, ctor), currentPackage_);
         auto stack = vec.Specialize(ctor);
         for (const PatternStack& witness : newChecker.FindWitnesses(stack)) {
             witnesses.emplace_back(witness.Apply(ctor, vec.Head().GoalTy()));
@@ -989,7 +1016,7 @@ private:
 
     std::vector<PatternStack> FindWitnessesForExpandedOr(std::vector<PatternStack>&& vecs) const
     {
-        UsefulnessChecker newChecker(diag, typeManager_, Matrix(matrix_));
+        UsefulnessChecker newChecker(diag, typeManager_, Matrix(matrix_), currentPackage_);
         std::vector<Ptr<Node>> unreachables;
         std::vector<PatternStack> totalWitnesses;
         for (PatternStack& vec : vecs) {
@@ -1019,7 +1046,7 @@ private:
     DiagnosticEngine& diag;
     TypeManager& typeManager_;
     Matrix matrix_;
-    bool keepABIStable{true};
+    const Package* currentPackage_{nullptr};
 };
 } // namespace
 
@@ -1031,20 +1058,19 @@ bool CheckMatchExprHasSelectorExhaustivenessAndReachability(
         // Avoid exhaustive & reachable checking if fatal errors appeared.
         return true;
     }
-    UsefulnessChecker checker(diag, typeManager);
+    auto selectorTy = typeManager.ReplaceThisTy(typeManager.TryGreedySubst(me.selector->GetTy()));
+    const Package* currentPackage = me.curFile ? me.curFile->curPackage : nullptr;
+    UsefulnessChecker checker(diag, typeManager, currentPackage);
     for (auto& mc : me.matchCases) {
         if (mc->patterns.empty()) {
             CJC_ABORT();
             continue;
         }
         for (auto& pattern : mc->patterns) {
-            if (Ty::IsInitialTy(pattern->GetTy())) {
-                pattern->SetTy(typeManager.TryGreedySubst(me.selector->GetTy()));
-            }
+            CJC_ASSERT(!Ty::IsInitialTy(pattern->GetTy()));
         }
         // The PatternStack vec contains only one item in the beginning.
-        PatternStack vec(DestructedPattern::FromPatterns(
-            typeManager, *typeManager.TryGreedySubst(me.selector->GetTy()), mc->patterns));
+        PatternStack vec(DestructedPattern::FromPatterns(typeManager, *selectorTy, mc->patterns));
         std::vector<PatternStack> witnesses = checker.FindWitnesses(vec);
         if (!witnesses.empty()) {
             // Add the witnesses to the matrix only if the match case doesn't have guard.
@@ -1058,8 +1084,7 @@ bool CheckMatchExprHasSelectorExhaustivenessAndReachability(
                 MakeRange(mc->patterns.front()->begin, mc->patterns.back()->end));
         }
     }
-    auto stack = PatternStack(
-        DestructedPattern(Constructor::Wildcard(), {}, *typeManager.TryGreedySubst(me.selector->GetTy()), nullptr));
+    auto stack = PatternStack(DestructedPattern(Constructor::Wildcard(), {}, *selectorTy, nullptr));
     std::vector<PatternStack> witnesses = checker.FindWitnesses(stack);
     if (witnesses.empty()) {
         return true;

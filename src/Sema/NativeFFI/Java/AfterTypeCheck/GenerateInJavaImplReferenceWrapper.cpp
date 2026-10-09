@@ -8,6 +8,9 @@
 
 #include "JavaDesugarManager.h"
 #include "GenerateInJavaImplReferenceWrapper.h"
+#include "NativeFFI/Java/AfterTypeCheck/ASTFactory.h"
+#include "NativeFFI/Java/AfterTypeCheck/AfterTypeCheckContext.h"
+#include "NativeFFI/Java/JavaMemberSignature.h"
 #include "NativeFFI/Utils.h"
 #include "Utils.h"
 #include "NativeFFI/Java/Utils.h"
@@ -128,7 +131,7 @@ void GenerateInJavaImplReferenceWrapper::GenerateWrappingConstructorBody(FuncDec
 
     wrappingCtor.constructorCall = ConstructorCall::SUPER;
 
-    Ptr<FuncDecl> parentCtor = GetGeneratedJavaMirrorConstructor(*refWrapper.GetSuperClassDecl());
+    Ptr<FuncDecl> parentCtor = GetJavaMirrorWrappingConstructor(*refWrapper.GetSuperClassDecl());
     CJC_ASSERT(parentCtor);
     CJC_ASSERT(parentCtor->funcBody->paramLists[0]->params.size() == 1); // Java_CFFI_JavaEntity
 
@@ -162,8 +165,8 @@ OwnedPtr<FuncDecl> GenerateInJavaImplReferenceWrapper::GenerateJavaSideConstruct
     auto& params = ctor->funcBody->paramLists[0]->params;
 
     // reg: companion.ty
-    params.insert(params.begin(), CreateFuncParam("reg", CreateRefType(companion), nullptr, companion.GetTy()));
-    auto& regCompanionParam = *params[0];
+    auto& regCompanionParam = **params.emplace(params.begin(),
+        CreateFuncParam("reg", CreateRefType(companion), nullptr, companion.GetTy()));
 
     // obj: Java_CFFI_JavaEntity
     auto javaEntityDecl = ilib.GetJavaEntityDecl();
@@ -171,12 +174,11 @@ OwnedPtr<FuncDecl> GenerateInJavaImplReferenceWrapper::GenerateJavaSideConstruct
         return nullptr;
     }
 
-    params.insert(params.begin(),
+    auto& entityParam = **params.emplace(params.begin(),
         CreateFuncParam(JAVA_IMPL_ENTITY_ARG_NAME_IN_GENERATED_CTOR,
             CreateRefType(*javaEntityDecl), nullptr, javaEntityDecl->GetTy()));
-    auto& entityParam = *params[0];
 
-    Ptr<FuncDecl> parentCtor = GetGeneratedJavaMirrorConstructor(*refWrapper.GetSuperClassDecl());
+    Ptr<FuncDecl> parentCtor = GetJavaMirrorWrappingConstructor(*refWrapper.GetSuperClassDecl());
     CJC_ASSERT(parentCtor);
     CJC_ASSERT(parentCtor->funcBody->paramLists[0]->params.size() == 1); // Java_CFFI_JavaEntity
 
@@ -240,8 +242,8 @@ FuncDecl& GenerateInJavaImplReferenceWrapper::InsertJavaSideConstructor(FuncDecl
     return res;
 }
 
-void GenerateInJavaImplReferenceWrapper::RewriteUserDefinedConstructorInitialization(FuncDecl& ctor,
-    VarDecl& companionRefField, ClassDecl& companion) const
+void GenerateInJavaImplReferenceWrapper::RewriteUserDefinedConstructorInitialization(AfterTypeCheckContext& ctx,
+    FuncDecl& ctor, VarDecl& companionRefField, ClassDecl& companion) const
 {
     auto curFile = ctor.curFile;
     auto jniEnvCall = ilib.CreateGetJniEnvCall(curFile);
@@ -257,59 +259,45 @@ void GenerateInJavaImplReferenceWrapper::RewriteUserDefinedConstructorInitializa
     }
 
     auto& refWrapper = *StaticAs<ASTKind::CLASS_DECL>(ctor.outerDecl);
-    FuncDecl& parentCtor = *GetGeneratedJavaMirrorConstructor(*refWrapper.GetSuperClassDecl());
+    FuncDecl& parentCtor = *GetJavaMirrorWrappingConstructor(*refWrapper.GetSuperClassDecl());
     CJC_ASSERT(parentCtor.funcBody->paramLists[0]->params.size() == 1); // Java_CFFI_JavaEntity
-
-    auto jniEnvVar = CreateTmpVarDecl(jniEnvPtrDecl->type, jniEnvCall);
 
     CJC_ASSERT(ctor.funcBody);
     CJC_ASSERT(ctor.funcBody->paramLists.size() == 1);
     auto& paramList = *ctor.funcBody->paramLists[0];
-
-    // Java_CFFI_newJavaObject_raw call.
-    // No global reference is created here:
+    auto args = factory.CreateParamsUsage(paramList);
+    args.push_back(ilib.CreateJavaEntityNullCall(curFile)); // Marker parameter
+    
+    // NOTE: No global reference is created here:
     // it is wrapped into global reference in `super` constructors chain call: within `JObject`.
-    if (auto newObjCall = ilib.CreateCFFINewJavaObjectCall(WithinFile(CreateRefExpr(*jniEnvVar), ctor.curFile),
-        utils.GetJavaClassNormalizeSignature(*refWrapper.GetTy()), paramList, false, *ctor.curFile)) {
-            auto jniEnvRef = WithinFile(CreateRefExpr(*jniEnvVar), curFile);
-            std::vector<OwnedPtr<Node>> nodes;
-            nodes.push_back(std::move(jniEnvVar));
-            nodes.push_back(std::move(newObjCall));
-            auto lambdaCall = WrapReturningLambdaCall(typeManager, std::move(nodes));
-            auto superCall = CreateSuperCall(*ctor.outerDecl, parentCtor, parentCtor.GetTy());
-
-            superCall->args.insert(superCall->args.begin(), CreateFuncArg(std::move(lambdaCall)));
-
-            if (!ctor.funcBody->body->body.empty()) {
-                auto firstNode = ctor.funcBody->body->body[0].get();
-                if (auto callExpr = As<ASTKind::CALL_EXPR>(firstNode); callExpr && IsSuperConstructorCall(*callExpr)) {
-                    // This super-constructor call `callExpr` is removed in `JavaSourceCodeGenerator`.
-                    // TODO: remove it here and memoize with context/cache.
-                    callExpr->EnableAttr(Attribute::JAVA_MIRROR, Attribute::UNREACHABLE);
-                }
-            }
-
-            // Inserts assignment of registry companion into an instance.
-            ctor.funcBody->body->body.insert(ctor.funcBody->body->body.begin(),
-                CreateRegistryCompanionRefFieldAssignment(companion, refWrapper, companionRefField));
-            // Inserts generated super call at the beginning of the constructor.
-            ctor.funcBody->body->body.insert(ctor.funcBody->body->body.begin(), std::move(superCall));
-            /*
-                We can't remove existing user-defined super call on this stage
-                because it is used for java code generation.
-                TODO: fix it.
-            */
-    } else {
+    // NOTE: marker is used to distinguish between two types of `@JavaImpl` constructors
+    // running the same user-defined logics within it:
+    // 1. Constructor directly callable in cangjie code.
+    // 2. Constructor (with marker) callable in generated `@C` bridge functions callable by Java counterpart object.
+    auto javaCtorExpr = factory.CreateNewJavaObjectCall(ctx, *curFile,
+        JavaMemberSignature::FromConstructor(ctor, /* withMarker = */ true),
+        std::move(args));
+    if (!javaCtorExpr) {
         ctor.EnableAttr(Attribute::IS_BROKEN);
         companion.EnableAttr(Attribute::HAS_BROKEN, Attribute::IS_BROKEN);
+        return;
     }
+
+    auto superCall = CreateSuperCall(*ctor.outerDecl, parentCtor, parentCtor.GetTy());
+    superCall->args.insert(superCall->args.begin(), CreateFuncArg(std::move(javaCtorExpr)));
+
+     // Inserts assignment of registry companion into an instance.
+    ctor.funcBody->body->body.insert(ctor.funcBody->body->body.begin(),
+        CreateRegistryCompanionRefFieldAssignment(companion, refWrapper, companionRefField));
+    // Inserts generated super call at the beginning of the constructor.
+    ctor.funcBody->body->body.insert(ctor.funcBody->body->body.begin(), std::move(superCall));
 }
 
 void GenerateInJavaImplReferenceWrapper::RewriteUserDefinedConstructorsInitialization(AfterTypeCheckContext& ctx,
     ClassDecl& refWrapper, VarDecl& companionRefField, ClassDecl& companion) const
 {
     for (auto ctor : ctx.GetJavaImplUserDefinedConstructors(refWrapper)) {
-        RewriteUserDefinedConstructorInitialization(*ctor, companionRefField, companion);
+        RewriteUserDefinedConstructorInitialization(ctx, *ctor, companionRefField, companion);
     }
 
     RewriteRefWrapperPrimaryConstructor(refWrapper, companion, companionRefField);
@@ -345,8 +333,8 @@ void GenerateInJavaImplReferenceWrapper::Process(ClassDecl& refWrapper, AfterTyp
 }
 
 GenerateInJavaImplReferenceWrapper::GenerateInJavaImplReferenceWrapper(TypeManager& typeManager,
-    const ImportManager& importManager, InteropLibBridge& ilib, Native::FFI::Java::Utils& utils)
-    : typeManager(typeManager), importManager(importManager), ilib(ilib), utils(utils)
+    const ImportManager& importManager, InteropLibBridge& ilib, ASTFactory& factory)
+    : typeManager(typeManager), importManager(importManager), ilib(ilib), factory(factory)
 {
 }
 

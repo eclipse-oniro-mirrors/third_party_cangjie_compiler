@@ -44,10 +44,6 @@ const std::unordered_map<std::string, uint8_t> LTO_MODE_MAP = {
     {"thin", uint8_t(GlobalOptions::LTOMode::THIN_LTO)},
 };
 
-const std::unordered_map<std::string, GlobalOptions::InteropLanguage> INTEROP_LANGUAGE_MAP = {
-    {"Java", GlobalOptions::InteropLanguage::Java}, {"ObjC", GlobalOptions::InteropLanguage::ObjC},
-};
-
 const std::unordered_map<std::string, uint8_t> WARN_GROUP_MAP = {
 #define WARN_GROUP(DESCR, KIND) {DESCR, uint8_t(WarnGroup::KIND)},
 #include "cangjie/Basic/DiagRefactor/DiagnosticWarnGroupKind.def"
@@ -264,7 +260,8 @@ bool ParseTargetTriple(GlobalOptions& opts, const std::string& triple)
                 }
 #ifndef CANGJIE_ENABLE_GCOV
             } catch (std::exception const&) {
-                Errorln("The Android API level is illegal. Please use a valid API level which is greater than or equal to 26.");
+                Errorln("The Android API level is illegal."
+                        " Please use a valid API level which is greater than or equal to 23.");
             }
 #endif
         }

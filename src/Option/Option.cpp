@@ -569,10 +569,6 @@ bool GlobalOptions::CheckLtoOptions() const
         Errorln("Obfuscation is not supported when LTO is enabled on iOS.");
         return false;
     }
-    if (target.os == OSType::IOS && outputMode != OutputMode::STATIC_LIB) {
-        Errorln("iOS LTO only supports --output-type=staticlib.");
-        return false;
-    }
     if (outputMode == OutputMode::OBJ) {
         Errorln("--output-type=obj is not allowed in LTO mode");
         return false;
@@ -647,9 +643,9 @@ bool GlobalOptions::CheckLTOPkgVisibilityOptions() const
     }
 
     if (IsLTOPkgVisibilityEnabled()) {
-        bool validForDylib = (outputMode == OutputMode::SHARED_LIB && target.os == OSType::LINUX);
-        bool validForStaticLib = (outputMode == OutputMode::STATIC_LIB && target.os == OSType::IOS);
-        if (!validForDylib && !validForStaticLib) {
+        bool isValid = target.os == OSType::IOS ||
+                       (target.os == OSType::LINUX && outputMode == OutputMode::SHARED_LIB);
+        if (!isValid) {
             DiagnosticEngine diag;
             diag.DiagnoseRefactor(DiagKindRefactor::driver_ineffective_option, DEFAULT_POSITION,
                 "--lto-keep-pkg-visibility");
@@ -1660,7 +1656,6 @@ std::vector<std::string> GlobalOptions::ToSerialized() const
     result.emplace_back(BoolToSerializedString(enableMacroInLSP));
     result.emplace_back(BoolToSerializedString(enableCompileTest));
     result.emplace_back(BoolToSerializedString(implicitPrelude));
-    result.emplace_back(BoolToSerializedString(enableInteropCJMapping));
     result.emplace_back(BoolToSerializedString(chirEA));
     result.emplace_back(BoolToSerializedString(chirLICM));
     result.emplace_back(BoolToSerializedString(chirCC));

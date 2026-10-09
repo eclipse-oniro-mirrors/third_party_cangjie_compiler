@@ -63,14 +63,6 @@ public:
      * @param isDebug flag whether print debug log.
      */
     void UnreachableBlockElimination(const std::vector<const Function*>& funcs, bool isDebug) const;
-    /**
-     * @brief process to report unreachable block warning.
-     * @param package package to report warning.
-     * @param threadsNum threads num join to do this pass.
-     * @param maybeUnreachableBlocks may be unreachable blocks to report.
-     */
-    void UnreachableBlockWarningReporter(const Package& package,
-        size_t threadsNum, const std::unordered_map<Block*, Terminator*>& maybeUnreachableBlocks);
 
     /**
      * @brief process to remove blocks which is marked unreachable.
@@ -113,11 +105,6 @@ private:
     // =============== Functions for Useless IR Elimination =============== //
     bool CheckUselessExpr(const Expression& expr, bool isReportWarning = false) const;
 
-    // =============== Functions for Debug Message Dump =============== //
-    Ptr<Expression> GetUnreachableExpression(const CHIR::Block& block, bool& isNormal) const;
-    void PrintUnreachableBlockWarning(
-        const CHIR::Block& block, const CHIR::Terminator& terminator, bool& isPrinted);
-
     // =============== Functions for dce reporter =============== //
     void TryReportUnusedOnExpr(Expression& expr, const GlobalOptions& opts, bool blockUsed);
     void ReportUnusedFunc(const Function& func, const GlobalOptions& opts, bool usingReflectPackage);
@@ -130,14 +117,9 @@ private:
     void DiagUnusedVariableForParam(const Debug& expr);
     void DiagUnusedVariableForLocalVar(const Debug& expr, bool isDebug);
     void DiagUnusedLambdaVariable(const Debug& expr);
-    std::string GetLiteralFromExprKind(const ExprKind& kind) const;
 
     // ============== Functions for clean code in parallel ===========//
     void ReportUnusedCodeInFunc(const BlockGroup& body, const GlobalOptions& opts);
-    void UnreachableBlockWarningReporterInSerial(
-        const Package& package, const std::unordered_map<Block*, Terminator*>& maybeUnreachableBlocks);
-    void UnreachableBlockWarningReporterInParallel(const Package& package,
-        size_t threadsNum, const std::unordered_map<Block*, Terminator*>& maybeUnreachableBlocks);
 };
 } // namespace Cangjie::CHIR
 #endif

@@ -20,7 +20,7 @@
 #include "cangjie/Basic/DiagnosticEngine.h"
 
 #include "ASTSerializeUtils.h"
-#include "flatbuffers/ModuleFormat_generated.h"
+#include "flatbuffers/CjoFormat_generated.h"
 
 namespace Cangjie {
 

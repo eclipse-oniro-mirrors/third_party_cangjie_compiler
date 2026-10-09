@@ -203,46 +203,24 @@ Value* Translator::TranslateVarRef(const AST::RefExpr& refExpr)
     return varLeftValueBase;
 }
 
-InvokeCallContext Translator::GenerateInvokeCallContext(const InstCalleeInfo& instFuncType, Value& caller,
-    const AST::FuncDecl& callee, const std::vector<Value*>& args, const OverflowStrategy strategy)
+InvokeCallContext Translator::GenerateInvokeCallContext(const InstCalleeInfo& instFuncInfo, Value& caller,
+    const std::vector<Value*>& args, const OverflowStrategy strategy)
 {
-    auto tempDecl = typeManager.GetTopOverriddenFuncDecl(&callee);
-    const AST::FuncDecl* originalFuncDecl = tempDecl ? tempDecl.get() : &callee;
-    auto originalFuncType = StaticCast<FuncType*>(TranslateType(*originalFuncDecl->GetTy()));
-    if (!originalFuncDecl->TestAttr(AST::Attribute::STATIC)) {
-        auto outerDecl = originalFuncDecl->outerDecl;
-        CJC_NULLPTR_CHECK(outerDecl);
-        auto parentType = GetNominalSymbolTable(*outerDecl)->GetType();
-        parentType = AddRefIfFuncIsMutOrClass(*parentType, *originalFuncDecl, builder);
-        auto paramTypes = originalFuncType->GetParamTypes();
-        paramTypes.insert(paramTypes.begin(), parentType);
-        originalFuncType = builder.GetType<FuncType>(paramTypes, originalFuncType->GetReturnType());
-    }
-    std::vector<GenericType*> originalGenericTypeParams;
-    if (originalFuncDecl->TestAttr(AST::Attribute::GENERIC)) {
-        for (const auto& genericTy : originalFuncDecl->funcBody->generic->typeParameters) {
-            originalGenericTypeParams.emplace_back(StaticCast<GenericType*>(TranslateType(*(genericTy->GetTy()))));
-        }
-    }
-    auto funcName = originalFuncDecl->identifier.Val();
-    if (IsOverflowOpCall(*originalFuncDecl)) {
-        funcName = OverflowStrategyPrefix(strategy) + funcName;
-    }
-
-    auto invokeInfo = InvokeCallContext {
+    CJC_NULLPTR_CHECK(instFuncInfo.originalFuncDecl);
+    auto method = StaticCast<Function*>(GetSymbolTable(*instFuncInfo.originalFuncDecl));
+    // the overflow strategy is NA in mock case, of course, it's a wrong choice, we have to use SATURATING as default
+    // we choose SATURATING because SATURATING and NA are same in `OverflowStrategyPrefix`
+    auto tempStrategy = strategy == OverflowStrategy::NA ? OverflowStrategy::SATURATING : strategy;
+    return InvokeCallContext {
+        .method = method,
         .caller = &caller,
         .funcCallCtx = FuncCallContext {
             .args = args,
-            .instTypeArgs = instFuncType.instantiatedTypeArgs,
-            .thisType = instFuncType.thisType
+            .instTypeArgs = instFuncInfo.instantiatedTypeArgs,
+            .thisType = instFuncInfo.thisType
         },
-        .virMethodCtx = FuncSigInfo {
-            .funcName = funcName,
-            .funcType = originalFuncType,
-            .genericTypeParams = originalGenericTypeParams
-        }
+        .overflowStrategy = IsOverflowOpCall(*instFuncInfo.originalFuncDecl) ? tempStrategy : OverflowStrategy::NA
     };
-    return invokeInfo;
 }
 
 Value* Translator::WrapMemberMethodByLambda(
@@ -290,36 +268,25 @@ Value* Translator::WrapMemberMethodByLambda(
             CJC_ASSERT(thisObj == nullptr);
             auto rtti = CreateAndAppendExpression<GetRTTIStatic>(
                 builder.GetUnitTy(), instFuncType.thisType->StripAllRefs(), currentBlock)->GetResult();
-            auto invokeInfo = GenerateInvokeCallContext(instFuncType, *rtti, funcDecl, args);
+            auto invokeInfo = GenerateInvokeCallContext(instFuncType, *rtti, args);
             ret = CreateAndAppendExpression<InvokeStatic>(lambdaRetType, invokeInfo, currentBlock)->GetResult();
         } else {
             // Invoke
             CJC_NULLPTR_CHECK(thisObj);
-            auto invokeInfo = GenerateInvokeCallContext(instFuncType, *thisObj, funcDecl, args);
+            auto invokeInfo = GenerateInvokeCallContext(instFuncType, *thisObj, args);
             ret = CreateAndAppendExpression<Invoke>(lambdaRetType, invokeInfo, currentBlock)->GetResult();
         }
     } else {
         // Apply
         if (thisObj != nullptr) {
-            auto objExpectedType = instFuncType.instParentCustomTy;
-            if (objExpectedType->IsReferenceType()) {
-                objExpectedType = builder.GetType<RefType>(objExpectedType);
-            }
+            auto objExpectedType = AddRefIfFuncIsMutOrClass(*instFuncType.instParentCustomTy, funcDecl, builder);
             args.insert(args.begin(), TransformThisType(*thisObj, *objExpectedType, *lambda));
         }
         CJC_ASSERT(args.size() == instFuncType.instParamTys.size());
-        std::vector<Type*> instTypeArgs(
-            instFuncType.instantiatedTypeArgs.begin(), instFuncType.instantiatedTypeArgs.end());
         auto callee = GetSymbolTable(funcDecl);
-        auto funcType = builder.GetType<FuncType>(instFuncType.instParamTys, instFuncType.instRetTy);
-        auto wrapperFunc = GetWrapperFuncFromMemberAccess(*instFuncType.instParentCustomTy->StripAllRefs(),
-            callee->GetSrcCodeIdentifier(), *funcType, callee->TestAttr(Attribute::STATIC), instTypeArgs);
-        if (wrapperFunc != nullptr) {
-            callee = wrapperFunc;
-        }
         auto funcCallContext = FuncCallContext {
             .args = args,
-            .instTypeArgs = instTypeArgs,
+            .instTypeArgs = instFuncType.instantiatedTypeArgs,
             .thisType = instFuncType.thisType
         };
         ret = CreateAndAppendExpression<Apply>(

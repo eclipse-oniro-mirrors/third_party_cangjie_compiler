@@ -18,6 +18,7 @@
 #include "cangjie/AST/Match.h"
 #include "cangjie/AST/Node.h"
 #include "cangjie/Modules/ImportManager.h"
+#include "cangjie/Utils/ConstantsUtils.h"
 #include "cangjie/Utils/SafePointer.h"
 
 namespace Cangjie::Interop::ObjC {
@@ -29,37 +30,34 @@ public:
     }
 
     /**
-     * Gets ForwarderMutex declaration.
-     */
-    Ptr<AST::TypeAliasDecl> GetForwarderMutexDecl();
-    /**
-     * Gets ForwarderMutex semantic type (std.sync.Mutex).
-     */
-    Ptr<AST::Ty> GetForwarderMutexTy();
-    /**
-     * Gets the constructor decl of ForwarderMutex.
-     */
-    Ptr<AST::FuncDecl> GetMutexConstructor();
-    /**
-     * Gets the lock decl of ForwarderMutex.
-     */
-    Ptr<AST::FuncDecl> GetMutexLock();
-    /**
-     * Gets the unlock decl of ForwarderMutex.
-     */
-    Ptr<AST::FuncDecl> GetMutexUnlock();
-    /**
      * Gets NativeObjCId declaration.
      * id or Instance Method Pointer type.
      */
-    Ptr<AST::TypeAliasDecl> GetNativeObjCIdDecl();
+    Ptr<AST::TypeAliasDecl> GetNativeObjCIdDecl() const noexcept;
+
+    /**
+     * Gets NativeObjCIdMarker declaration.
+     * Used as argument for generated internal constructors.
+     */
+    Ptr<AST::StructDecl> GetNativeObjCIdMarkerDecl() const noexcept;
+
+    /**
+     * Gets __NATIVE_OBJC_ID_MARKER instance.
+     * Used as argument for generated internal constructors.
+     */
+    Ptr<AST::VarDecl> GetNativeObjCIdMarkerInstance() const noexcept;
 
     Ptr<AST::InterfaceDecl> GetObjCIdDecl();
 
     /**
      * Gets NativeObjCId semantic type.
      */
-    Ptr<AST::Ty> GetNativeObjCIdTy();
+    Ptr<AST::Ty> GetNativeObjCIdTy() const noexcept;
+
+    /**
+     * Gets NativeObjCIdMarker semantic type.
+     */
+    Ptr<AST::Ty> GetNativeObjCIdMarkerTy() const noexcept;
 
     /**
      * Gets NativeObjCSel declaration.
@@ -89,12 +87,12 @@ public:
      * Gets RegistryId declaration.
      * An opaque identifier for Cangjie mirror objects.
      */
-    Ptr<AST::TypeAliasDecl> GetRegistryIdDecl();
+    Ptr<AST::TypeAliasDecl> GetRegistryIdDecl() const noexcept;
 
     /**
      * Gets RegistryId semantic type.
      */
-    Ptr<AST::Ty> GetRegistryIdTy();
+    Ptr<AST::Ty> GetRegistryIdTy() const noexcept;
 
     /**
      * Gets ObjCUnreachableCodeException declaration.
@@ -106,15 +104,15 @@ public:
 
     Ptr<AST::ClassDecl> GetObjCStaticMethodCallOnIntefaceExceptionDecl();
 
-    Ptr<AST::FuncDecl> GetGetFromRegistryByNativeHandleDecl();
+    Ptr<AST::ClassDecl> GetObjCInitException();
 
-    Ptr<AST::FuncDecl> GetGetFromRegistryByIdDecl();
+    Ptr<AST::FuncDecl> GetGetFromRegistryByIdDecl() const noexcept;
 
-    Ptr<AST::FuncDecl> GetPutToRegistryDecl();
+    Ptr<AST::FuncDecl> GetPutToRegistryDecl() const noexcept;
 
     Ptr<AST::FuncDecl> GetRemoveFromRegistryDecl();
 
-    Ptr<AST::FuncDecl> GetAllocDecl();
+    Ptr<AST::FuncDecl> GetAllocDecl() const noexcept;
 
     Ptr<AST::FuncDecl> GetWithAutoreleasePoolDecl();
 
@@ -158,7 +156,11 @@ public:
 
     Ptr<AST::FuncDecl> GetDescriptionAsStringDecl();
 
-    Ptr<AST::FuncDecl> GetObjCRetainAutoreleasedReturnValue();
+    Ptr<AST::FuncDecl> GetObjCRetainAutoreleasedReturnValueDecl() const noexcept;
+
+    Ptr<AST::FuncDecl> GetSetRegistryIdDecl() const noexcept;
+
+    Ptr<AST::FuncDecl> GetGetRegistryIdDecl() const noexcept;
 
     /**
      * Get objc.lang.ObjCPointer declaration
@@ -196,14 +198,12 @@ public:
     static bool IsInteropLibAccessible(ImportManager& importManager);
 
 private:
-    static constexpr auto INTEROPLIB_PACKAGE_NAME = "objc.internal";
-
-    template <AST::ASTKind K = AST::ASTKind::DECL> auto GetInteropLibDecl(const std::string& ident)
+    template <AST::ASTKind K = AST::ASTKind::DECL> auto GetInteropLibDecl(const std::string& ident) const noexcept
     {
-        auto decl = importManager.GetImportedDecl(INTEROPLIB_PACKAGE_NAME, ident);
+        auto decl = importManager.GetImportedDecl(OBJ_C_INTERNAL_PACKAGE_IDENT, ident);
         if (!decl) {
             diag.DiagnoseRefactor(DiagKindRefactor::sema_member_not_imported, DEFAULT_POSITION,
-                INTEROPLIB_PACKAGE_NAME + std::string(".") + ident);
+                OBJ_C_INTERNAL_PACKAGE_IDENT + std::string(".") + ident);
             return Ptr(AST::As<K>(nullptr));
         }
 

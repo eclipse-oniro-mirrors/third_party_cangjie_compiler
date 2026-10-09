@@ -362,7 +362,7 @@ void Translator::TranslateForInRangeLatchBlockGroup(const AST::Node& node)
     auto constZero = CreateAndAppendConstantExpression<IntLiteral>(
         builder.GetInt64Ty(), *currentBlock, 0UL)->GetResult();
     auto isNeedExit = CreateAndAppendExpression<BinaryExpression>(
-        builder.GetBoolTy(), ExprKind::GT, delayExitSignalVal->GetResult(), constZero, currentBlock);
+        builder.GetBoolTy(), BinaryExprKind::GT, delayExitSignalVal->GetResult(), constZero, currentBlock);
     isNeedExit->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
     isNeedExit->Set<GeneratedFromForIn>(true);
     CreateAndAppendTerminator<Branch>(loc, isNeedExit->GetResult(),
@@ -399,7 +399,7 @@ void Translator::TranslateForInStringLatchBlockGroup(Ptr<Value>& inductiveVar)
     auto constZero = CreateAndAppendConstantExpression<IntLiteral>(
         builder.GetInt64Ty(), *currentBlock, 0UL)->GetResult();
     auto isNeedExit = CreateAndAppendExpression<BinaryExpression>(
-        builder.GetBoolTy(), ExprKind::GT, delayExitSignalVal->GetResult(), constZero, currentBlock);
+        builder.GetBoolTy(), BinaryExprKind::GT, delayExitSignalVal->GetResult(), constZero, currentBlock);
     isNeedExit->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
     isNeedExit->Set<GeneratedFromForIn>(true);
     CreateAndAppendTerminator<Branch>(loc, isNeedExit->GetResult(), delayExitTrueBlock,
@@ -414,7 +414,7 @@ void Translator::TranslateForInStringLatchBlockGroup(Ptr<Value>& inductiveVar)
         CreateAndAppendConstantExpression<IntLiteral>(inductiveVal->GetType(), *currentBlock, 1UL);
     constOne->Set<GeneratedFromForIn>(true);
     auto plusOne = CreateAndAppendExpression<BinaryExpression>(loc, inductiveVal->GetType(),
-        ExprKind::ADD, inductiveVal, constOne->GetResult(), OverflowStrategy::WRAPPING, currentBlock);
+        BinaryExprKind::ADD, inductiveVal, constOne->GetResult(), OverflowStrategy::WRAPPING, currentBlock);
     plusOne->Set<GeneratedFromForIn>(true);
     CreateAndAppendWrappedStore(*plusOne->GetResult(), *inductiveVar, loc);
     CreateAndAppendTerminator<Exit>(loc, currentBlock);
@@ -439,7 +439,7 @@ void Translator::TranslateForInCondControlFlow(Ptr<Value>& condVar)
     auto constZero = CreateAndAppendConstantExpression<IntLiteral>(builder.GetInt64Ty(), *currentBlock, 0UL);
     constZero->Set<GeneratedFromForIn>(true);
     auto isNeedExit = CreateAndAppendExpression<BinaryExpression>(
-        builder.GetBoolTy(), ExprKind::GT, delayExitSignalVal->GetResult(), constZero->GetResult(), currentBlock);
+        builder.GetBoolTy(), BinaryExprKind::GT, delayExitSignalVal->GetResult(), constZero->GetResult(), currentBlock);
     isNeedExit->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
     isNeedExit->Set<GeneratedFromForIn>(true);
     CreateAndAppendTerminator<Branch>(loc, isNeedExit->GetResult(), delayExitTrueBlock,
@@ -460,7 +460,7 @@ void Translator::TranslateForInCondControlFlow(Ptr<Value>& condVar)
     delayExitSignalVal->Set<GeneratedFromForIn>(true);
     auto constOne = CreateAndAppendConstantExpression<IntLiteral>(builder.GetInt64Ty(), *currentBlock, 1UL);
     constOne->Set<GeneratedFromForIn>(true);
-    auto decreaseOne = CreateAndAppendExpression<BinaryExpression>(builder.GetInt64Ty(), ExprKind::SUB,
+    auto decreaseOne = CreateAndAppendExpression<BinaryExpression>(builder.GetInt64Ty(), BinaryExprKind::SUB,
         delayExitSignalVal->GetResult(), constOne->GetResult(), OverflowStrategy::WRAPPING, currentBlock);
     decreaseOne->Set<GeneratedFromForIn>(true);
     CreateAndAppendWrappedStore(*decreaseOne->GetResult(), *delayExitSignal);
@@ -494,7 +494,7 @@ void Translator::UpdateDelayExitSignalInForInEnd(const ForIn& forIn)
         CreateAndAppendExpression<Load>(builder.GetInt64Ty(), delayExitSignal, currentBlock);
     delayExitSignalVal->Set<GeneratedFromForIn>(true);
     auto isNeedExit = CreateAndAppendExpression<BinaryExpression>(
-        builder.GetBoolTy(), ExprKind::GT, delayExitSignalVal->GetResult(), constZero->GetResult(), currentBlock);
+        builder.GetBoolTy(), BinaryExprKind::GT, delayExitSignalVal->GetResult(), constZero->GetResult(), currentBlock);
     isNeedExit->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
     isNeedExit->Set<GeneratedFromForIn>(true);
     CreateAndAppendTerminator<Branch>(loc, isNeedExit->GetResult(),
@@ -516,7 +516,7 @@ void Translator::UpdateDelayExitSignalInForInEnd(const ForIn& forIn)
     delayExitSignalVal->Set<GeneratedFromForIn>(true);
     auto constOne = CreateAndAppendConstantExpression<IntLiteral>(builder.GetInt64Ty(), *currentBlock, 1UL);
     constOne->Set<GeneratedFromForIn>(true);
-    auto decreaseOne = CreateAndAppendExpression<BinaryExpression>(builder.GetInt64Ty(), ExprKind::SUB,
+    auto decreaseOne = CreateAndAppendExpression<BinaryExpression>(builder.GetInt64Ty(), BinaryExprKind::SUB,
         delayExitSignalVal->GetResult(), constOne->GetResult(), OverflowStrategy::WRAPPING, currentBlock);
     CreateAndAppendWrappedStore(*decreaseOne->GetResult(), *delayExitSignal);
     Ptr<Value> funcRetValLocation = GetOuterBlockGroupReturnValLocation();
@@ -545,7 +545,7 @@ void Translator::GenerateSignalCheckForThrow()
         CreateAndAppendExpression<Load>(builder.GetInt64Ty(), delayExitSignal, currentBlock);
     delayExitSignalVal->Set<GeneratedFromForIn>(true);
     auto hasThrow = CreateAndAppendExpression<BinaryExpression>(
-        builder.GetBoolTy(), ExprKind::GT, delayExitSignalVal->GetResult(), constZero->GetResult(), currentBlock);
+        builder.GetBoolTy(), BinaryExprKind::GT, delayExitSignalVal->GetResult(), constZero->GetResult(), currentBlock);
     auto throwBB = CreateBlock(); // if throw check is true, rethrow it to outer Exception block
     auto exception = CreateAndAppendExpression<GetException>(builder.GetType<RefType>(builder.GetObjectTy()), throwBB);
     auto baseETy = builder.GetType<RefType>(builder.GetObjectTy());
@@ -575,7 +575,7 @@ Ptr<Value> Translator::TranslateForInIterCondition(Ptr<Value>& iterNextLocation,
     auto enumIdx = GetEnumIDValue(astTy, GetDerefedValue(iterNextLocation, iterNextLocation->GetDebugLocation()));
     // bool == 0 euqals !bool
     return CreateAndAppendExpression<UnaryExpression>(iterNextLocation->GetDebugLocation(),
-        builder.GetBoolTy(), ExprKind::NOT, enumIdx, Cangjie::OverflowStrategy::NA, currentBlock)->GetResult();
+        builder.GetBoolTy(), UnaryExprKind::NOT, enumIdx, Cangjie::OverflowStrategy::NA, currentBlock)->GetResult();
 }
 
 void Translator::TranslateForInIterPattern(const AST::ForInExpr& forInExpr, Ptr<Value>& iterNextLocation)
@@ -618,7 +618,7 @@ void Translator::TranslateForInIterLatchBlockGroup(
     delayExitSignalVal->Set<GeneratedFromForIn>(true);
     auto constZero = CreateAndAppendConstantExpression<IntLiteral>(builder.GetInt64Ty(), *currentBlock, 0UL);
     auto isNeedExit = CreateAndAppendExpression<BinaryExpression>(
-        builder.GetBoolTy(), ExprKind::GT, delayExitSignalVal->GetResult(), constZero->GetResult(), currentBlock);
+        builder.GetBoolTy(), BinaryExprKind::GT, delayExitSignalVal->GetResult(), constZero->GetResult(), currentBlock);
     isNeedExit->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
     isNeedExit->Set<GeneratedFromForIn>(true);
     CreateAndAppendTerminator<Branch>(loc, isNeedExit->GetResult(), delayExitTrueBlock,
@@ -712,10 +712,10 @@ Ptr<Value> Translator::TranslateForInRange(const AST::ForInExpr& forInExpr)
     ScopeContext context(*this);
     context.ScopePlus();
     LocalVar* localConditionVal = StaticCast<LocalVar>(condition);
-    auto conditionExprKind = localConditionVal->GetExpr()->GetExprKind();
+    auto conditionOpKind = ExprKindMgr::ToBinaryExprKind(localConditionVal->GetExpr()->GetExprKind());
     TranslateForInCondControlFlow(condVar);
     auto conditionInCondBG = CreateAndAppendExpression<BinaryExpression>(condLoc,
-        builder.GetBoolTy(), conditionExprKind, GetDerefedValue(inductiveVar, condLoc), GetDerefedValue(stopExprVar),
+        builder.GetBoolTy(), conditionOpKind, GetDerefedValue(inductiveVar, condLoc), GetDerefedValue(stopExprVar),
         currentBlock)->GetResult();
     CreateAndAppendWrappedStore(*conditionInCondBG, *condVar, condLoc);
     CreateAndAppendTerminator<Exit>(condLoc, currentBlock);
@@ -761,7 +761,7 @@ Ptr<Value> Translator::TranslateForInString(const AST::ForInExpr& forInExpr)
     auto condLoc = TranslateLocation(*inExpression->body[2U]);
     auto stringSize = GetDerefedValue(GetSymbolTable(*inExpression->body[2U]), condLoc);
     auto condition = CreateAndAppendExpression<BinaryExpression>(condLoc, builder.GetBoolTy(),
-        ExprKind::LT, GetDerefedValue(inductiveVar, condLoc), stringSize, currentBlock)->GetResult();
+        BinaryExprKind::LT, GetDerefedValue(inductiveVar, condLoc), stringSize, currentBlock)->GetResult();
     condition->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
     condition->GetExpr()->Set<GeneratedFromForIn>(true);
     auto recordBlock = currentBlock;
@@ -807,9 +807,8 @@ Ptr<Value> Translator::TranslateForInString(const AST::ForInExpr& forInExpr)
     ScopeContext context(*this);
     context.ScopePlus();
     TranslateForInCondControlFlow(condVar);
-    auto conditionInCondBG = CreateAndAppendExpression<BinaryExpression>(
-        condLoc, builder.GetBoolTy(), ExprKind::LT, GetDerefedValue(inductiveVar, condLoc), stringSize, currentBlock)
-                                 ->GetResult();
+    auto conditionInCondBG = CreateAndAppendExpression<BinaryExpression>(condLoc, builder.GetBoolTy(),
+        BinaryExprKind::LT, GetDerefedValue(inductiveVar, condLoc), stringSize, currentBlock)->GetResult();
     CreateAndAppendWrappedStore(*conditionInCondBG, *condVar, condLoc);
     CreateAndAppendTerminator<Exit>(condLoc, currentBlock);
     blockGroupStack.pop_back();
@@ -1108,7 +1107,7 @@ protected:
         // cond = i != b
         auto& iterVarLoc = iterVar->GetDebugLocation();
         auto conditionInCondBG = tr.CreateAndAppendExpression<BinaryExpression>(iterVarLoc, tr.builder.GetBoolTy(),
-            ExprKind::NOTEQUAL, iterValue, &iterEnd, tr.GetCurrentBlock())->GetResult();
+            BinaryExprKind::NOTEQUAL, iterValue, &iterEnd, tr.GetCurrentBlock())->GetResult();
         tr.CreateAndAppendWrappedStore(*conditionInCondBG, *condVar, iterVarLoc);
         tr.CreateAndAppendTerminator<Exit>(tr.GetCurrentBlock());
         tr.blockGroupStack.pop_back();
@@ -1135,7 +1134,7 @@ protected:
         auto constZero = tr.CreateAndAppendConstantExpression<IntLiteral>(tr.builder.GetInt64Ty(),
             *tr.GetCurrentBlock(), 0UL)->GetResult();
         auto needsExit = tr.CreateAndAppendExpression<BinaryExpression>(tr.builder.GetBoolTy(),
-            ExprKind::EQUAL, delayExitValue, constZero, tr.GetCurrentBlock())->GetResult();
+            BinaryExprKind::EQUAL, delayExitValue, constZero, tr.GetCurrentBlock())->GetResult();
         auto br = CreateBranch(needsExit, delayExitTrueBlock, delayExitFalseBlock, tr.GetCurrentBlock());
         br->Set<SkipCheck>(SkipKind::SKIP_DCE_WARNING);
 
@@ -1181,7 +1180,7 @@ protected:
         auto one = tr.CreateAndAppendConstantExpression<IntLiteral>(type, *tr.GetCurrentBlock(), 1UL)->GetResult();
         // this add is guaranteed to be never throwing
         auto newValue = tr.CreateAndAppendExpression<BinaryExpression>(
-            iterLoc, type, IsIncrement() ? ExprKind::ADD : ExprKind::SUB,
+            iterLoc, type, IsIncrement() ? BinaryExprKind::ADD : BinaryExprKind::SUB,
             iterValue, one, OverflowStrategy::WRAPPING, tr.GetCurrentBlock())->GetResult();
         tr.CreateAndAppendWrappedStore(*newValue, *iterVar, iterLoc);
         tr.CreateAndAppendTerminator<GoTo>(fb, tb);
@@ -1193,7 +1192,7 @@ protected:
     {
         auto loc = tr.TranslateLocation(*range);
         auto le = tr.CreateAndAppendExpression<BinaryExpression>(loc, tr.builder.GetBoolTy(),
-            IsIncrement() ? ExprKind::LE : ExprKind::GE, &iterBegin,
+            IsIncrement() ? BinaryExprKind::LE : BinaryExprKind::GE, &iterBegin,
             &iterEnd, tr.GetCurrentBlock())->GetResult();
         auto tb = tr.CreateBlock();
         auto fb = tr.CreateBlock();

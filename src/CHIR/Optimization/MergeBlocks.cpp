@@ -59,7 +59,7 @@ void MergeGotoOnlyBlock(Block& block)
         auto terminator = pred->GetTerminator();
         CJC_NULLPTR_CHECK(terminator);
         target->SetDebugLocation(block.GetDebugLocation());
-        terminator->ReplaceSuccessor(block, *target);
+        terminator->ReplaceOperand(&block, target);
         // skip check of block.terminator is not considered, because it is a simple GoTo and is unconditionally removed
         if (auto skip = terminator->Get<SkipCheck>() & block.Get<SkipCheck>(); skip != SkipKind::NO_SKIP) {
             terminator->Set<SkipCheck>(skip);
@@ -108,7 +108,7 @@ void MergeForInCondBlock(CHIRBuilder& builder, Block& block)
     for (size_t i{0}; i < oldPreds.size() - 1; ++i) {
         auto cpBlock = CopyBlock(builder, block);
         auto pred = oldPreds[i];
-        pred->GetTerminator()->ReplaceSuccessor(block, *cpBlock);
+        pred->GetTerminator()->ReplaceOperand(&block, cpBlock);
     }
     block.Remove<GeneratedFromForIn>();
 }
@@ -127,7 +127,8 @@ void MergeBlocks::RunOnPackage(const Package& package, CHIRBuilder& builder, con
 
 static bool SkipMergeBlock(const Block& bl, const GlobalOptions& opts)
 {
-    if (bl.TestAttr(Attribute::UNREACHABLE)) {
+    // Pattern blocks encode source-case boundaries consumed after ConstAnalysis; merging would erase that structure.
+    if (bl.TestAttr(Attribute::UNREACHABLE) || bl.TestAttr(Attribute::MATCH_PATTERN)) {
         return true;
     }
     if (!opts.enableCompileDebug) {

@@ -31,6 +31,7 @@
 namespace Cangjie::CHIR {
 class CHIRBuilder;
 class ExprTypeConverter;
+class Function;
 
 /**
  * @brief Expression major kind.
@@ -56,6 +57,40 @@ enum class ExprKind : uint8_t {
     MAX_EXPR_KINDS
 };
 
+/**
+ * @brief Unary operator category (independent of try/non-try ExprKind).
+ */
+enum class UnaryExprKind : uint8_t {
+    NEG,
+    NOT,
+    BITNOT,
+};
+
+/**
+ * @brief Binary operator category (independent of try/non-try ExprKind).
+ */
+enum class BinaryExprKind : uint8_t {
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    MOD,
+    EXP,
+    LSHIFT,
+    RSHIFT,
+    BITAND,
+    BITOR,
+    BITXOR,
+    LT,
+    GT,
+    LE,
+    GE,
+    EQUAL,
+    NOTEQUAL,
+    AND,
+    OR,
+};
+
 class ExprKindMgr {
 public:
     static const ExprKindMgr* Instance()
@@ -71,6 +106,11 @@ public:
     {
         return exprKindNames[exprKind];
     }
+
+    static ExprKind ToExprKind(UnaryExprKind kind, bool isTry = false);
+    static ExprKind ToExprKind(BinaryExprKind kind, bool isTry = false);
+    static UnaryExprKind ToUnaryExprKind(ExprKind kind);
+    static BinaryExprKind ToBinaryExprKind(ExprKind kind);
 
 private:
     void InitMap(ExprMajorKind majorKind, ...)
@@ -126,27 +166,11 @@ public:
     std::string GetExprKindName() const;
     ExprMajorKind GetExprMajorKind() const;
 
-    bool IsApply() const;
-    bool IsApplyWithException() const;
-    bool IsBinaryExpr() const;
-    bool IsConstant() const;
     bool IsConstantNull() const;
     bool IsConstantBool() const;
     bool IsConstantInt() const;
-    bool IsConstantFloat() const;
     bool IsConstantString() const;
-    bool IsDebug() const;
-    bool IsDynamicDispatch() const;
-    bool IsField() const;
-    bool IsFuncCall() const;
-    bool IsIntOpWithException() const;
-    bool IsInvoke() const;
-    bool IsInvokeStaticBase() const;
-    bool IsLambda() const;
-    bool IsLoad() const;
     bool IsTerminator() const;
-    bool IsTypeCast() const;
-    bool IsUnaryExpr() const;
 
     bool HasExceptionBranch() const;
 
@@ -207,26 +231,52 @@ public:
     // Operand
     // ===--------------------------------------------------------------------===//
     /**
-     * @brief Retrieves the number of operands.
+     * @brief Retrieves the number of operands, including successor blocks.
+     *
+     * Use GetNumOfNonSuccessorOperands() if successor blocks must be excluded.
      *
      * @return The number of operands.
      */
-    virtual size_t GetNumOfOperands() const;
+    size_t GetNumOfOperands() const;
+
+    /**
+     * @brief Retrieves the number of operands except successor blocks.
+     *
+     * This is the number of operands reachable through GetOperand().
+     *
+     * @return The number of the leading non-block operands.
+     */
+    size_t GetNumOfNonSuccessorOperands() const;
 
     /**
      * @brief Retrieves an operand by index.
      *
+     * Successor blocks can not be reached through this function, use GetSuccessor() instead.
+     *
      * @param idx The index of the operand to retrieve.
      * @return The operand at the specified index.
      */
-    virtual Value* GetOperand(size_t idx) const;
+    Value* GetOperand(size_t idx) const;
 
     /**
-     * @brief Retrieves all operands.
+     * @brief Retrieves all operands, including successor blocks.
+     *
+     * Use GetNonSuccessorOperands() if successor blocks must be excluded.
      *
      * @return A vector of pointers to all operands.
      */
-    virtual std::vector<Value*> GetOperands() const;
+    std::vector<Value*> GetOperands() const;
+
+    /**
+     * @brief Retrieves all operands except successor blocks.
+     *
+     * Only useful for code which walks the operands of an arbitrary Expression and can not tell
+     * a data operand from a successor block. Prefer a subclass specific accessor
+     * (e.g. Tuple::GetElementValues(), Apply::GetArgs()) whenever the expression kind is known.
+     *
+     * @return A vector of pointers to the leading non-block operands.
+     */
+    std::vector<Value*> GetNonSuccessorOperands() const;
 
     /**
      * @brief Replace old operand in specified position.
@@ -244,6 +294,34 @@ public:
      * @param newOperand The destination value.
      */
     virtual void ReplaceOperand(Value* oldOperand, Value* newOperand);
+
+    // ===--------------------------------------------------------------------===//
+    // Successor
+    // ===--------------------------------------------------------------------===//
+    /**
+     * @brief Retrieves successor blocks among operands.
+     *
+     * Any operand that is a Block is treated as a successor.
+     *
+     * @return The successor blocks.
+     */
+    std::vector<Block*> GetSuccessors() const;
+
+    /**
+     * @brief Map a successor index to its index in operands.
+     *
+     * Operands are laid out as: op1, op2, ..., block1, block2, ...
+     * Given the index among Block successors, return the corresponding operands index
+     * (successor index plus the number of leading non-block operands).
+     *
+     * @param index The 0-based index among successor blocks.
+     * @return The index in the operands vector.
+     */
+    size_t GetSuccessorIndex(size_t index) const;
+
+    size_t GetNumOfSuccessor() const;
+
+    Block* GetSuccessor(size_t index) const;
 
     // ===--------------------------------------------------------------------===//
     // Modify Self
@@ -331,16 +409,9 @@ protected:
 };
 
 /**
- * @brief Unary expression, including Neg, Not and BitNot.
- *
- * Cangjie Code:
- *      var x = 1
- *      var y = -x // kind is Neg
+ * @brief Common base for unary expressions with overflow strategy.
  */
-class UnaryExpression : public Expression {
-    friend class CHIRContext;
-    friend class CHIRBuilder;
-
+class UnaryExpressionBase : public Expression {
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
@@ -348,37 +419,49 @@ public:
     using Expression::GetOperand;
     Value* GetOperand() const;
 
+    /**
+     * @brief Non-exception unary operator kind.
+     * For Try* forms, returns the corresponding UnaryExprKind.
+     */
+    UnaryExprKind GetOpKind() const;
+
     OverflowStrategy GetOverflowStrategy() const;
 
 protected:
+    explicit UnaryExpressionBase(
+        UnaryExprKind kind, Value* operand, Cangjie::OverflowStrategy ofs, bool isTry,
+        const std::vector<Block*>& successors, Block* parent);
+    ~UnaryExpressionBase() override = default;
+
     std::string AddExtraComment() const override;
-    ~UnaryExpression() override = default;
 
-private:
-    explicit UnaryExpression(ExprKind kind, Value* operand, Cangjie::OverflowStrategy ofs, Block* parent)
-        : Expression(kind, {operand}, {}, parent), overflowStrategy(ofs)
-    {
-    }
-
-    UnaryExpression* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-    Cangjie::OverflowStrategy overflowStrategy;
+    Cangjie::OverflowStrategy overflowStrategy{Cangjie::OverflowStrategy::NA};
 };
 
 /**
- * @brief Binary expression, including:
- * 1. mathematical operator, such as `add`, `sub`, `mul`, `div`, `mod` and `exp`
- * 2. bit operator, such as `<<`, `>>`, `&`, `|` and `^`
- * 3. comparison operator, such as `<`, `>`, `<=`, `>=`, `==` and `!=`
- * 4. logical operator, such as `&&` and `||`
+ * @brief Unary expression, including Neg, Not and BitNot.
  *
  * Cangjie Code:
- *      var x = 1 + 2 // kind is Add, `1` is left-hand side op, `2` is right-hand side op
+ *      var x = 1
+ *      var y = -x // kind is Neg
  */
-class BinaryExpression : public Expression {
+class UnaryExpression : public UnaryExpressionBase {
     friend class CHIRContext;
     friend class CHIRBuilder;
 
+protected:
+    ~UnaryExpression() override = default;
+
+private:
+    explicit UnaryExpression(UnaryExprKind kind, Value* operand, Cangjie::OverflowStrategy ofs, Block* parent);
+
+    UnaryExpression* Clone(CHIRBuilder& builder, Block& parent) const override;
+};
+
+/**
+ * @brief Common base for binary expressions with overflow strategy.
+ */
+class BinaryExpressionBase : public Expression {
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
@@ -397,19 +480,53 @@ public:
      */
     Value* GetRHSOperand() const;
 
+    /**
+     * @brief Non-exception binary operator kind.
+     * For Try* forms, returns the corresponding BinaryExprKind.
+     */
+    BinaryExprKind GetOpKind() const;
+
+    bool IsMathematicalOperator() const;
+    bool IsBitwiseOperator() const;
+    bool IsComparisonOperator() const;
+    bool IsLogicalOperator() const;
+
     OverflowStrategy GetOverflowStrategy() const;
 
 protected:
+    explicit BinaryExpressionBase(
+        BinaryExprKind kind, Value* lhs, Value* rhs, OverflowStrategy ofs, bool isTry,
+        const std::vector<Block*>& successors, Block* parent);
+    explicit BinaryExpressionBase(BinaryExprKind kind, Value* lhs, Value* rhs, Block* parent);
+    ~BinaryExpressionBase() override = default;
+
     std::string AddExtraComment() const override;
+
+    Cangjie::OverflowStrategy overflowStrategy{Cangjie::OverflowStrategy::NA};
+};
+
+/**
+ * @brief Binary expression, including:
+ * 1. mathematical operator, such as `add`, `sub`, `mul`, `div`, `mod` and `exp`
+ * 2. bit operator, such as `<<`, `>>`, `&`, `|` and `^`
+ * 3. comparison operator, such as `<`, `>`, `<=`, `>=`, `==` and `!=`
+ * 4. logical operator, such as `&&` and `||`
+ *
+ * Cangjie Code:
+ *      var x = 1 + 2 // kind is Add, `1` is left-hand side op, `2` is right-hand side op
+ */
+class BinaryExpression : public BinaryExpressionBase {
+    friend class CHIRContext;
+    friend class CHIRBuilder;
+
+protected:
     ~BinaryExpression() override = default;
 
 private:
-    explicit BinaryExpression(ExprKind kind, Value* lhs, Value* rhs, OverflowStrategy ofs, Block* parent);
-    explicit BinaryExpression(ExprKind kind, Value* lhs, Value* rhs, Block* parent);
+    explicit BinaryExpression(BinaryExprKind kind, Value* lhs, Value* rhs, OverflowStrategy ofs, Block* parent);
+    explicit BinaryExpression(BinaryExprKind kind, Value* lhs, Value* rhs, Block* parent);
 
     BinaryExpression* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-    Cangjie::OverflowStrategy overflowStrategy{Cangjie::OverflowStrategy::NA};
 };
 
 /**
@@ -461,14 +578,12 @@ private:
 };
 
 /**
- * @brief Allocate memory whit specific type
+ * @brief Common base for `Allocate` and `TryAllocate`.
  *
  * Cangjie Code:
  *      var x = 1 // allocate 8 Bytes memory
  */
-class Allocate : public Expression {
-    friend class CHIRContext;
-    friend class CHIRBuilder;
+class AllocateBase : public Expression {
     friend class ExprTypeConverter;
 public:
     // ===--------------------------------------------------------------------===//
@@ -480,17 +595,25 @@ public:
     Type* GetType() const;
 
 protected:
+    explicit AllocateBase(ExprKind kind, Type* ty, const std::vector<Block*>& successors, Block* parent);
+    ~AllocateBase() override = default;
+
     std::string OperandsToString() const override;
-    ~Allocate() override = default;
-
-private:
-    explicit Allocate(Type* ty, Block* parent) : Expression(ExprKind::ALLOCATE, {}, {}, parent), ty(ty)
-    {
-    }
-
-    Allocate* Clone(CHIRBuilder& builder, Block& parent) const override;
 
     Type* ty; // The type to be allocated.
+};
+
+/**
+ * @brief Allocate memory whit specific type
+ */
+class Allocate : public AllocateBase {
+    friend class CHIRContext;
+    friend class CHIRBuilder;
+private:
+    explicit Allocate(Type* ty, Block* parent);
+    ~Allocate() override = default;
+
+    Allocate* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
@@ -582,7 +705,7 @@ public:
      *
      * @return a value with reference type
      */
-    Value* GetLocation() const;
+    Value* GetBase() const;
 
     const std::vector<uint64_t>& GetPath() const;
 
@@ -661,13 +784,13 @@ public:
      * @return The value.
      */
     Value* GetValue() const;
-    
+
     /**
-     * @brief Retrieves the location.
+     * @brief Retrieves the base value which the element belongs to.
      *
-     * @return The location.
+     * @return a value with reference type
      */
-    Value* GetLocation() const;
+    Value* GetBase() const;
 
     /**
      * @brief Retrieves the path.
@@ -748,16 +871,19 @@ struct FuncCallContext {
  * @brief Context for a virtual function calling
  */
 struct InvokeCallContext {
-    Value* caller{nullptr};  // the object in Invoke, or the rtti in InvokeStatic
+    Function* method{nullptr};  // virtual method, like callee in Apply
+    Value* caller{nullptr};       // the object in Invoke, or the rtti in InvokeStatic
     FuncCallContext funcCallCtx;
-    FuncSigInfo virMethodCtx;
+    Cangjie::OverflowStrategy overflowStrategy{Cangjie::OverflowStrategy::NA};
 };
 
 /**
- * @brief An expression for function call, including Apply, Invoke and InvokeStatic
+ * @brief An expression for function call, including Apply, Invoke, InvokeStatic, Intrinsic
+ * (and their Try* forms).
  */
 class FuncCall : public Expression {
     friend class ExprTypeConverter;
+    friend class PrivateTypeConverterNoInvokeOriginal;
     friend class CHIRSerializer;
 public:
     // ===--------------------------------------------------------------------===//
@@ -769,6 +895,14 @@ public:
      * @return A vector of pointers to the application argument nodes.
      */
     virtual std::vector<Value*> GetArgs() const = 0;
+
+    /**
+     * @brief Retrieves the argument at the given index.
+     *
+     * @param index The index of the argument.
+     * @return The argument at the given index.
+     */
+    Value* GetArg(size_t index) const;
 
     /**
      * @brief Retrieves the type of 'this'.
@@ -793,6 +927,11 @@ public:
 
 protected:
     explicit FuncCall(ExprKind kind, const FuncCallContext& funcCallCtx, Block* parent);
+    ~FuncCall() override = default;
+
+    std::string OperandsToString() const override;
+
+    virtual std::string GetCalleeIdentifier() const = 0;
 
     /**
      * @brief Record instantiated type args.
@@ -816,17 +955,15 @@ protected:
 };
 
 /**
- * @brief A non-virtual function call
+ * @brief Common base for Apply and TryApply.
  *
  * Cangjie Code:
  *      func foo() {}
  *      foo()  // `foo` is global function, not virtual function
  */
-class Apply : public FuncCall {
+class ApplyBase : public FuncCall {
     friend class ExprTypeConverter;
     friend class CHIRSerializer;
-    friend class CHIRContext;
-    friend class CHIRBuilder;
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
@@ -845,6 +982,33 @@ public:
      */
     std::vector<Value*> GetArgs() const override;
 
+    // ===--------------------------------------------------------------------===//
+    // Instantiated Types
+    // ===--------------------------------------------------------------------===//
+    /**
+     * @brief Retrieves the instantiated parent custom type of the callee.
+     *
+     * @return The instantiated parent custom type of the callee.
+     */
+    Type* GetInstParentCustomTyOfCallee(CHIRBuilder& builder) const;
+
+protected:
+    explicit ApplyBase(ExprKind kind, Value* callee, const FuncCallContext& callContext,
+        const std::vector<Block*>& successors, Block* parent);
+    ~ApplyBase() override = default;
+
+    std::string GetCalleeIdentifier() const override;
+};
+
+/**
+ * @brief A non-virtual function call
+ */
+class Apply : public ApplyBase {
+    friend class ExprTypeConverter;
+    friend class CHIRSerializer;
+    friend class CHIRContext;
+    friend class CHIRBuilder;
+public:
     /**
      * @brief Checks if the call is a super call.
      *
@@ -857,18 +1021,7 @@ public:
      */
     void SetSuperCall();
 
-    // ===--------------------------------------------------------------------===//
-    // Instantiated Types
-    // ===--------------------------------------------------------------------===//
-    /**
-     * @brief Retrieves the instantiated parent custom type of the callee.
-     *
-     * @return The instantiated parent custom type of the callee.
-     */
-    Type* GetInstParentCustomTyOfCallee(CHIRBuilder& builder) const;
-
 protected:
-    std::string OperandsToString() const override;
     std::string AddExtraComment() const override;
     ~Apply() override = default;
 
@@ -885,6 +1038,7 @@ private:
 
 /**
  * @brief An expression for virtual function call, including Invoke and InvokeStatic
+ * (and their Try* forms).
  */
 class DynamicDispatch : public FuncCall {
     friend class ExprTypeConverter;
@@ -895,11 +1049,18 @@ public:
     // Base Information
     // ===--------------------------------------------------------------------===//
     /**
+     * @brief Retrieves the virtual method of this Invoke operation.
+     *
+     * @return The virtual method of this Invoke operation.
+     */
+    Function* GetCallee() const;
+
+    /**
      * @brief Retrieves the method name of this Invoke operation.
      *
      * @return The method name of this Invoke operation.
      */
-    const std::string& GetMethodName() const;
+    std::string GetMethodName() const;
 
     /**
      * @brief Retrieves the method type of this Invoke operation.
@@ -915,7 +1076,7 @@ public:
      *
      * @return The offset, greater than or equal to zero.
      */
-    size_t GetVirtualMethodOffset(CHIRBuilder* builder = nullptr) const;
+    size_t GetVirtualMethodOffset() const;
 
     // ===--------------------------------------------------------------------===//
     // Instantiated Types
@@ -935,20 +1096,19 @@ public:
      *
      * @return Virtual method's attribute.
      */
-    AttributeInfo GetVirtualMethodAttr(CHIRBuilder& builder) const;
+    AttributeInfo GetVirtualMethodAttr() const;
 
 protected:
-    std::string OperandsToString() const override;
+    std::string GetCalleeIdentifier() const override;
+    std::string AddExtraComment() const override;
     explicit DynamicDispatch(ExprKind kind, const InvokeCallContext& callContext, Block* parent);
+    ~DynamicDispatch() override = default;
 
-    FuncSigInfo virMethodCtx;
-
-private:
-    std::vector<VTableSearchRes> GetVirtualMethodInfo(CHIRBuilder& builder) const;
+    Cangjie::OverflowStrategy overflowStrategy{Cangjie::OverflowStrategy::NA};
 };
 
 /**
- * @brief An expression for virtual instance member method call
+ * @brief Common base for Invoke and TryInvoke.
  *
  * Cangjie Code:
  *      interface I { func foo() {} }
@@ -956,33 +1116,14 @@ private:
  *      var x: I = A()
  *      x.foo() // `foo` is a virtual instance member method, which means `foo` can be overrided by class A
  */
-class Invoke : public DynamicDispatch {
+class InvokeBase : public DynamicDispatch {
     friend class ExprTypeConverter;
     friend class PrivateTypeConverterNoInvokeOriginal;
     friend class CHIRSerializer;
-    friend class CHIRContext;
-    friend class CHIRBuilder;
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
     // ===--------------------------------------------------------------------===//
-    /**
-     * @brief Replace old operand in specified position.
-     *
-     * @param idx The sepcified position.
-     * @param newOperand The destination value.
-     */
-    void ReplaceOperand(size_t idx, Value* newOperand) final;
-
-    /**
-     * @brief Replace old operand with the new one, if there are many old operands in same expression,
-     * then replace them all
-     *
-     * @param oldOperand The source value.
-     * @param newOperand The destination value.
-     */
-    void ReplaceOperand(Value* oldOperand, Value* newOperand) final;
-    
     /**
      * @brief Retrieves the object of this Invoke operation.
      * Object's type doesn't always equal to ThisType, maybe we use an object from sub type to call
@@ -1001,14 +1142,27 @@ public:
     std::vector<Value*> GetArgs() const override;
 
 protected:
+    explicit InvokeBase(
+        ExprKind kind, const InvokeCallContext& callContext, const std::vector<Block*>& successors, Block* parent);
+    ~InvokeBase() override = default;
+};
+
+/**
+ * @brief An expression for virtual instance member method call
+ */
+class Invoke : public InvokeBase {
+    friend class ExprTypeConverter;
+    friend class PrivateTypeConverterNoInvokeOriginal;
+    friend class CHIRSerializer;
+    friend class CHIRContext;
+    friend class CHIRBuilder;
+protected:
     ~Invoke() override = default;
 
 private:
     explicit Invoke(const InvokeCallContext& callContext, Block* parent);
 
     Invoke* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-    void UpdateThisType();
 };
 
 /**
@@ -1071,7 +1225,7 @@ private:
 };
 
 /**
- * @brief If a static member method calling can trigger dynamic dispatch, we will use `InvokeStatic` to describe
+ * @brief Common base for InvokeStatic and TryInvokeStatic.
  *
  * Cangjie Code:
  *      interface I { static func goo() {} }
@@ -1080,12 +1234,10 @@ private:
  *          T.goo()  // we don't know which `goo` is called in runtime, I.goo or A.goo
  *      }
  */
-class InvokeStatic : public DynamicDispatch {
+class InvokeStaticBase : public DynamicDispatch {
     friend class ExprTypeConverter;
     friend class PrivateTypeConverterNoInvokeOriginal;
     friend class CHIRSerializer;
-    friend class CHIRContext;
-    friend class CHIRBuilder;
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
@@ -1105,6 +1257,21 @@ public:
     Value* GetRTTIValue() const;
 
 protected:
+    explicit InvokeStaticBase(
+        ExprKind kind, const InvokeCallContext& callContext, const std::vector<Block*>& successors, Block* parent);
+    ~InvokeStaticBase() override = default;
+};
+
+/**
+ * @brief If a static member method calling can trigger dynamic dispatch, we will use `InvokeStatic` to describe
+ */
+class InvokeStatic : public InvokeStaticBase {
+    friend class ExprTypeConverter;
+    friend class PrivateTypeConverterNoInvokeOriginal;
+    friend class CHIRSerializer;
+    friend class CHIRContext;
+    friend class CHIRBuilder;
+protected:
     ~InvokeStatic() override = default;
 
 private:
@@ -1114,15 +1281,9 @@ private:
 };
 
 /**
- * @brief Cast a src type to target type.
- *
- * Cangjie Code:
- *      var x: Int32 = 1
- *      var y: Int64 = Int64(x)  // x is Int32, cast to Int64
+ * @brief Common base for all type-cast expressions in CHIR.
  */
 class TypeCast : public Expression {
-    friend class CHIRContext;
-    friend class CHIRBuilder;
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
@@ -1131,25 +1292,69 @@ public:
     Value* GetSourceValue() const;
 
     /** @brief Get the source type of this operation */
-    Type* GetSourceTy() const;
+    Type* GetSourceType() const;
 
     /** @brief Get the target type of this operation */
-    Type* GetTargetTy() const;
+    Type* GetTargetType() const;
 
+protected:
+    explicit TypeCast(ExprKind kind, Value* operand, const std::vector<Block*>& successors, Block* parent);
+    ~TypeCast() override = default;
+};
+
+/**
+ * @brief Common base for numeric cast expressions with overflow strategy.
+ */
+class NumericCastBase : public TypeCast {
+public:
     /** @brief Get the overflow strategy of this cast operation */
     OverflowStrategy GetOverflowStrategy() const;
 
 protected:
+    explicit NumericCastBase(
+        ExprKind kind, Value* operand, Cangjie::OverflowStrategy overflow, const std::vector<Block*>& successors,
+        Block* parent);
+    ~NumericCastBase() override = default;
+
     std::string AddExtraComment() const override;
-    ~TypeCast() override = default;
 
 private:
-    explicit TypeCast(Value* operand, Block* parent);
-    explicit TypeCast(Value* operand, Cangjie::OverflowStrategy overflow, Block* parent);
-
-    TypeCast* Clone(CHIRBuilder& builder, Block& parent) const override;
-
     Cangjie::OverflowStrategy overflowStrategy{Cangjie::OverflowStrategy::NA};
+};
+
+/**
+ * @brief Cast a src type to target type for class/func/tuple etc.
+ *
+ * Cangjie Code:
+ *      var x: Base = subObj  // class hierarchy cast
+ */
+class ClassStaticCast : public TypeCast {
+    friend class CHIRContext;
+    friend class CHIRBuilder;
+
+private:
+    explicit ClassStaticCast(Value* operand, Block* parent);
+    ~ClassStaticCast() override = default;
+
+    ClassStaticCast* Clone(CHIRBuilder& builder, Block& parent) const override;
+};
+
+/**
+ * @brief Numeric cast with overflow strategy.
+ *
+ * Cangjie Code:
+ *      var x: Int32 = 1
+ *      var y: Int64 = Int64(x)  // x is Int32, cast to Int64
+ */
+class NumericCast : public NumericCastBase {
+    friend class CHIRContext;
+    friend class CHIRBuilder;
+
+private:
+    explicit NumericCast(Value* operand, Cangjie::OverflowStrategy overflow, Block* parent);
+    ~NumericCast() override = default;
+
+    NumericCast* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
@@ -1197,21 +1402,9 @@ private:
  *      2. BoxType&
  *      3. This&
  */
-class Box : public Expression {
+class Box : public TypeCast {
     friend class CHIRContext;
     friend class CHIRBuilder;
-public:
-    // ===--------------------------------------------------------------------===//
-    // Base Information
-    // ===--------------------------------------------------------------------===//
-    /** @brief Get the source value of this operation */
-    Value* GetSourceValue() const;
-
-    /** @brief Get the source type of this operation */
-    Type* GetSourceTy() const;
-
-    /** @brief Get the target type of this operation */
-    Type* GetTargetTy() const;
 
 private:
     explicit Box(Value* operand, Block* parent);
@@ -1231,27 +1424,15 @@ private:
  *      2. BoxType&
  *      3. This&
  */
-class UnBox : public Expression {
+class UnBoxToValue : public TypeCast {
     friend class CHIRContext;
     friend class CHIRBuilder;
-public:
-    // ===--------------------------------------------------------------------===//
-    // Base Information
-    // ===--------------------------------------------------------------------===//
-    /** @brief Get the source value of this operation */
-    Value* GetSourceValue() const;
-
-    /** @brief Get the source type of this operation */
-    Type* GetSourceTy() const;
-
-    /** @brief Get the target type of this operation */
-    Type* GetTargetTy() const;
 
 private:
-    explicit UnBox(Value* operand, Block* parent);
-    ~UnBox() override = default;
+    explicit UnBoxToValue(Value* operand, Block* parent);
+    ~UnBoxToValue() override = default;
 
-    UnBox* Clone(CHIRBuilder& builder, Block& parent) const override;
+    UnBoxToValue* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
@@ -1259,27 +1440,15 @@ private:
  * 1. Bool -> T
  * 2. Class A<Bool>& -> Class A<T>&
  */
-class TransformToGeneric : public Expression {
+class CastToGeneric : public TypeCast {
     friend class CHIRContext;
     friend class CHIRBuilder;
-public:
-    // ===--------------------------------------------------------------------===//
-    // Base Information
-    // ===--------------------------------------------------------------------===//
-    /** @brief Get the source value of this operation */
-    Value* GetSourceValue() const;
-
-    /** @brief Get the source type of this operation */
-    Type* GetSourceTy() const;
-
-    /** @brief Get the target type of this operation */
-    Type* GetTargetTy() const;
 
 private:
-    explicit TransformToGeneric(Value* operand, Block* parent);
-    ~TransformToGeneric() override = default;
+    explicit CastToGeneric(Value* operand, Block* parent);
+    ~CastToGeneric() override = default;
 
-    TransformToGeneric* Clone(CHIRBuilder& builder, Block& parent) const override;
+    CastToGeneric* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
@@ -1287,48 +1456,24 @@ private:
  * 1. T -> Bool
  * 2. Class A<T>& -> Class A<Bool>&
  */
-class TransformToConcrete : public Expression {
+class CastToConcrete : public TypeCast {
     friend class CHIRContext;
     friend class CHIRBuilder;
-public:
-    // ===--------------------------------------------------------------------===//
-    // Base Information
-    // ===--------------------------------------------------------------------===//
-    /** @brief Get the source value of this operation */
-    Value* GetSourceValue() const;
-
-    /** @brief Get the source type of this operation */
-    Type* GetSourceTy() const;
-
-    /** @brief Get the target type of this operation */
-    Type* GetTargetTy() const;
 
 private:
-    explicit TransformToConcrete(Value* operand, Block* parent);
-    ~TransformToConcrete() override = default;
+    explicit CastToConcrete(Value* operand, Block* parent);
+    ~CastToConcrete() override = default;
 
-    TransformToConcrete* Clone(CHIRBuilder& builder, Block& parent) const override;
+    CastToConcrete* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
  * @brief Cast a reference type to a value ref type.
  * 1. Class I& -> Struct S&
  */
-class UnBoxToRef : public Expression {
+class UnBoxToRef : public TypeCast {
     friend class CHIRContext;
     friend class CHIRBuilder;
-public:
-    // ===--------------------------------------------------------------------===//
-    // Base Information
-    // ===--------------------------------------------------------------------===//
-    /** @brief Get the source value of this operation */
-    Value* GetSourceValue() const;
-
-    /** @brief Get the source type of this operation */
-    Type* GetSourceTy() const;
-
-    /** @brief Get the target type of this operation */
-    Type* GetTargetTy() const;
 
 private:
     explicit UnBoxToRef(Value* operand, Block* parent);
@@ -1440,8 +1585,7 @@ private:
 // So CHIR need to use specific expressions to describe
 // ===--------------------------------------------------------------------===//
 /**
- * @brief Allocate a memory to store array element value,
- * this expression is an internal implementation to generate Array
+ * @brief Common base for `RawArrayAllocate` and `TryRawArrayAllocate`.
  *
  *  Cangjie Code:
  *      var x: Array<Int32> = [1, 2, 3]  // use `RawArrayAllocate` to get a memory to store `1, 2, 3`
@@ -1453,11 +1597,9 @@ private:
  *      %4: Int32 = Constant(3)
  *      %5: Unit = RawArrayLiteralInit(%1, %2, %3, %4)
  */
-class RawArrayAllocate : public Expression {
+class RawArrayAllocateBase : public Expression {
     friend class ExprTypeConverter;
     friend class TypeConverterForCC;
-    friend class CHIRContext;
-    friend class CHIRBuilder;
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
@@ -1473,15 +1615,27 @@ public:
     Type* GetElementType() const;
 
 protected:
+    explicit RawArrayAllocateBase(
+        ExprKind kind, Type* eleTy, Value* size, const std::vector<Block*>& successors, Block* parent);
+    ~RawArrayAllocateBase() override = default;
+
     std::string OperandsToString() const override;
 
+    Type* elementType; // The element type.
+};
+
+/**
+ * @brief Allocate a memory to store array element value,
+ * this expression is an internal implementation to generate Array.
+ */
+class RawArrayAllocate : public RawArrayAllocateBase {
+    friend class CHIRContext;
+    friend class CHIRBuilder;
 private:
     explicit RawArrayAllocate(Type* eleTy, Value* size, Block* parent);
     ~RawArrayAllocate() override = default;
     
     RawArrayAllocate* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-    Type* elementType; // The element type.
 };
 
 /**
@@ -1517,7 +1671,7 @@ public:
     /**
      * @brief Retrieves all elements in Array.
      */
-    std::vector<Value*> GetElements() const;
+    std::vector<Value*> GetElementValues() const;
 
 private:
     explicit RawArrayLiteralInit(const Ptr<Value> raw, std::vector<Value*> elements, Block* parent);
@@ -1584,6 +1738,11 @@ public:
      * @brief Retrieves element quantity in VArray.
      */
     int64_t GetSize() const;
+
+    /**
+     * @brief Retrieves all elements in VArray.
+     */
+    std::vector<Value*> GetElementValues() const;
 
 private:
     explicit VArray(std::vector<Value*> elements, Block* parent);
@@ -1657,13 +1816,13 @@ struct IntrisicCallContext {
 };
 
 /**
- * @brief Generate intrinsic function calling.
- * All intrinsic kinds are listd in cangjie/CHIR/IR/IntrinsicKind.h
+ * @brief Common base for Intrinsic and TryIntrinsic.
+ *
+ * All intrinsic kinds are listed in cangjie/CHIR/IR/IntrinsicKind.h
  */
-class Intrinsic : public Expression {
+class IntrinsicBase : public FuncCall {
     friend class ExprTypeConverter;
-    friend class CHIRContext;
-    friend class CHIRBuilder;
+    friend class CHIRSerializer;
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
@@ -1674,31 +1833,35 @@ public:
     CHIR::IntrinsicKind GetIntrinsicKind() const;
 
     /**
-     * @brief Retrieves the generic type information.
-     *
-     * @return A vector of pointers to the generic types.
-     */
-    const std::vector<Type*>& GetInstantiatedTypeArgs() const;
-
-    /**
      * @brief Retrieves the arguments of the intrinsic operation.
      *
      * @return A vector of pointers to the arguments.
      */
-    const std::vector<Value*>& GetArgs() const;
+    std::vector<Value*> GetArgs() const override;
 
 protected:
-    std::string OperandsToString() const override;
+    explicit IntrinsicBase(ExprKind kind, const IntrisicCallContext& callContext,
+        const std::vector<Block*>& successors, Block* parent);
+    ~IntrinsicBase() override = default;
 
+    std::string GetCalleeIdentifier() const override;
+
+private:
+    CHIR::IntrinsicKind intrinsicKind;
+};
+
+/**
+ * @brief Generate intrinsic function calling.
+ */
+class Intrinsic : public IntrinsicBase {
+    friend class ExprTypeConverter;
+    friend class CHIRContext;
+    friend class CHIRBuilder;
 private:
     explicit Intrinsic(const IntrisicCallContext& callContext, Block* parent);
     ~Intrinsic() override = default;
 
     Intrinsic* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-private:
-    CHIR::IntrinsicKind intrinsicKind;
-    std::vector<Type*> instantiatedTypeArgs;
 };
 
 /**
@@ -2065,7 +2228,7 @@ private:
 };
 
 /**
- * @brief An expression to describe `spawn` in Cangjie.
+ * @brief Common base for `Spawn` and `TrySpawn`.
  *
  * Cangjie Code:
  *      let x = spawn(arg) {
@@ -2090,9 +2253,7 @@ private:
  *      %4: Class-Future<Int64>& = Spawn(%1, %3)
  * Then, %1 is closure
  */
-class Spawn : public Expression {
-    friend class CHIRContext;
-    friend class CHIRBuilder;
+class SpawnBase : public Expression {
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
@@ -2106,6 +2267,9 @@ public:
 
     bool IsExecuteClosure() const;
     void SetExecuteClosure(Function& func);
+
+    /** @brief Get the Future or closure object (first non-successor operand). */
+    Value* GetObject() const;
 
     // ===--------------------------------------------------------------------===//
     // Before Optimization
@@ -2125,21 +2289,31 @@ public:
     Function* GetExecuteClosure() const;
 
 protected:
+    explicit SpawnBase(
+        ExprKind kind, const std::vector<Value*>& operands, const std::vector<Block*>& successors, Block* parent);
+    ~SpawnBase() override = default;
+
     std::string AddExtraComment() const override;
 
+    /**
+     * @brief After optimization, backend will use `executeClosure` to create new thread, not `Future` object.
+     * `executeClosure` is member method in class `Future` which is declared in std.core
+     */
+    Function* executeClosure{nullptr};
+};
+
+/**
+ * @brief An expression to describe `spawn` in Cangjie.
+ */
+class Spawn : public SpawnBase {
+    friend class CHIRContext;
+    friend class CHIRBuilder;
 private:
     explicit Spawn(Value* val, Block* parent);
     explicit Spawn(Value* val, Value* arg, Block* parent);
     ~Spawn() override = default;
 
     Spawn* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-private:
-    /**
-     * @brief After optimization, backend will use `executeClosure` to create new thread, not `Future` object.
-     * `executeClosure` is member method in class `Future` which is declared in std.core
-     */
-    Function* executeClosure{nullptr};
 };
 
 /**

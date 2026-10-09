@@ -9,7 +9,7 @@
 /**
  * @file
  *
- * This file declares all terminators of CHIR, including Terminator itself and its sub class
+ * This file declares CHIR terminator expressions (block-ending expressions).
  */
 
 #ifndef CANGJIE_CHIR_TERMINATOR_H
@@ -30,88 +30,15 @@ enum class SourceExpr : uint8_t {
     QUEST,
     BINARY,
     FOR_IN_EXPR,
+    // Its failure edge enters the next source match case rather than another condition in the same case.
+    MATCH_CASE,
     OTHER
-};
-
-/**
- * @brief Terminator class in CHIR.
- * Terminator is also an expression, but it can only be at the end of one block.
- */
-class Terminator : public Expression {
-    friend class Block;
-
-public:
-    // ===--------------------------------------------------------------------===//
-    // Operand
-    // ===--------------------------------------------------------------------===//
-    std::vector<Value*> GetOperands() const override;
-
-    Value* GetOperand(size_t idx) const override;
-
-    size_t GetNumOfOperands() const override;
-
-    // ===--------------------------------------------------------------------===//
-    // Successor
-    // ===--------------------------------------------------------------------===//
-    size_t GetNumOfSuccessor() const;
-
-    Block* GetSuccessor(size_t index) const;
-
-    /**
-     * @brief Replace `oldSuccessor` with `newSuccessor`
-     *
-     * @param oldSuccessor: one of the current successors
-     * @param newSuccessor: new successor
-     */
-    void ReplaceSuccessor(Block& oldSuccessor, Block& newSuccessor);
-
-    /**
-     * @brief Replaced the successor of this terminator
-     *
-     * @param index: the index-th successor need to be replaced
-     * @param newSuccessor: new successor
-     */
-    void ReplaceSuccessor(size_t index, Block& newSuccessor);
-
-    const std::vector<Block*> GetSuccessors() const;
-
-    // ===--------------------------------------------------------------------===//
-    // Modify Self
-    // ===--------------------------------------------------------------------===//
-    void ReplaceWith(Expression& newTerminator) override;
-
-    /**
-     * @brief Break all connection with its parent and operands
-     * that means you can not get its parent and operands any more, and you can not get this terminator by its parent
-     * and its operands, too. But we don't free this terminator's memory.
-     */
-    void RemoveSelfFromBlock() override;
-
-protected:
-    explicit Terminator(
-        ExprKind kind, const std::vector<Value*>& operands, const std::vector<Block*>& successors, Block* parent);
-    ~Terminator() override = default;
-
-    void AppendSuccessor(Block& block);
-
-    /**
-     * @brief Get first successor's index in operands.
-     *
-     * in another sense, return the num of operand(does not include successors).
-     *
-     * NOTE: because returned value is constant,
-     * call this function only after Terminator's full initialization(operand and successor are properly set).
-     */
-    size_t GetFirstSuccessorIndex() const;
-
-private:
-    void LetSuccessorsRemoveCurBlock() const;
 };
 
 /**
  * @brief Jump from current block to another one
  */
-class GoTo : public Terminator {
+class GoTo : public Expression {
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
@@ -130,7 +57,7 @@ private:
 /**
  * @brief `if`, `for-in`, `while`, `do-while` and `match` can be translated to `Branch`
  */
-class Branch : public Terminator {
+class Branch : public Expression {
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
@@ -167,7 +94,7 @@ private:
 /**
  * @brief `match` can be translated to `MultiBranch` in O2
  */
-class MultiBranch : public Terminator {
+class MultiBranch : public Expression {
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
@@ -191,6 +118,12 @@ public:
 
     std::vector<Block*> GetNormalBlocks() const;
 
+    /** Records which source construct owns the default edge for unreachable diagnostics. */
+    void SetSourceExpr(SourceExpr srcExpr);
+
+    /** Returns the source construct represented by this table's default edge. */
+    SourceExpr GetSourceExpr() const;
+
 protected:
     std::string OperandsToString() const override;
 
@@ -206,12 +139,14 @@ private:
      * Note that default Block does not have the case val.
      */
     std::vector<uint64_t> caseVals;
+    // The checker interprets a table default differently for a match case, if-let, while-let, and ordinary CHIR.
+    SourceExpr sourceExpr{SourceExpr::OTHER};
 };
 
 /**
  * @brief Exit current function.
  */
-class Exit : public Terminator {
+class Exit : public Expression {
     friend class CHIRContext;
     friend class CHIRBuilder;
 private:
@@ -224,7 +159,7 @@ private:
 /**
  * @brief Throw an exception.
  */
-class RaiseException : public Terminator {
+class RaiseException : public Expression {
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
@@ -250,7 +185,15 @@ private:
     RaiseException* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
-class ExpressionWithException : public Terminator {
+/**
+ * @brief `Apply` expression written in `try` block
+ */
+class TryApply : public ApplyBase {
+    friend class ExprTypeConverter;
+    friend class TypeConverterForCC;
+    friend class CHIRSerializer;
+    friend class CHIRContext;
+    friend class CHIRBuilder;
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
@@ -269,192 +212,18 @@ public:
      */
     Block* GetErrorBlock() const;
 
-protected:
-    explicit ExpressionWithException(ExprKind kind, Block* parent);
-    explicit ExpressionWithException(
-        ExprKind kind, const std::vector<Value*>& operands, const std::vector<Block*>& successors, Block* parent);
-};
-
-/**
- * @brief An expression for function call, including
- * ApplyWithException, InvokeWithException and InvokeStaticWithException
- */
-class FuncCallWithException : public ExpressionWithException {
-    friend class ExprTypeConverter;
-    friend class CHIRSerializer;
-public:
-    // ===--------------------------------------------------------------------===//
-    // Base Information
-    // ===--------------------------------------------------------------------===//
-    /**
-     * @brief Retrieves a list of the application argument nodes.
-     *
-     * @return A vector of pointers to the application argument nodes.
-     */
-    virtual std::vector<Value*> GetArgs() const = 0;
-
-    /**
-     * @brief Retrieves the type of 'this'.
-     *
-     * @return The type of 'this'.
-     */
-    Type* GetThisType() const;
-
-    /**
-     * @brief Sets the type of 'this'.
-     *
-     * @param type The type of 'this'.
-     */
-    void SetThisType(Type* type);
-
-    /**
-     * @brief Retrieves the instantiated argument types.
-     *
-     * @return A vector of pointers to the instantiated argument types.
-     */
-    const std::vector<Type*>& GetInstantiatedTypeArgs() const;
-
-protected:
-    explicit FuncCallWithException(ExprKind kind, const FuncCallContext& funcCallCtx, Block* parent);
-
-    /**
-     * @brief Record instantiated type args.
-     * Cangjie Code:
-     *      func foo<T1, T2>() {}
-     *      foo<Bool, Int32>()  // {Bool, Int32} is current Apply's instantiated type args
-     */
-    std::vector<Type*> instantiatedTypeArgs;
-
-    /**
-     * @brief Record object type if callee is member method.
-     * 1. foo(), global func, `thisType` is nullptr
-     * 2. obj.foo(), instance member method, `thisType` is obj's type
-     * 3. A<Bool>.foo(), static member method, `thisType` is A<Bool>
-     * 4. method(), a member method with implicit `this`, `thisType` is parent custom type
-     *
-     * As for global func and instance member method, we can compute `thisType` from callee's args,
-     * but for static member method, we can't.
-     */
-    Type* thisType{nullptr};
-};
-
-/**
- * @brief `Apply` expression wroten in `try` block
- */
-class ApplyWithException : public FuncCallWithException {
-    friend class ExprTypeConverter;
-    friend class TypeConverterForCC;
-    friend class CHIRSerializer;
-    friend class CHIRContext;
-    friend class CHIRBuilder;
-public:
-    // ===--------------------------------------------------------------------===//
-    // Base Information
-    // ===--------------------------------------------------------------------===//
-    /**
-     * @brief Retrieves the callee of this ApplyWithException operation.
-     *
-     * @return The callee of this ApplyWithException operation.
-     */
-    Value* GetCallee() const;
-
-    /**
-     * @brief Retrieves a list of the ApplyWithException operation argument nodes.
-     *
-     * @return A vector of pointers to the argument nodes.
-     */
-    std::vector<Value*> GetArgs() const override;
-
-    // ===--------------------------------------------------------------------===//
-    // Instantiated Types
-    // ===--------------------------------------------------------------------===//
-    /**
-     * @brief Retrieves the instantiated parent custom type of the callee.
-     *
-     * @return The instantiated parent custom type of the callee.
-     */
-    Type* GetInstParentCustomTyOfCallee(CHIRBuilder& builder) const;
-
-protected:
-    std::string OperandsToString() const override;
-
 private:
-    explicit ApplyWithException(
+    explicit TryApply(
         Value* callee, const FuncCallContext& callContext, Block* sucBlock, Block* errBlock, Block* parent);
-    ~ApplyWithException() override = default;
+    ~TryApply() override = default;
 
-    ApplyWithException* Clone(CHIRBuilder& builder, Block& parent) const override;
+    TryApply* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
- * @brief An expression for virtual function call, including Invoke and InvokeStatic
+ * @brief `Invoke` expression written in `try` block
  */
-class DynamicDispatchWithException : public FuncCallWithException {
-    friend class ExprTypeConverter;
-    friend class PrivateTypeConverterNoInvokeOriginal;
-    friend class CHIRSerializer;
-public:
-    // ===--------------------------------------------------------------------===//
-    // Base Information
-    // ===--------------------------------------------------------------------===//
-    /**
-     * @brief Retrieves the method name of this Invoke operation.
-     *
-     * @return The method name of this Invoke operation.
-     */
-    const std::string& GetMethodName() const;
-
-    /**
-     * @brief Retrieves the method type of this Invoke operation.
-     *
-     * @return The method type of this Invoke operation.
-     */
-    FuncType* GetMethodType() const;
-
-    const std::vector<GenericType*>& GetGenericTypeParams() const;
-    /**
-     * @brief Retrieves the method's offset in vtable.
-     *
-     * @return The offset, greater than or equal to zero.
-     */
-    size_t GetVirtualMethodOffset(CHIRBuilder* builder = nullptr) const;
-
-    // ===--------------------------------------------------------------------===//
-    // Instantiated Types
-    // ===--------------------------------------------------------------------===//
-    /**
-     * @brief Retrieves base class's instantiated type, base class is the one in which method first appears.
-     *
-     * @return Base class's instantiated type.
-     */
-    ClassType* GetInstSrcParentCustomTypeOfMethod(CHIRBuilder& builder) const;
-
-    // ===--------------------------------------------------------------------===//
-    // Others
-    // ===--------------------------------------------------------------------===//
-    /*
-     * @brief Retrieves virtual method's attribute.
-     *
-     * @return Virtual method's attribute.
-     */
-    AttributeInfo GetVirtualMethodAttr(CHIRBuilder& builder) const;
-
-protected:
-    std::string OperandsToString() const override;
-
-    explicit DynamicDispatchWithException(
-        ExprKind kind, const InvokeCallContext& callContext, Block* sucBlock, Block* errBlock, Block* parent);
-
-    FuncSigInfo virMethodCtx;
-
-private:
-    std::vector<VTableSearchRes> GetVirtualMethodInfo(CHIRBuilder& builder) const;
-};
-
-/**
- * @brief `Invoke` expression wroten in `try` block
- */
-class InvokeWithException : public DynamicDispatchWithException {
+class TryInvoke : public InvokeBase {
     friend class ExprTypeConverter;
     friend class TypeConverterForCC;
     friend class PrivateTypeConverterNoInvokeOriginal;
@@ -466,32 +235,31 @@ public:
     // Base Information
     // ===--------------------------------------------------------------------===//
     /**
-     * @brief Retrieves the object of this InvokeWithException operation.
+     * @brief Retrieves the success block.
      *
-     * @return The object of this InvokeWithException operation.
+     * @return The success block.
      */
-    Value* GetObject() const;
+    Block* GetSuccessBlock() const;
 
     /**
-     * @brief Retrieves the call arguments of this InvokeWithException operation.
+     * @brief Retrieves the error block.
      *
-     * @return A vector of pointers to the call arguments.
+     * @return The error block.
      */
-    std::vector<Value*> GetArgs() const override;
+    Block* GetErrorBlock() const;
 
 private:
-    explicit InvokeWithException(
-        const InvokeCallContext& callContext, Block* sucBlock, Block* errBlock, Block* parent);
+    explicit TryInvoke(const InvokeCallContext& callContext, Block* sucBlock, Block* errBlock, Block* parent);
 
-    ~InvokeWithException() override = default;
+    ~TryInvoke() override = default;
 
-    InvokeWithException* Clone(CHIRBuilder& builder, Block& parent) const override;
+    TryInvoke* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
- * @brief `InvokeStatic` expression wroten in `try` block
+ * @brief `InvokeStatic` expression written in `try` block
  */
-class InvokeStaticWithException : public DynamicDispatchWithException {
+class TryInvokeStatic : public InvokeStaticBase {
     friend class ExprTypeConverter;
     friend class TypeConverterForCC;
     friend class PrivateTypeConverterNoInvokeOriginal;
@@ -503,33 +271,31 @@ public:
     // Base Information
     // ===--------------------------------------------------------------------===//
     /**
-     * @brief Retrieves the RTTI value.
+     * @brief Retrieves the success block.
      *
-     * @return The RTTI value.
+     * @return The success block.
      */
-    Value* GetRTTIValue() const;
+    Block* GetSuccessBlock() const;
 
     /**
-     * @brief Retrieves the call arguments of this InvokeStaticWithException operation.
+     * @brief Retrieves the error block.
      *
-     * @return A vector of pointers to the call arguments.
+     * @return The error block.
      */
-    std::vector<Value*> GetArgs() const override;
+    Block* GetErrorBlock() const;
 
 private:
-    explicit InvokeStaticWithException(
-        const InvokeCallContext& callContext, Block* sucBlock, Block* errBlock, Block* parent);
+    explicit TryInvokeStatic(const InvokeCallContext& callContext, Block* sucBlock, Block* errBlock, Block* parent);
 
-    ~InvokeStaticWithException() override = default;
+    ~TryInvokeStatic() override = default;
 
-    InvokeStaticWithException* Clone(CHIRBuilder& builder, Block& parent) const override;
+    TryInvokeStatic* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
- * @brief `Unary` or `Binary` expression wroten in `try` block
+ * @brief `Unary` expression written in `try` block (Neg only).
  */
-class IntOpWithException : public ExpressionWithException {
-    friend class CHIRDeserializer;
+class TryUnaryExpression : public UnaryExpressionBase {
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
@@ -537,57 +303,31 @@ public:
     // Base Information
     // ===--------------------------------------------------------------------===//
     /**
-     * @brief Retrieves the operation kind.
+     * @brief Retrieves the success block.
      *
-     * @return The operation kind.
+     * @return The success block.
      */
-    ExprKind GetOpKind() const;
+    Block* GetSuccessBlock() const;
 
     /**
-     * @brief Retrieves the operation kind name.
+     * @brief Retrieves the error block.
      *
-     * @return The operation kind name.
+     * @return The error block.
      */
-    std::string GetOpKindName() const;
-
-    /**
-     * @brief Retrieves the left-hand side operand.
-     *
-     * @return The left-hand side operand.
-     */
-    Value* GetLHSOperand() const;
-
-    /**
-     * @brief Retrieves the right-hand side operand.
-     *
-     * @return The right-hand side operand.
-     */
-    Value* GetRHSOperand() const;
-
-    /**
-     * @brief Retrieves the overflow strategy.
-     *
-     * @return The overflow strategy.
-     */
-    OverflowStrategy GetOverflowStrategy() const;
+    Block* GetErrorBlock() const;
 
 private:
-    explicit IntOpWithException(
-        ExprKind unaryKind, Value* operand, OverflowStrategy ofs, Block* normal, Block* exception, Block* parent);
-    explicit IntOpWithException(ExprKind binaryKind, Value* lhs, Value* rhs, OverflowStrategy ofs, Block* normal,
-        Block* exception, Block* parent);
-    ~IntOpWithException() override = default;
+    explicit TryUnaryExpression(
+        UnaryExprKind unaryKind, Value* operand, Block* normal, Block* exception, Block* parent);
+    ~TryUnaryExpression() override = default;
 
-    IntOpWithException* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-    ExprKind opKind; // Operator Kind
-    Cangjie::OverflowStrategy overflowStrategy{Cangjie::OverflowStrategy::NA};
+    TryUnaryExpression* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
- * @brief `TypeCast` expression wroten in `try` block
+ * @brief `Binary` expression written in `try` block.
  */
-class TypeCastWithException : public ExpressionWithException {
+class TryBinaryExpression : public BinaryExpressionBase {
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
@@ -595,46 +335,65 @@ public:
     // Base Information
     // ===--------------------------------------------------------------------===//
     /**
-     * @brief Retrieves the overflow strategy.
+     * @brief Retrieves the success block.
      *
-     * @return The overflow strategy.
+     * @return The success block.
      */
-    OverflowStrategy GetOverflowStrategy() const;
+    Block* GetSuccessBlock() const;
 
     /**
-     * @brief Retrieves the source value of this cast operation.
+     * @brief Retrieves the error block.
      *
-     * @return The source value of this cast operation.
+     * @return The error block.
      */
-    Value* GetSourceValue() const;
-
-    /**
-     * @brief Retrieves the source type of this cast operation.
-     *
-     * @return The source type of this cast operation.
-     */
-    Type* GetSourceTy() const;
-
-    /**
-     * @brief Retrieves the target type of this cast operation.
-     *
-     * @return The target type of this cast operation.
-     */
-    Type* GetTargetTy() const;
+    Block* GetErrorBlock() const;
 
 private:
-    explicit TypeCastWithException(Value* operand, Block* normal, Block* exception, Block* parent);
-    ~TypeCastWithException() override = default;
+    explicit TryBinaryExpression(BinaryExprKind binaryKind, Value* lhs, Value* rhs, OverflowStrategy ofs,
+        Block* normal, Block* exception, Block* parent);
+    ~TryBinaryExpression() override = default;
 
-    TypeCastWithException* Clone(CHIRBuilder& builder, Block& parent) const override;
+    TryBinaryExpression* Clone(CHIRBuilder& builder, Block& parent) const override;
+};
+
+/**
+ * @brief `NumericCast` expression written in `try` block
+ */
+class TryNumericCast : public NumericCastBase {
+    friend class CHIRContext;
+    friend class CHIRBuilder;
+public:
+    // ===--------------------------------------------------------------------===//
+    // Base Information
+    // ===--------------------------------------------------------------------===//
+    /**
+     * @brief Retrieves the success block.
+     *
+     * @return The success block.
+     */
+    Block* GetSuccessBlock() const;
+
+    /**
+     * @brief Retrieves the error block.
+     *
+     * @return The error block.
+     */
+    Block* GetErrorBlock() const;
+
+private:
+    explicit TryNumericCast(Value* operand, Block* normal, Block* exception, Block* parent);
+    ~TryNumericCast() override = default;
+
+    TryNumericCast* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
  * @brief `Intrinsic` expression wroten in `try` block
  */
-class IntrinsicWithException : public ExpressionWithException {
+class TryIntrinsic : public IntrinsicBase {
     friend class ExprTypeConverter;
     friend class TypeConverterForCC;
+    friend class CHIRSerializer;
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
@@ -642,99 +401,92 @@ public:
     // Base Information
     // ===--------------------------------------------------------------------===//
     /**
-     * @brief Retrieves the intrinsic kind.
+     * @brief Retrieves the success block.
      *
-     * @return The intrinsic kind.
+     * @return The success block.
      */
-    CHIR::IntrinsicKind GetIntrinsicKind() const;
+    Block* GetSuccessBlock() const;
 
     /**
-     * @brief Retrieves the generic type information.
+     * @brief Retrieves the error block.
      *
-     * @return A vector of pointers to the generic types.
+     * @return The error block.
      */
-    const std::vector<Type*>& GetInstantiatedTypeArgs() const;
-
-    /**
-     * @brief Retrieves the arguments of the intrinsic operation.
-     *
-     * @return A vector of pointers to the arguments.
-     */
-    const std::vector<Value*> GetArgs() const;
-
-protected:
-    std::string OperandsToString() const override;
+    Block* GetErrorBlock() const;
 
 private:
-    explicit IntrinsicWithException(
-        const IntrisicCallContext& callContext, Block* normal, Block* exception, Block* parent);
-    ~IntrinsicWithException() override = default;
+    explicit TryIntrinsic(const IntrisicCallContext& callContext, Block* normal, Block* exception, Block* parent);
+    ~TryIntrinsic() override = default;
 
-    IntrinsicWithException* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-    CHIR::IntrinsicKind intrinsicKind;
-    std::vector<Type*> instantiatedTypeArgs;
+    TryIntrinsic* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
- * @brief `Allocate` expression wroten in `try` block
+ * @brief `Allocate` expression written in `try` block
  */
-class AllocateWithException : public ExpressionWithException {
-    friend class ExprTypeConverter;
+class TryAllocate : public AllocateBase {
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
     // ===--------------------------------------------------------------------===//
-    Type* GetType() const;
+    /**
+     * @brief Retrieves the success block.
+     *
+     * @return The success block.
+     */
+    Block* GetSuccessBlock() const;
 
-protected:
-    std::string OperandsToString() const override;
+    /**
+     * @brief Retrieves the error block.
+     *
+     * @return The error block.
+     */
+    Block* GetErrorBlock() const;
 
 private:
-    explicit AllocateWithException(Type* ty, Block* normal, Block* exception, Block* parent);
-    ~AllocateWithException() override = default;
+    explicit TryAllocate(Type* ty, Block* normal, Block* exception, Block* parent);
+    ~TryAllocate() override = default;
 
-    AllocateWithException* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-    /** @brief The type to be allocated.
-     */
-    Type* ty;
+    TryAllocate* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
- * @brief `RawArrayAllocate` expression wroten in `try` block
+ * @brief `RawArrayAllocate` expression written in `try` block
  */
-class RawArrayAllocateWithException : public ExpressionWithException {
-    friend class ExprTypeConverter;
-    friend class TypeConverterForCC;
+class TryRawArrayAllocate : public RawArrayAllocateBase {
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
     // ===--------------------------------------------------------------------===//
     // Base Information
     // ===--------------------------------------------------------------------===//
-    Value* GetSize() const;
+    /**
+     * @brief Retrieves the success block.
+     *
+     * @return The success block.
+     */
+    Block* GetSuccessBlock() const;
 
-    Type* GetElementType() const;
-
-protected:
-    std::string OperandsToString() const override;
+    /**
+     * @brief Retrieves the error block.
+     *
+     * @return The error block.
+     */
+    Block* GetErrorBlock() const;
 
 private:
-    explicit RawArrayAllocateWithException(Type* eleTy, Value* size, Block* normal, Block* exception, Block* parent);
-    ~RawArrayAllocateWithException() override = default;
+    explicit TryRawArrayAllocate(Type* eleTy, Value* size, Block* normal, Block* exception, Block* parent);
+    ~TryRawArrayAllocate() override = default;
 
-    RawArrayAllocateWithException* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-    Type* elementType; // The element type.
+    TryRawArrayAllocate* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 
 /**
- * @brief `Spawn` expression wroten in `try` block
+ * @brief `Spawn` expression written in `try` block
  */
-class SpawnWithException : public ExpressionWithException {
+class TrySpawn : public SpawnBase {
     friend class CHIRContext;
     friend class CHIRBuilder;
 public:
@@ -742,51 +494,25 @@ public:
     // Base Information
     // ===--------------------------------------------------------------------===//
     /**
-     * @brief Get the spawn argument.
+     * @brief Retrieves the success block.
      *
-     * @return nullptr if no argument.
+     * @return The success block.
      */
-    Value* GetSpawnArg() const;
-
-    bool IsExecuteClosure() const;
-    void SetExecuteClosure(Function& func);
-
-    // ===--------------------------------------------------------------------===//
-    // Before Optimization
-    // ===--------------------------------------------------------------------===//
-    /** @brief Get the future argument for execute.*/
-    Value* GetFuture() const;
-    
-    // ===--------------------------------------------------------------------===//
-    // After Optimization
-    // ===--------------------------------------------------------------------===//
-    /** @brief Get the closure argument for execute closure.*/
-    Value* GetClosure() const;
+    Block* GetSuccessBlock() const;
 
     /**
-     * @brief Get the Function* of execute closure.
+     * @brief Retrieves the error block.
      *
-     * @return nullptr if not exist.
+     * @return The error block.
      */
-    Function* GetExecuteClosure() const;
-
-protected:
-    std::string AddExtraComment() const override;
+    Block* GetErrorBlock() const;
 
 private:
-    explicit SpawnWithException(
-        Value* val, Value* arg, Block* normal, Block* exception, Block* parent);
-    explicit SpawnWithException(
-        Value* val, Block* normal, Block* exception, Block* parent);
-    ~SpawnWithException() override = default;
+    explicit TrySpawn(Value* val, Value* arg, Block* normal, Block* exception, Block* parent);
+    explicit TrySpawn(Value* val, Block* normal, Block* exception, Block* parent);
+    ~TrySpawn() override = default;
 
-    SpawnWithException* Clone(CHIRBuilder& builder, Block& parent) const override;
-
-    /**
-     * @brief After optimization, backend will use `executeClosure` to create new thread, not `Future` object.
-     * `executeClosure` is member method in class `Future` which is declared in std.core
-     */
-    Function* executeClosure{nullptr};
+    TrySpawn* Clone(CHIRBuilder& builder, Block& parent) const override;
 };
 } // namespace Cangjie::CHIR
 #endif // CANGJIE_CHIR_EXPRESSION_H

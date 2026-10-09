@@ -10,7 +10,6 @@ set(BASIC_SRC
     StringConvertor.cpp
     DiagnosticEngine.cpp
     DiagnosticEngineImpl.cpp
-    InteropCJPackageConfigReader.cpp
     MacroCallDiagInfo.cpp
     Position.cpp
     SourceManager.cpp
@@ -21,8 +20,6 @@ set(BASIC_SRC
     Print.cpp)
 
 set(BASIC_SRC ${BASIC_SRC} Version.cpp)
-
-include_directories(${CMAKE_SOURCE_DIR}/third_party/tinytoml)
 
 add_library(CangjieBasic OBJECT ${BASIC_SRC})
 target_compile_options(CangjieBasic PRIVATE -Wno-deprecated-declarations)

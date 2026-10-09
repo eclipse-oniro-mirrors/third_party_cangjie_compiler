@@ -121,8 +121,7 @@ private:
     void ReplaceUserPoint(
         Lambda& srcFunc, Expression& user, const std::vector<Value*>& envs, ClassDef& autoEnvImplDef);
     void ConvertExpressions();
-    void ConvertApplyWithExceptionToInvokeWithException(ApplyWithException& apply);
-    void ConvertApplyToInvoke(Apply& apply);
+    void ConvertApplyToInvoke(ApplyBase& apply);
     void CreateVTableForAutoEnvDef();
     bool LambdaCanBeInlined(const Expression& user, const Function& lambda);
     void DoFunctionInlineForLambda();
@@ -134,21 +133,17 @@ private:
     void ModifyTypeMismatchInFunc(Function& func, size_t paramIndex);
     void ModifyTypeMismatchInVTable();
     void ModifyTypeMismatchInExpr();
-    void CastApplyArgAndRetIfNeed(Apply& e);
-    void WrapApplyRetVal(Apply& apply);
-    void CastApplyWithExceptionArgAndRetIfNeed(ApplyWithException& e);
-    void WrapApplyWithExceptionRetVal(ApplyWithException& apply);
+    void CastApplyArgAndRetIfNeed(ApplyBase& e);
+    void WrapApplyRetVal(ApplyBase& apply);
     void CastInvokeRetIfNeed(DynamicDispatch& e);
     void WrapInvokeRetVal(DynamicDispatch& e);
-    void CastInvokeWithExceptionRetIfNeed(DynamicDispatchWithException& e);
-    void WrapInvokeWithExceptionRetVal(DynamicDispatchWithException& e);
     void CastGetElementRefRetIfNeed(GetElementRef& e);
     void WrapGetElementRefRetVal(GetElementRef& getEleRef);
     void WrapFieldRetVal(Field& field);
     void CastRawArrayInitByValueArgIfNeed(RawArrayInitByValue& e);
-    void CastTypeCastArgIfNeed(TypeCast& e);
-    void WrapTypeCastSrcVal(TypeCast& typecast);
-    void CastSpawnArgIfNeed(Spawn& e);
+    void CastTypeCastArgIfNeed(ClassStaticCast& e);
+    void WrapTypeCastSrcVal(ClassStaticCast& typecast);
+    void CastSpawnArgIfNeed(SpawnBase& e);
     ClassDef* GetOrCreateAutoEnvWrapper(ClassType& instAutoEnvBaseType);
     ClassDef* CreateAutoEnvWrapper(const std::string& className, ClassType& superClassType);
     void CreateMemberVarInAutoEnvWrapper(ClassDef& autoEnvWrapperDef);

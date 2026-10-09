@@ -7,7 +7,6 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "AfterTypeCheckContext.h"
-#include "cangjie/AST/AttributePack.h"
 #include "cangjie/AST/Match.h"
 #include "cangjie/AST/Node.h"
 #include "NativeFFI/Java/Utils.h"
@@ -86,28 +85,38 @@ std::vector<Ptr<FuncDecl>> AfterTypeCheckContext::GetJavaImplUserDefinedConstruc
     std::vector<Ptr<FuncDecl>> ctors;
 
     for (auto member : refWrapper.GetMemberDeclPtrs()) {
-        if (!member->TestAttr(Attribute::CONSTRUCTOR)) {
+        if (!IsUserDefinedJavaImplConstructor(*member)) {
             continue;
         }
-
-        // Skip original primary constructors and only consider its FuncDecl counterpart.
-        auto ctor = As<ASTKind::FUNC_DECL>(member);
-        if (!ctor) {
-            continue;
-        }
-        auto hasParams = !ctor->funcBody->paramLists.empty() && !ctor->funcBody->paramLists[0]->params.empty();
-
-        // Primary constructor is desugared as fresh FuncDecl with COMPILER_ADD attribute.
-        auto isPrimary = member->TestAttr(Attribute::PRIMARY_CONSTRUCTOR, Attribute::COMPILER_ADD);
-        // Visit implicit constructors too (compiler added without any parameters).
-        auto isImplicit = member->TestAttr(Attribute::COMPILER_ADD, Attribute::IMPLICIT_ADD) && !hasParams;
-        if (!isPrimary && !isImplicit && member->TestAttr(Attribute::COMPILER_ADD)) {
-            continue;
-        }
-
-        ctors.emplace_back(ctor);
+        ctors.emplace_back(StaticAs<ASTKind::FUNC_DECL>(member));
     }
     return ctors;
+}
+
+void AfterTypeCheckContext::CacheJavaImplSuperCtorArgNativeFunc(const FuncDecl& ctor, Ptr<FuncDecl> nativeFunc)
+{
+    auto inativeFunc = javaImplUserCtorToNativeFuncs.insert({ &ctor, std::vector<Ptr<FuncDecl>>{} }).first;
+    inativeFunc->second.push_back(nativeFunc);
+}
+
+const std::vector<Ptr<FuncDecl>> AfterTypeCheckContext::GetJavaImplSuperCtorArgNativeFuncs(const FuncDecl& ctor)
+{
+    return javaImplUserCtorToNativeFuncs[&ctor];
+}
+
+bool AfterTypeCheckContext::HasDesugaredJavaImplSuperConstructorCall(const AST::FuncDecl& userCtor) const
+{
+    return javaImplUserCtorToNativeFuncs.find(&userCtor) != javaImplUserCtorToNativeFuncs.end();
+}
+
+void AfterTypeCheckContext::CacheJavaImplSuperCtorCall(const FuncDecl& ctor, OwnedPtr<CallExpr>&& call)
+{
+    javaImplUserCtorToOriginalSuperCall[&ctor] = std::move(call);
+}
+
+CallExpr& AfterTypeCheckContext::GetJavaImplSuperCtorCall(const AST::FuncDecl& ctor)
+{
+    return *javaImplUserCtorToOriginalSuperCall[&ctor];
 }
 
 void AfterTypeCheckContext::AddGeneratedDecl(OwnedPtr<Decl>&& decl)
@@ -122,7 +131,9 @@ void AfterTypeCheckContext::FlushGeneratedDecls()
         /*
          * Make the generated declaration visible and available via ImportManager/CjoManager.
          */
-        importManager.GetCjoManager()->AddGeneratedDeclToDeclMap(*generatedDecl);
+        if (generatedDecl->IsExportedDecl()) {
+            importManager.GetCjoManager()->AddGeneratedDeclToDeclMap(*generatedDecl);
+        }
         auto& fileDecls = generatedDecl->curFile->decls;
         fileDecls.push_back(std::move(generatedDecl));
     }

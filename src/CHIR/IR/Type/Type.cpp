@@ -91,12 +91,7 @@ bool Type::IsAutoEnvGenericBase() const
 
 bool Type::IsString() const
 {
-    if (IsStruct()) {
-        auto ty = StaticCast<const StructType*>(this);
-        auto structDef = ty->GetStructDef();
-        return CheckCustomTypeDefIsExpected(*structDef, CORE_PACKAGE_NAME, STD_LIB_STRING);
-    }
-    return false;
+    return IsExpectedCustomType(*this, CORE_PACKAGE_NAME, STD_LIB_STRING);
 }
 
 bool Type::IsClassRef([[maybe_unused]] bool nullable) const
@@ -121,12 +116,7 @@ bool Type::IsConstant() const
 
 bool Type::IsStructArray() const
 {
-    if (IsStruct()) {
-        auto ty = StaticCast<const StructType*>(this);
-        auto structDef = ty->GetStructDef();
-        return CheckCustomTypeDefIsExpected(*structDef, CORE_PACKAGE_NAME, STD_LIB_ARRAY);
-    }
-    return false;
+    return IsExpectedCustomType(*this, CORE_PACKAGE_NAME, STD_LIB_ARRAY);
 }
 
 bool Type::IsBuiltinType() const
@@ -199,11 +189,7 @@ bool Type::IsCFunc() const
 
 bool Type::IsCType() const
 {
-    if (kind != TYPE_CLASS) {
-        return false;
-    }
-    auto def = static_cast<const ClassType*>(this)->GetClassDef();
-    return CheckCustomTypeDefIsExpected(*def, CORE_PACKAGE_NAME, CTYPE_NAME);
+    return IsExpectedCustomType(*this, CORE_PACKAGE_NAME, CTYPE_NAME);
 }
 
 std::vector<Function*> Type::GetDeclareAndExtendMethods([[maybe_unused]] CHIRBuilder& builder) const
@@ -213,6 +199,13 @@ std::vector<Function*> Type::GetDeclareAndExtendMethods([[maybe_unused]] CHIRBui
 #else
     CJC_ABORT();
 #endif
+}
+
+Function* Type::GetExpectedFunc([[maybe_unused]] const std::string& funcName, [[maybe_unused]] FuncType& funcType,
+    [[maybe_unused]] bool isStatic, [[maybe_unused]] std::vector<Type*>& funcInstTypeArgs,
+    [[maybe_unused]] CHIRBuilder& builder, [[maybe_unused]] bool checkAbstractMethod)
+{
+    return nullptr;
 }
 
 void Type::Dump() const
@@ -1188,6 +1181,19 @@ std::string ThisType::ToSrcCodeString() const
     return "This";
 }
 
+Function* GenericType::GetExpectedFunc(const std::string& funcName, FuncType& funcType, bool isStatic,
+    std::vector<Type*>& funcInstTypeArgs, CHIRBuilder& builder, bool checkAbstractMethod)
+{
+    for (auto upperBound : upperBounds) {
+        auto func = upperBound->StripAllRefs()->GetExpectedFunc(
+            funcName, funcType, isStatic, funcInstTypeArgs, builder, checkAbstractMethod);
+        if (func != nullptr) {
+            return func;
+        }
+    }
+    return nullptr;
+}
+
 void GenericType::SetUpperBounds(const std::vector<Type*>& args)
 {
     for (auto arg : args) {
@@ -1388,6 +1394,29 @@ std::vector<Function*> BuiltinType::GetExtendMethods() const
 std::vector<Function*> BuiltinType::GetDeclareAndExtendMethods([[maybe_unused]] CHIRBuilder& builder) const
 {
     return GetExtendMethods();
+}
+
+Function* BuiltinType::GetExpectedFunc(const std::string& funcName, FuncType& funcType, bool isStatic,
+    std::vector<Type*>& funcInstTypeArgs, CHIRBuilder& builder, bool checkAbstractMethod)
+{
+    std::unordered_map<const GenericType*, Type*> replaceTable;
+    auto classInstArgs = GetTypeArgs();
+    for (auto ex : GetExtends(&builder)) {
+        auto classGenericArgs = ex->GetExtendedType()->GetTypeArgs();
+        CJC_ASSERT(classInstArgs.size() == classGenericArgs.size());
+        replaceTable.clear();
+        for (size_t i = 0; i < classInstArgs.size(); ++i) {
+            if (auto genericTy1 = DynamicCast<GenericType*>(classGenericArgs[i])) {
+                replaceTable.emplace(genericTy1, classInstArgs[i]);
+            }
+        }
+        auto func = ex->GetExpectedFunc(
+            funcName, funcType, isStatic, replaceTable, funcInstTypeArgs, builder, checkAbstractMethod);
+        if (func != nullptr && func->Get<WrappedRawMethod>() == nullptr) {
+            return func;
+        }
+    }
+    return nullptr;
 }
 
 std::vector<ClassType*> BuiltinType::GetSuperTypes(CHIRBuilder& builder) const
@@ -1599,5 +1628,14 @@ bool Type::SatisfyGenericConstraints(const GenericType& type, CHIRBuilder& build
         }
     }
     return true;
+}
+
+bool Type::CanBeInherited() const
+{
+    auto customType = DynamicCast<CustomType*>(this);
+    if (customType == nullptr) {
+        return false;
+    }
+    return customType->GetCustomTypeDef()->CanBeInherited();
 }
 } // namespace Cangjie::CHIR

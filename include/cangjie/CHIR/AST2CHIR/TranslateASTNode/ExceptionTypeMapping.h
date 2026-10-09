@@ -25,26 +25,19 @@ template <typename T> struct CHIRNodeMap {
 #define DEFINE_CHIR_TYPE_MAPPING(TYPE)                                                                                 \
     template <> struct CHIRNodeMap<TYPE> {                                                                             \
         using Normal = TYPE;                                                                                           \
-        using Exception = TYPE##WithException;                                                                         \
+        using Exception = Try##TYPE;                                                                                   \
     }
 
-DEFINE_CHIR_TYPE_MAPPING(CHIR::Apply);
-DEFINE_CHIR_TYPE_MAPPING(CHIR::Invoke);
-DEFINE_CHIR_TYPE_MAPPING(CHIR::InvokeStatic);
-DEFINE_CHIR_TYPE_MAPPING(CHIR::TypeCast);
-DEFINE_CHIR_TYPE_MAPPING(CHIR::Allocate);
-DEFINE_CHIR_TYPE_MAPPING(CHIR::Spawn);
-DEFINE_CHIR_TYPE_MAPPING(CHIR::Intrinsic);
-DEFINE_CHIR_TYPE_MAPPING(CHIR::RawArrayAllocate);
-
-template <> struct CHIRNodeMap<UnaryExpression> {
-    using Normal = CHIR::UnaryExpression;
-    using Exception = CHIR::IntOpWithException;
-};
-template <> struct CHIRNodeMap<BinaryExpression> {
-    using Normal = CHIR::BinaryExpression;
-    using Exception = CHIR::IntOpWithException;
-};
+DEFINE_CHIR_TYPE_MAPPING(Apply);
+DEFINE_CHIR_TYPE_MAPPING(Invoke);
+DEFINE_CHIR_TYPE_MAPPING(InvokeStatic);
+DEFINE_CHIR_TYPE_MAPPING(NumericCast);
+DEFINE_CHIR_TYPE_MAPPING(Allocate);
+DEFINE_CHIR_TYPE_MAPPING(Spawn);
+DEFINE_CHIR_TYPE_MAPPING(Intrinsic);
+DEFINE_CHIR_TYPE_MAPPING(RawArrayAllocate);
+DEFINE_CHIR_TYPE_MAPPING(UnaryExpression);
+DEFINE_CHIR_TYPE_MAPPING(BinaryExpression);
 
 template <typename T> using CHIRNodeNormalT = typename CHIRNodeMap<T>::Normal;
 template <typename T> using CHIRNodeExceptionT = typename CHIRNodeMap<T>::Exception;

@@ -416,7 +416,7 @@ void CHIR2BCHIR::TranslateBlock(Context& ctx, const Block& bb)
 
 void CHIR2BCHIR::TranslateExpression(Context& ctx, const Expression& expr)
 {
-    if (expr.GetExprKind() == ExprKind::INVOKE || expr.GetExprKind() == ExprKind::INVOKE_WITH_EXCEPTION) {
+    if (Is<InvokeBase>(expr)) {
         // Create a dummy value on the arg stack, to be dropped when entering the function implementing the method
         // Functions in BCHIR have the strict form LVAR_SET :: ID1 :: ... :: LVAR_SET :: IDn :: DROP :: body, where
         // - LVAR_SET :: ID1 :: ... :: LVAR_SET :: IDn initializes the function arguments by popping args from the stack
@@ -425,8 +425,22 @@ void CHIR2BCHIR::TranslateExpression(Context& ctx, const Expression& expr)
     }
 
     // translate all operands
-    for (auto value : expr.GetOperands()) {
-        TranslateValue(ctx, *value);
+    // For virtual calls, operands[0] is the abstract method (metadata only). Runtime dispatch uses
+    // GetMethodName()/GetMethodType() and does not push the method Function onto the arg stack.
+    switch (expr.GetExprKind()) {
+        case ExprKind::INVOKE:
+        case ExprKind::TRY_INVOKE:
+        case ExprKind::INVOKESTATIC:
+        case ExprKind::TRY_INVOKESTATIC:
+            for (size_t i = 1; i < expr.GetNumOfNonSuccessorOperands(); ++i) {
+                TranslateValue(ctx, *expr.GetOperand(i));
+            }
+            break;
+        default:
+            for (auto value : expr.GetNonSuccessorOperands()) {
+                TranslateValue(ctx, *value);
+            }
+            break;
     }
 
     switch (expr.GetExprMajorKind()) {
@@ -435,11 +449,11 @@ void CHIR2BCHIR::TranslateExpression(Context& ctx, const Expression& expr)
             break;
         case ExprMajorKind::UNARY_EXPR:
             CJC_ASSERT(expr.GetResult());
-            TranslateUnaryExpression(ctx, expr);
+            TranslateUnaryExpression(ctx, StaticCast<const UnaryExpressionBase&>(expr));
             break;
         case ExprMajorKind::BINARY_EXPR:
             CJC_ASSERT(expr.GetResult());
-            TranslateBinaryExpression(ctx, expr);
+            TranslateBinaryExpression(ctx, StaticCast<const BinaryExpressionBase&>(expr));
             break;
         case ExprMajorKind::MEMORY_EXPR:
             CJC_ASSERT(expr.GetResult());
@@ -512,19 +526,11 @@ Bchir::ByteCodeContent CHIR2BCHIR::LVarId(Context& ctx, const Value& value)
 }
 
 
-void CHIR2BCHIR::TranslateAllocate(Context& ctx, const Expression& expr)
+void CHIR2BCHIR::TranslateAllocate(Context& ctx, const AllocateBase& expr)
 {
     CHIR::Type* ty;
-    bool withException = false;
-    if (expr.GetExprKind() == ExprKind::ALLOCATE) {
-        auto allocate = StaticCast<const Allocate*>(&expr);
-        ty = allocate->GetType();
-    } else {
-        CJC_ASSERT(expr.GetExprKind() == ExprKind::ALLOCATE_WITH_EXCEPTION);
-        auto allocate = StaticCast<const AllocateWithException*>(&expr);
-        ty = allocate->GetType();
-        withException = true;
-    }
+    bool withException = expr.IsTerminator();
+    ty = expr.GetType();
     if (ty->IsClass()) {
         auto classTy = StaticCast<const ClassType*>(ty);
         auto numberOfFields = classTy->GetClassDef()->GetAllInstanceVarNum();

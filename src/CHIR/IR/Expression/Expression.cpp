@@ -7,9 +7,12 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "cangjie/CHIR/IR/Expression/Expression.h"
+#include <algorithm>
 #include <iostream>
 #include <sstream>
+#include <tuple>
 
+#include "cangjie/CHIR/AST2CHIR/Utils.h"
 #include "cangjie/CHIR/Utils/CHIRCasting.h"
 #include "cangjie/CHIR/IR/CHIRBuilder.h"
 #include "cangjie/CHIR/IR/Expression/Terminator.h"
@@ -40,24 +43,6 @@ std::pair<size_t, size_t> GetAllocExprOfRetVal(const BlockGroup& body)
     }
     CJC_ABORT();
     return {0, 0};
-}
-
-void GetAllSuperClassDefs(const ClassDef& def, std::unordered_set<ClassDef*>& allSuperDefs)
-{
-    for (auto parent : def.GetImplementedInterfaceDefs()) {
-        allSuperDefs.emplace(parent);
-        GetAllSuperClassDefs(*parent, allSuperDefs);
-    }
-    if (auto superClass = def.GetSuperClassDef()) {
-        allSuperDefs.emplace(superClass);
-        GetAllSuperClassDefs(*superClass, allSuperDefs);
-    }
-    for (auto extendDef : def.GetExtends()) {
-        for (auto parent : extendDef->GetImplementedInterfaceDefs()) {
-            allSuperDefs.emplace(parent);
-            GetAllSuperClassDefs(*parent, allSuperDefs);
-        }
-    }
 }
 }
 
@@ -96,15 +81,6 @@ bool Expression::IsConstantInt() const
     return false;
 }
 
-bool Expression::IsConstantFloat() const
-{
-    if (kind == ExprKind::CONSTANT) {
-        auto constant = StaticCast<const Constant*>(this);
-        return constant->IsFloatLit();
-    }
-    return false;
-}
-
 bool Expression::IsConstantBool() const
 {
     if (kind == ExprKind::CONSTANT) {
@@ -133,84 +109,10 @@ ExprKind Expression::GetExprKind() const
     return kind;
 }
 
-bool Expression::IsConstant() const
-{
-    return kind == ExprKind::CONSTANT;
-}
 
 bool Expression::IsTerminator() const
 {
     return ExprKindMgr::Instance()->GetMajorKind(kind) == ExprMajorKind::TERMINATOR;
-}
-
-bool Expression::IsUnaryExpr() const
-{
-    return ExprKindMgr::Instance()->GetMajorKind(kind) == ExprMajorKind::UNARY_EXPR;
-}
-
-bool Expression::IsLoad() const
-{
-    return kind == ExprKind::LOAD;
-}
-
-bool Expression::IsTypeCast() const
-{
-    return kind == ExprKind::TYPECAST;
-}
-
-bool Expression::IsDynamicDispatch() const
-{
-    return kind == ExprKind::INVOKE || kind == ExprKind::INVOKESTATIC;
-}
-
-bool Expression::IsFuncCall() const
-{
-    return kind == ExprKind::APPLY || kind == ExprKind::INVOKE || kind == ExprKind::INVOKESTATIC;
-}
-
-bool Expression::IsField() const
-{
-    return kind == ExprKind::FIELD;
-}
-
-bool Expression::IsApply() const
-{
-    return kind == ExprKind::APPLY;
-}
-
-bool Expression::IsApplyWithException() const
-{
-    return kind == ExprKind::APPLY_WITH_EXCEPTION;
-}
-
-bool Expression::IsInvoke() const
-{
-    return kind == ExprKind::INVOKE;
-}
-
-bool Expression::IsLambda() const
-{
-    return kind == ExprKind::LAMBDA;
-}
-
-bool Expression::IsBinaryExpr() const
-{
-    return ExprKindMgr::Instance()->GetMajorKind(kind) == ExprMajorKind::BINARY_EXPR;
-}
-
-bool Expression::IsIntOpWithException() const
-{
-    return kind == ExprKind::INT_OP_WITH_EXCEPTION;
-}
-
-bool Expression::IsInvokeStaticBase() const
-{
-    return kind == ExprKind::INVOKESTATIC || kind == ExprKind::INVOKESTATIC_WITH_EXCEPTION;
-}
-
-bool Expression::IsDebug() const
-{
-    return kind == ExprKind::DEBUGEXPR;
 }
 
 std::string Expression::GetExprKindName() const
@@ -250,6 +152,11 @@ size_t Expression::GetNumOfOperands() const
     return operands.size();
 }
 
+size_t Expression::GetNumOfNonSuccessorOperands() const
+{
+    return GetSuccessorIndex(0);
+}
+
 std::vector<Value*> Expression::GetOperands() const
 {
     return operands;
@@ -257,8 +164,45 @@ std::vector<Value*> Expression::GetOperands() const
 
 Value* Expression::GetOperand(size_t idx) const
 {
-    CJC_ASSERT(idx < operands.size());
+    CJC_ASSERT(idx < GetNumOfNonSuccessorOperands());
     return operands[idx];
+}
+
+std::vector<Value*> Expression::GetNonSuccessorOperands() const
+{
+    auto num = GetNumOfNonSuccessorOperands();
+    CJC_ASSERT(operands.size() >= num);
+    return {operands.begin(), operands.begin() + static_cast<long>(num)};
+}
+
+std::vector<Block*> Expression::GetSuccessors() const
+{
+    std::vector<Block*> succs;
+    for (auto op : operands) {
+        if (op->IsBlock()) {
+            succs.emplace_back(StaticCast<Block*>(op));
+        }
+    }
+    return succs;
+}
+
+size_t Expression::GetSuccessorIndex(size_t index) const
+{
+    size_t firstSuccIdx = 0;
+    while (firstSuccIdx < operands.size() && !operands[firstSuccIdx]->IsBlock()) {
+        ++firstSuccIdx;
+    }
+    return firstSuccIdx + index;
+}
+
+size_t Expression::GetNumOfSuccessor() const
+{
+    return operands.size() - GetSuccessorIndex(0);
+}
+
+Block* Expression::GetSuccessor(size_t index) const
+{
+    return StaticCast<Block*>(operands[GetSuccessorIndex(index)]);
 }
 
 LocalVar* Expression::GetResult() const
@@ -293,6 +237,9 @@ Function* Expression::GetTopLevelFunc() const
  */
 void Expression::RemoveSelfFromBlock()
 {
+    for (auto suc : GetSuccessors()) {
+        suc->RemovePredecessor(*parent);
+    }
     if (parent != nullptr) {
         parent->RemoveExprOnly(*this);
         parent = nullptr;
@@ -302,28 +249,39 @@ void Expression::RemoveSelfFromBlock()
 
 void Expression::ReplaceWith(Expression& newExpr)
 {
-    CJC_ASSERT(!newExpr.IsTerminator());
     // 1. replace result
-    for (auto user : result->GetUsers()) {
-        user->ReplaceOperand(result, newExpr.GetResult());
+    if (result != nullptr) {
+        CJC_NULLPTR_CHECK(newExpr.GetResult());
+        for (auto user : result->GetUsers()) {
+            user->ReplaceOperand(result, newExpr.GetResult());
+        }
     }
-    // 2. break double linkage between operands and current expr
-    EraseOperands();
 
-    // 3. remove new expr from its parent block
+    // 2. store current parent and the position of this expression in the parent block
+    CJC_NULLPTR_CHECK(parent);
+    auto tempParent = parent;
+    auto pos = std::find(tempParent->exprs.begin(), tempParent->exprs.end(), this);
+    CJC_ASSERT(pos != tempParent->exprs.end());
+    auto idx = static_cast<size_t>(pos - tempParent->exprs.begin());
+
+    // 3. remove this expression from its parent block
+    RemoveSelfFromBlock();
+
+    // 4. remove the new expression from its parent block
     if (newExpr.parent != nullptr) {
         newExpr.parent->RemoveExprOnly(newExpr);
     }
 
-    // 4. replace to new expr in parent block
-    CJC_NULLPTR_CHECK(parent);
-    for (size_t i = 0; i < parent->exprs.size(); ++i) {
-        if (parent->exprs[i] == this) {
-            parent->exprs[i] = &newExpr;
-        }
+    // 5. set new parent
+    newExpr.SetParent(tempParent);
+
+    // 6. insert the new expression into the parent block at the same position
+    tempParent->exprs.insert(tempParent->exprs.begin() + static_cast<std::ptrdiff_t>(idx), &newExpr);
+
+    // 7. add the successors of the new expression to the parent block
+    for (auto suc : newExpr.GetSuccessors()) {
+        suc->AddPredecessor(tempParent);
     }
-    newExpr.parent = parent;
-    parent = nullptr;
 }
 
 /**
@@ -369,10 +327,8 @@ void Expression::MoveAfter(Expression* expr)
     CJC_ASSERT(!expr->IsTerminator());
     if (parent != nullptr) {
         parent->RemoveExprOnly(*this);
-        if (IsTerminator()) {
-            for (auto suc : StaticCast<Terminator*>(this)->GetSuccessors()) {
-                suc->RemovePredecessor(*parent);
-            }
+        for (auto suc : GetSuccessors()) {
+            suc->RemovePredecessor(*parent);
         }
     }
     CJC_NULLPTR_CHECK(expr->parent);
@@ -380,6 +336,10 @@ void Expression::MoveAfter(Expression* expr)
     CJC_ASSERT(pos != expr->parent->exprs.end());
     expr->parent->exprs.insert(pos + 1, this);
     parent = expr->parent;
+    // Terminator moved to a new block: rebuild predecessor edges for its successors.
+    for (auto suc : GetSuccessors()) {
+        suc->AddPredecessor(parent);
+    }
 }
 
 void Expression::MoveTo(Block& block)
@@ -387,10 +347,8 @@ void Expression::MoveTo(Block& block)
     CJC_NULLPTR_CHECK(parent);
     CJC_ASSERT(this->GetParentBlockGroup() == block.GetParentBlockGroup());
     parent->RemoveExprOnly(*this);
-    if (IsTerminator()) {
-        for (auto suc : StaticCast<Terminator*>(this)->GetSuccessors()) {
-            suc->RemovePredecessor(*parent);
-        }
+    for (auto suc : GetSuccessors()) {
+        suc->RemovePredecessor(*parent);
     }
     block.AppendExpression(this);
 }
@@ -404,34 +362,43 @@ void Expression::ReplaceOperand(Value* oldOperand, Value* newOperand)
 {
     CJC_NULLPTR_CHECK(oldOperand);
     CJC_NULLPTR_CHECK(newOperand);
-    if (oldOperand == newOperand) {
+    if (oldOperand == newOperand || std::find(operands.begin(), operands.end(), oldOperand) == operands.end()) {
         return;
     }
-    for (unsigned i = 0; i < operands.size(); i++) {
-        if (operands[i] == oldOperand) {
-            operands[i] = newOperand;
-            operands[i]->AddUserOnly(this);
-            oldOperand->RemoveUserOnly(this);
-        }
+    std::replace(operands.begin(), operands.end(), oldOperand, newOperand);
+    // Block successors update CFG edges (and users) via predecessor APIs.
+    if (auto block = DynamicCast<Block*>(oldOperand)) {
+        block->RemovePredecessor(*GetParentBlock());
+    } else {
+        oldOperand->RemoveUserOnly(this);
+    }
+    if (auto block = DynamicCast<Block*>(newOperand)) {
+        block->AddPredecessor(GetParentBlock());
+    } else {
+        newOperand->AddUserOnly(this);
     }
 }
 
 void Expression::ReplaceOperand(size_t idx, Value* newOperand)
 {
     CJC_ASSERT(idx < operands.size());
+    CJC_NULLPTR_CHECK(newOperand);
     auto oldOperand = operands[idx];
     if (oldOperand == newOperand) {
         return;
     }
     operands[idx] = newOperand;
-    newOperand->AddUserOnly(this);
-    bool needRemoveOldOpUser = true;
-    for (auto op : operands) {
-        if (op == oldOperand) {
-            needRemoveOldOpUser = false;
-        }
+    if (auto block = DynamicCast<Block*>(newOperand)) {
+        block->AddPredecessor(GetParentBlock());
+    } else {
+        newOperand->AddUserOnly(this);
     }
-    if (needRemoveOldOpUser) {
+    if (std::find(operands.begin(), operands.end(), oldOperand) != operands.end()) {
+        return;
+    }
+    if (auto block = DynamicCast<Block*>(oldOperand)) {
+        block->RemovePredecessor(*GetParentBlock());
+    } else {
         oldOperand->RemoveUserOnly(this);
     }
 }
@@ -459,11 +426,7 @@ std::string Expression::ToString(size_t indent) const
         }
         ss << ": " << result->GetType()->ToString() << " = ";
     }
-    if (kind == ExprKind::INT_OP_WITH_EXCEPTION) {
-        ss << StaticCast<const IntOpWithException*>(this)->GetOpKindName();
-    } else {
-        ss << GetExprKindName();
-    }
+    ss << GetExprKindName();
     if (kind == ExprKind::LAMBDA) {
         ss << StaticCast<const Lambda*>(this)->LambdaOperandsToString(indent);
     } else {
@@ -478,15 +441,16 @@ std::string Expression::ToString(size_t indent) const
 
 bool Expression::HasExceptionBranch() const
 {
-    return kind == ExprKind::APPLY_WITH_EXCEPTION ||
-        kind == ExprKind::INVOKE_WITH_EXCEPTION ||
-        kind == ExprKind::INVOKESTATIC_WITH_EXCEPTION ||
-        kind == ExprKind::INT_OP_WITH_EXCEPTION ||
-        kind == ExprKind::SPAWN_WITH_EXCEPTION ||
-        kind == ExprKind::TYPECAST_WITH_EXCEPTION ||
-        kind == ExprKind::INTRINSIC_WITH_EXCEPTION ||
-        kind == ExprKind::ALLOCATE_WITH_EXCEPTION ||
-        kind == ExprKind::RAW_ARRAY_ALLOCATE_WITH_EXCEPTION;
+    return kind == ExprKind::TRY_APPLY ||
+        kind == ExprKind::TRY_INVOKE ||
+        kind == ExprKind::TRY_INVOKESTATIC ||
+        Is<TryUnaryExpression>(*this) ||
+        Is<TryBinaryExpression>(*this) ||
+        kind == ExprKind::TRY_SPAWN ||
+        kind == ExprKind::TRY_NUMERIC_CAST ||
+        kind == ExprKind::TRY_INTRINSIC ||
+        kind == ExprKind::TRY_ALLOCATE ||
+        kind == ExprKind::TRY_RAW_ARRAY_ALLOCATE;
 }
 
 std::string Expression::OperandsToString() const
@@ -522,17 +486,112 @@ std::string Expression::AddExtraComment() const
     return "";
 }
 
-Value* UnaryExpression::GetOperand() const
+namespace {
+// (opKind, ExprKind, try ExprKind). ExprKind::INVALID means no try form.
+constexpr std::tuple<UnaryExprKind, ExprKind, ExprKind> UNARY_EXPR_KIND_TABLE[] = {
+    {UnaryExprKind::NEG, ExprKind::NEG, ExprKind::TRY_NEG},
+    {UnaryExprKind::NOT, ExprKind::NOT, ExprKind::INVALID},
+    {UnaryExprKind::BITNOT, ExprKind::BITNOT, ExprKind::INVALID},
+};
+
+constexpr std::tuple<BinaryExprKind, ExprKind, ExprKind> BINARY_EXPR_KIND_TABLE[] = {
+    {BinaryExprKind::ADD, ExprKind::ADD, ExprKind::TRY_ADD},
+    {BinaryExprKind::SUB, ExprKind::SUB, ExprKind::TRY_SUB},
+    {BinaryExprKind::MUL, ExprKind::MUL, ExprKind::TRY_MUL},
+    {BinaryExprKind::DIV, ExprKind::DIV, ExprKind::TRY_DIV},
+    {BinaryExprKind::MOD, ExprKind::MOD, ExprKind::TRY_MOD},
+    {BinaryExprKind::EXP, ExprKind::EXP, ExprKind::TRY_EXP},
+    {BinaryExprKind::LSHIFT, ExprKind::LSHIFT, ExprKind::TRY_LSHIFT},
+    {BinaryExprKind::RSHIFT, ExprKind::RSHIFT, ExprKind::TRY_RSHIFT},
+    {BinaryExprKind::BITAND, ExprKind::BITAND, ExprKind::INVALID},
+    {BinaryExprKind::BITOR, ExprKind::BITOR, ExprKind::INVALID},
+    {BinaryExprKind::BITXOR, ExprKind::BITXOR, ExprKind::INVALID},
+    {BinaryExprKind::LT, ExprKind::LT, ExprKind::INVALID},
+    {BinaryExprKind::GT, ExprKind::GT, ExprKind::INVALID},
+    {BinaryExprKind::LE, ExprKind::LE, ExprKind::INVALID},
+    {BinaryExprKind::GE, ExprKind::GE, ExprKind::INVALID},
+    {BinaryExprKind::EQUAL, ExprKind::EQUAL, ExprKind::INVALID},
+    {BinaryExprKind::NOTEQUAL, ExprKind::NOTEQUAL, ExprKind::INVALID},
+    {BinaryExprKind::AND, ExprKind::AND, ExprKind::INVALID},
+    {BinaryExprKind::OR, ExprKind::OR, ExprKind::INVALID},
+};
+
+template <typename OpKind, size_t N>
+ExprKind LookupExprKind(
+    const std::tuple<OpKind, ExprKind, ExprKind> (&table)[N], OpKind kind, bool isTry)
+{
+    for (const auto& [opKind, exprKind, tryExprKind] : table) {
+        if (opKind != kind) {
+            continue;
+        }
+        auto result = isTry ? tryExprKind : exprKind;
+        CJC_ASSERT(result != ExprKind::INVALID);
+        return result;
+    }
+    CJC_ABORT();
+    return ExprKind::INVALID;
+}
+
+template <typename OpKind, size_t N>
+OpKind LookupOpKind(const std::tuple<OpKind, ExprKind, ExprKind> (&table)[N], ExprKind kind)
+{
+    for (const auto& [opKind, exprKind, tryExprKind] : table) {
+        if (exprKind == kind || (tryExprKind != ExprKind::INVALID && tryExprKind == kind)) {
+            return opKind;
+        }
+    }
+    CJC_ABORT();
+    return OpKind{};
+}
+} // namespace
+
+ExprKind ExprKindMgr::ToExprKind(UnaryExprKind kind, bool isTry)
+{
+    return LookupExprKind(UNARY_EXPR_KIND_TABLE, kind, isTry);
+}
+
+ExprKind ExprKindMgr::ToExprKind(BinaryExprKind kind, bool isTry)
+{
+    return LookupExprKind(BINARY_EXPR_KIND_TABLE, kind, isTry);
+}
+
+UnaryExprKind ExprKindMgr::ToUnaryExprKind(ExprKind kind)
+{
+    return LookupOpKind(UNARY_EXPR_KIND_TABLE, kind);
+}
+
+BinaryExprKind ExprKindMgr::ToBinaryExprKind(ExprKind kind)
+{
+    return LookupOpKind(BINARY_EXPR_KIND_TABLE, kind);
+}
+
+UnaryExpressionBase::UnaryExpressionBase(
+    UnaryExprKind kind, Value* operand, Cangjie::OverflowStrategy ofs, bool isTry,
+    const std::vector<Block*>& successors, Block* parent)
+    : Expression(ExprKindMgr::ToExprKind(kind, isTry), {operand}, parent), overflowStrategy(ofs)
+{
+    CJC_NULLPTR_CHECK(parent);
+    for (auto succ : successors) {
+        AppendOperand(*succ);
+    }
+}
+
+Value* UnaryExpressionBase::GetOperand() const
 {
     return GetOperand(0);
 }
 
-Cangjie::OverflowStrategy UnaryExpression::GetOverflowStrategy() const
+UnaryExprKind UnaryExpressionBase::GetOpKind() const
+{
+    return ExprKindMgr::ToUnaryExprKind(GetExprKind());
+}
+
+Cangjie::OverflowStrategy UnaryExpressionBase::GetOverflowStrategy() const
 {
     return overflowStrategy;
 }
 
-std::string UnaryExpression::AddExtraComment() const
+std::string UnaryExpressionBase::AddExtraComment() const
 {
     if (overflowStrategy != Cangjie::OverflowStrategy::NA) {
         return OverflowToString(overflowStrategy);
@@ -540,38 +599,88 @@ std::string UnaryExpression::AddExtraComment() const
     return "";
 }
 
-BinaryExpression::BinaryExpression(ExprKind kind, Value* lhs, Value* rhs, OverflowStrategy ofs, Block* parent)
-    : Expression(kind, {lhs, rhs}, {}, parent), overflowStrategy(ofs)
+UnaryExpression::UnaryExpression(UnaryExprKind kind, Value* operand, Cangjie::OverflowStrategy ofs, Block* parent)
+    : UnaryExpressionBase(kind, operand, ofs, false, {}, parent)
 {
 }
 
-BinaryExpression::BinaryExpression(ExprKind kind, Value* lhs, Value* rhs, Block* parent)
-    : Expression(kind, {lhs, rhs}, {}, parent)
+BinaryExpressionBase::BinaryExpressionBase(
+    BinaryExprKind kind, Value* lhs, Value* rhs, OverflowStrategy ofs, bool isTry,
+    const std::vector<Block*>& successors, Block* parent)
+    : Expression(ExprKindMgr::ToExprKind(kind, isTry), {lhs, rhs}, parent), overflowStrategy(ofs)
 {
-    CJC_ASSERT(kind >= ExprKind::BITAND);
+    CJC_NULLPTR_CHECK(parent);
+    for (auto succ : successors) {
+        AppendOperand(*succ);
+    }
 }
 
-Value* BinaryExpression::GetLHSOperand() const
+BinaryExpressionBase::BinaryExpressionBase(BinaryExprKind kind, Value* lhs, Value* rhs, Block* parent)
+    : Expression(ExprKindMgr::ToExprKind(kind, false), {lhs, rhs}, parent)
+{
+    CJC_ASSERT(kind >= BinaryExprKind::BITAND);
+}
+
+Value* BinaryExpressionBase::GetLHSOperand() const
 {
     return GetOperand(0);
 }
 
-Value* BinaryExpression::GetRHSOperand() const
+Value* BinaryExpressionBase::GetRHSOperand() const
 {
     return GetOperand(1);
 }
 
-Cangjie::OverflowStrategy BinaryExpression::GetOverflowStrategy() const
+BinaryExprKind BinaryExpressionBase::GetOpKind() const
+{
+    return ExprKindMgr::ToBinaryExprKind(GetExprKind());
+}
+
+bool BinaryExpressionBase::IsMathematicalOperator() const
+{
+    auto kind = GetOpKind();
+    return kind >= BinaryExprKind::ADD && kind <= BinaryExprKind::EXP;
+}
+
+bool BinaryExpressionBase::IsBitwiseOperator() const
+{
+    auto kind = GetOpKind();
+    return kind >= BinaryExprKind::LSHIFT && kind <= BinaryExprKind::BITXOR;
+}
+
+bool BinaryExpressionBase::IsComparisonOperator() const
+{
+    auto kind = GetOpKind();
+    return kind >= BinaryExprKind::LT && kind <= BinaryExprKind::NOTEQUAL;
+}
+
+bool BinaryExpressionBase::IsLogicalOperator() const
+{
+    auto kind = GetOpKind();
+    return kind >= BinaryExprKind::AND && kind <= BinaryExprKind::OR;
+}
+
+Cangjie::OverflowStrategy BinaryExpressionBase::GetOverflowStrategy() const
 {
     return overflowStrategy;
 }
 
-std::string BinaryExpression::AddExtraComment() const
+std::string BinaryExpressionBase::AddExtraComment() const
 {
     if (overflowStrategy != Cangjie::OverflowStrategy::NA) {
         return OverflowToString(overflowStrategy);
     }
     return "";
+}
+
+BinaryExpression::BinaryExpression(BinaryExprKind kind, Value* lhs, Value* rhs, OverflowStrategy ofs, Block* parent)
+    : BinaryExpressionBase(kind, lhs, rhs, ofs, false, {}, parent)
+{
+}
+
+BinaryExpression::BinaryExpression(BinaryExprKind kind, Value* lhs, Value* rhs, Block* parent)
+    : BinaryExpressionBase(kind, lhs, rhs, parent)
+{
 }
 
 LiteralValue* Constant::GetValue() const
@@ -674,14 +783,27 @@ bool Constant::IsUnitLit() const
 }
 
 // Allocate
-Type* Allocate::GetType() const
+AllocateBase::AllocateBase(ExprKind kind, Type* ty, const std::vector<Block*>& successors, Block* parent)
+    : Expression(kind, {}, parent), ty(ty)
+{
+    CJC_NULLPTR_CHECK(parent);
+    for (auto succ : successors) {
+        AppendOperand(*succ);
+    }
+}
+
+Type* AllocateBase::GetType() const
 {
     return ty;
 }
 
-std::string Allocate::OperandsToString() const
+std::string AllocateBase::OperandsToString() const
 {
     return ty->ToString();
+}
+
+Allocate::Allocate(Type* ty, Block* parent) : AllocateBase(ExprKind::ALLOCATE, ty, {}, parent)
+{
 }
 
 Value* Load::GetLocation() const
@@ -699,7 +821,7 @@ Value* Store::GetLocation() const
 }
 
 // GetElementRef
-Value* GetElementRef::GetLocation() const
+Value* GetElementRef::GetBase() const
 {
     return operands[0];
 }
@@ -712,7 +834,7 @@ const std::vector<uint64_t>& GetElementRef::GetPath() const
 std::string GetElementRef::OperandsToString() const
 {
     std::stringstream ss;
-    ss << GetLocation()->GetIdentifier();
+    ss << GetBase()->GetIdentifier();
     for (auto p : GetPath()) {
         ss << ", " << p;
     }
@@ -754,7 +876,7 @@ Value* StoreElementRef::GetValue() const
     return operands[0];
 }
 
-Value* StoreElementRef::GetLocation() const
+Value* StoreElementRef::GetBase() const
 {
     return operands[1];
 }
@@ -807,6 +929,13 @@ FuncCall::FuncCall(ExprKind kind, const FuncCallContext& funcCallCtx, Block* par
 {
 }
 
+Value* FuncCall::GetArg(size_t index) const
+{
+    auto args = GetArgs();
+    CJC_ASSERT(index < args.size());
+    return args[index];
+}
+
 Type* FuncCall::GetThisType() const
 {
     return thisType;
@@ -822,20 +951,70 @@ const std::vector<Type*>& FuncCall::GetInstantiatedTypeArgs() const
     return instantiatedTypeArgs;
 }
 
-// Apply
-Apply::Apply(Value* callee, const FuncCallContext& callContext, Block* parent)
-    : FuncCall(ExprKind::APPLY, callContext, parent)
+std::string FuncCall::OperandsToString() const
 {
+    std::vector<std::string> res;
+    std::string func;
+    if (thisType != nullptr) {
+        func += thisType->ToString() + "->";
+    }
+    func += GetCalleeIdentifier();
+    func += TypeVecToString("<", instantiatedTypeArgs, ">");
+    res.emplace_back(func);
+    std::vector<Value*> ops;
+    if (Is<const IntrinsicBase*>(this)) {
+        ops = operands;
+    } else {
+        ops = std::vector<Value*>(operands.begin() + 1, operands.end());
+    }
+    res.emplace_back(ValueIdVecToString("", ops, "", IsTerminator()));
+    return StringJoin(res, ", ");
+}
+
+// ApplyBase
+ApplyBase::ApplyBase(ExprKind kind, Value* callee, const FuncCallContext& callContext,
+    const std::vector<Block*>& successors, Block* parent)
+    : FuncCall(kind, callContext, parent)
+{
+    CJC_NULLPTR_CHECK(callee);
     CJC_NULLPTR_CHECK(parent);
     AppendOperand(*callee);
     for (auto op : callContext.args) {
         AppendOperand(*op);
     }
+    for (auto succ : successors) {
+        AppendOperand(*succ);
+    }
 }
 
-Value* Apply::GetCallee() const
+Value* ApplyBase::GetCallee() const
 {
     return operands[0];
+}
+
+std::vector<Value*> ApplyBase::GetArgs() const
+{
+    auto end = GetSuccessorIndex(0);
+    if (end <= 1) {
+        return {};
+    }
+    return {operands.begin() + 1, operands.begin() + static_cast<long>(end)};
+}
+
+Type* ApplyBase::GetInstParentCustomTyOfCallee(CHIRBuilder& builder) const
+{
+    return ::Cangjie::CHIR::GetInstParentCustomTyOfCallee(*GetCallee(), GetArgs(), GetThisType(), builder);
+}
+
+std::string ApplyBase::GetCalleeIdentifier() const
+{
+    return GetCallee()->GetIdentifier();
+}
+
+// Apply
+Apply::Apply(Value* callee, const FuncCallContext& callContext, Block* parent)
+    : ApplyBase(ExprKind::APPLY, callee, callContext, {}, parent)
+{
 }
 
 void Apply::SetSuperCall()
@@ -848,34 +1027,6 @@ bool Apply::IsSuperCall() const
     return isSuperCall;
 }
 
-Type* Apply::GetInstParentCustomTyOfCallee(CHIRBuilder& builder) const
-{
-    return GetInstParentCustomTypeForApplyCallee(*this, builder);
-}
-
-std::vector<Value*> Apply::GetArgs() const
-{
-    std::vector<Value*> args;
-    if (operands.size() > 1) {
-        args.assign(operands.begin() + 1, operands.end());
-    }
-    return args;
-}
-
-std::string Apply::OperandsToString() const
-{
-    std::vector<std::string> res;
-    std::string func;
-    if (thisType != nullptr) {
-        func += thisType->ToString() + "->";
-    }
-    func += GetCallee()->GetIdentifier();
-    func += TypeVecToString("<", instantiatedTypeArgs, ">");
-    res.emplace_back(func);
-    res.emplace_back(ValueIdVecToString("", GetArgs(), ""));
-    return StringJoin(res, ", ");
-}
-
 std::string Apply::AddExtraComment() const
 {
     if (IsSuperCall()) {
@@ -885,190 +1036,175 @@ std::string Apply::AddExtraComment() const
 }
 
 DynamicDispatch::DynamicDispatch(ExprKind kind, const InvokeCallContext& callContext, Block* parent)
-    : FuncCall(kind, callContext.funcCallCtx, parent),
-      virMethodCtx(callContext.virMethodCtx)
+    : FuncCall(kind, callContext.funcCallCtx, parent), overflowStrategy(callContext.overflowStrategy)
 {
-    CJC_ASSERT(!virMethodCtx.funcName.empty());
-    CJC_NULLPTR_CHECK(virMethodCtx.funcType);
+    CJC_NULLPTR_CHECK(callContext.method);
     CJC_NULLPTR_CHECK(callContext.funcCallCtx.thisType);
+    CJC_ASSERT(callContext.overflowStrategy != Cangjie::OverflowStrategy::CHECKED);
+    AppendOperand(*callContext.method);
 }
 
-const std::string& DynamicDispatch::GetMethodName() const
+Function* DynamicDispatch::GetCallee() const
 {
-    return virMethodCtx.funcName;
+    return StaticCast<Function*>(operands[0]);
+}
+
+std::string DynamicDispatch::GetMethodName() const
+{
+    auto name = GetCallee()->GetSrcCodeIdentifier();
+    if (overflowStrategy != Cangjie::OverflowStrategy::NA) {
+        return OverflowStrategyPrefix(overflowStrategy) + name;
+    }
+    return name;
 }
 
 FuncType* DynamicDispatch::GetMethodType() const
 {
-    return virMethodCtx.funcType;
+    return GetCallee()->GetFuncType();
 }
 
 const std::vector<GenericType*>& DynamicDispatch::GetGenericTypeParams() const
 {
-    return virMethodCtx.genericTypeParams;
+    return GetCallee()->GetGenericTypeParams();
 }
 
-std::vector<VTableSearchRes> DynamicDispatch::GetVirtualMethodInfo(CHIRBuilder& builder) const
+size_t DynamicDispatch::GetVirtualMethodOffset() const
+{
+    auto offset = Get<VirMethodOffset>();
+    if (offset.has_value()) {
+        return offset.value();
+    }
+    auto callee = GetCallee();
+    auto def = callee->GetParentCustomTypeDef();
+    const auto& virtualMethods =
+        def->GetDefVTable().GetExpectedTypeVTable(*StaticCast<ClassType*>(def->GetType())).GetVirtualMethods();
+    // Overflow operators (`+` etc.) are split into multiple vtable slots (`&+`/`~+`/`%+`) that may share
+    // the same Function*. Matching only by callee would always hit the first slot, so also compare
+    // method name (GetMethodName() already includes OverflowStrategyPrefix).
+    for (size_t i = 0; i < virtualMethods.size(); i++) {
+        if (virtualMethods[i].GetVirtualMethod() == callee &&
+            virtualMethods[i].GetMethodName() == GetMethodName()) {
+            return i;
+        }
+    }
+    CJC_ABORT();
+    return 0;
+}
+
+ClassType* DynamicDispatch::GetInstSrcParentCustomTypeOfMethod(CHIRBuilder& builder) const
 {
     auto thisTypeDeref = thisType->StripAllRefs();
     if (thisTypeDeref->IsThis()) {
         thisTypeDeref = GetTopLevelFunc()->GetParentCustomTypeDef()->GetType();
     }
-    std::vector<Type*> instParamTypes;
-    for (auto arg : GetArgs()) {
-        instParamTypes.emplace_back(arg->GetType());
-    }
-    if (!IsInvokeStaticBase()) {
-        instParamTypes.erase(instParamTypes.begin());
-    }
-    auto instFuncType = builder.GetType<FuncType>(instParamTypes, builder.GetUnitTy());
-    FuncCallType funcCallType{virMethodCtx.funcName, instFuncType, instantiatedTypeArgs};
-    auto res = GetFuncIndexInVTable(*thisTypeDeref, funcCallType, builder);
-    CJC_ASSERT(!res.empty());
-    return res;
+    // May inherit the same parent interface more than once with different type args, e.g.
+    //   interface A<T> { func foo(a: T) {} }
+    //   class B <: A<Bool> & A<Int64> {}
+    //   B().foo(1)  // must pick A<Int64>, not A<Bool>
+    // GetInstParentCustomTyOfCallee disambiguates by matching callee args when multiple parents match.
+    return StaticCast<ClassType*>(
+        ::Cangjie::CHIR::GetInstParentCustomTyOfCallee(*GetCallee(), GetArgs(), thisTypeDeref, builder));
 }
 
-size_t DynamicDispatch::GetVirtualMethodOffset(CHIRBuilder* builder) const
+AttributeInfo DynamicDispatch::GetVirtualMethodAttr() const
 {
-    auto offset = Get<VirMethodOffset>();
-    if (offset.has_value()) {
-        return offset.value();
-    } else {
-        CJC_NULLPTR_CHECK(builder);
-        return GetVirtualMethodInfo(*builder)[0].offset;
+    return GetCallee()->GetAttributeInfo();
+}
+
+std::string DynamicDispatch::GetCalleeIdentifier() const
+{
+    return GetCallee()->GetIdentifier();
+}
+
+std::string DynamicDispatch::AddExtraComment() const
+{
+    if (overflowStrategy != Cangjie::OverflowStrategy::NA) {
+        return "methodName: " + GetMethodName();
+    }
+    return "";
+}
+
+inline static void CheckVirFuncInvokeInfo(const InvokeCallContext& callContext)
+{
+    CJC_NULLPTR_CHECK(callContext.method);
+    CJC_NULLPTR_CHECK(callContext.caller);
+    CJC_NULLPTR_CHECK(callContext.funcCallCtx.thisType);
+}
+
+// InvokeBase
+InvokeBase::InvokeBase(
+    ExprKind kind, const InvokeCallContext& callContext, const std::vector<Block*>& successors, Block* parent)
+    : DynamicDispatch(kind, callContext, parent)
+{
+    CJC_NULLPTR_CHECK(parent);
+    CheckVirFuncInvokeInfo(callContext);
+    AppendOperand(*callContext.caller);
+    for (auto op : callContext.funcCallCtx.args) {
+        AppendOperand(*op);
+    }
+    for (auto succ : successors) {
+        AppendOperand(*succ);
     }
 }
 
-ClassType* DynamicDispatch::GetInstSrcParentCustomTypeOfMethod(CHIRBuilder& builder) const
+Value* InvokeBase::GetObject() const
 {
-    for (auto& r : GetVirtualMethodInfo(builder)) {
-        if (r.offset == GetVirtualMethodOffset()) {
-            auto def = r.instSrcParentType->GetClassDef();
-            const auto& parentFuncInfo = def->GetDefVTable().GetExpectedTypeVTable(*def->GetType());
-            auto originalType = parentFuncInfo.GetVirtualMethods()[r.offset].GetOriginalFuncType();
-            if (VirMethodTypeIsMatched(*originalType, *GetMethodType())) {
-                CJC_NULLPTR_CHECK(r.instSrcParentType);
-                return r.instSrcParentType;
-            }
-        }
-    }
-    CJC_ABORT();
-    return nullptr;
+    return operands[1];
 }
 
-AttributeInfo DynamicDispatch::GetVirtualMethodAttr(CHIRBuilder& builder) const
+std::vector<Value*> InvokeBase::GetArgs() const
 {
-    for (auto& r : GetVirtualMethodInfo(builder)) {
-        if (r.offset == GetVirtualMethodOffset()) {
-            CJC_NULLPTR_CHECK(r.instSrcParentType);
-            return r.attr;
-        }
-    }
-    CJC_ABORT();
-    return AttributeInfo{};
-}
-
-std::string DynamicDispatch::OperandsToString() const
-{
-    std::stringstream ss;
-    CJC_NULLPTR_CHECK(thisType);
-    ss << thisType->ToString() << "->" << GetMethodName() << TypeVecToString("<", instantiatedTypeArgs, ">");
-    ss << ", " << GetMethodType()->ToString() << ", " << ValueIdVecToString("", operands, "");
-    return ss.str();
+    return {operands.begin() + 1, operands.begin() + static_cast<long>(GetSuccessorIndex(0))};
 }
 
 // Invoke
 Invoke::Invoke(const InvokeCallContext& callContext, Block* parent)
-    : DynamicDispatch(ExprKind::INVOKE, callContext, parent)
+    : InvokeBase(ExprKind::INVOKE, callContext, {}, parent)
+{
+}
+
+// InvokeStaticBase
+InvokeStaticBase::InvokeStaticBase(
+    ExprKind kind, const InvokeCallContext& callContext, const std::vector<Block*>& successors, Block* parent)
+    : DynamicDispatch(kind, callContext, parent)
 {
     CJC_NULLPTR_CHECK(parent);
+    CheckVirFuncInvokeInfo(callContext);
     AppendOperand(*callContext.caller);
     for (auto op : callContext.funcCallCtx.args) {
         AppendOperand(*op);
     }
-}
-
-Value* Invoke::GetObject() const
-{
-    return operands[0];
-}
-
-void Invoke::UpdateThisType()
-{
-    auto objType = GetObject()->GetType();
-    auto objDerefType = DynamicCast<ClassType*>(objType->StripAllRefs());
-    auto thisDerefType = DynamicCast<ClassType*>(thisType->StripAllRefs());
-    // for now, we only care about class type, maybe we can handle other types later
-    if (objDerefType == thisDerefType || objDerefType == nullptr || thisDerefType == nullptr) {
-        return;
-    }
-    // `ThisType` must be sub type or equal to object's type, in fact, they should be same,
-    // but original object may be casted to parent type for func param type matched.
-    // after function inlining, object may be changed to sub type of `ThisType`, so we need to update `ThisType`
-    auto parentDef = objDerefType->GetClassDef();
-    std::unordered_set<ClassDef*> allSuperDefs;
-    GetAllSuperClassDefs(*thisDerefType->GetClassDef(), allSuperDefs);
-    auto it = allSuperDefs.find(parentDef);
-    if (it == allSuperDefs.end()) {
-        SetThisType(objType);
+    for (auto succ : successors) {
+        AppendOperand(*succ);
     }
 }
 
-void Invoke::ReplaceOperand(Value* oldOperand, Value* newOperand)
+Value* InvokeStaticBase::GetRTTIValue() const
 {
-    auto needUpdateThisType = false;
-    if (GetObject() == oldOperand) {
-        needUpdateThisType = true;
-    }
-    Expression::ReplaceOperand(oldOperand, newOperand);
-    if (needUpdateThisType) {
-        UpdateThisType();
-    }
+    return operands[1];
 }
 
-void Invoke::ReplaceOperand(size_t idx, Value* newOperand)
+std::vector<Value*> InvokeStaticBase::GetArgs() const
 {
-    Expression::ReplaceOperand(idx, newOperand);
-    if (idx == 0) {
-        UpdateThisType();
-    }
-}
-
-std::vector<Value*> Invoke::GetArgs() const
-{
-    return operands;
+    return {operands.begin() + 2, operands.begin() + static_cast<long>(GetSuccessorIndex(0))};
 }
 
 InvokeStatic::InvokeStatic(const InvokeCallContext& callContext, Block* parent)
-    : DynamicDispatch(ExprKind::INVOKESTATIC, callContext, parent)
+    : InvokeStaticBase(ExprKind::INVOKESTATIC, callContext, {}, parent)
 {
-    CJC_NULLPTR_CHECK(parent);
-    AppendOperand(*callContext.caller);
-    for (auto op : callContext.funcCallCtx.args) {
-        AppendOperand(*op);
-    }
-}
-
-Value* InvokeStatic::GetRTTIValue() const
-{
-    return operands[0];
-}
-
-std::vector<Value*> InvokeStatic::GetArgs() const
-{
-    return {operands.begin() + 1, operands.end()};
 }
 
 InvokeStatic* InvokeStatic::Clone(CHIRBuilder& builder, Block& parent) const
 {
     auto invokeInfo = InvokeCallContext {
+        .method = GetCallee(),
         .caller = GetRTTIValue(),
         .funcCallCtx = FuncCallContext {
             .args = GetArgs(),
             .instTypeArgs = instantiatedTypeArgs,
             .thisType = thisType
         },
-        .virMethodCtx = virMethodCtx
+        .overflowStrategy = overflowStrategy
     };
     auto newNode = builder.CreateExpression<InvokeStatic>(result->GetType(), invokeInfo, &parent);
     parent.AppendExpression(newNode);
@@ -1077,13 +1213,13 @@ InvokeStatic* InvokeStatic::Clone(CHIRBuilder& builder, Block& parent) const
 }
 
 // TypeCast
-TypeCast::TypeCast(Value* operand, Block* parent) : Expression(ExprKind::TYPECAST, {operand}, {}, parent)
+TypeCast::TypeCast(ExprKind kind, Value* operand, const std::vector<Block*>& successors, Block* parent)
+    : Expression(kind, {operand}, parent)
 {
-}
-
-TypeCast::TypeCast(Value* operand, Cangjie::OverflowStrategy overflow, Block* parent)
-    : Expression(ExprKind::TYPECAST, {operand}, {}, parent), overflowStrategy(overflow)
-{
+    CJC_NULLPTR_CHECK(parent);
+    for (auto succ : successors) {
+        AppendOperand(*succ);
+    }
 }
 
 Value* TypeCast::GetSourceValue() const
@@ -1091,27 +1227,68 @@ Value* TypeCast::GetSourceValue() const
     return operands[0];
 }
 
-Type* TypeCast::GetSourceTy() const
+Type* TypeCast::GetSourceType() const
 {
     return operands[0]->GetType();
 }
 
-Type* TypeCast::GetTargetTy() const
+Type* TypeCast::GetTargetType() const
 {
     return result->GetType();
 }
 
-Cangjie::OverflowStrategy TypeCast::GetOverflowStrategy() const
+// NumericCastBase
+NumericCastBase::NumericCastBase(
+    ExprKind kind, Value* operand, Cangjie::OverflowStrategy overflow, const std::vector<Block*>& successors,
+    Block* parent)
+    : TypeCast(kind, operand, successors, parent), overflowStrategy(overflow)
+{
+}
+
+Cangjie::OverflowStrategy NumericCastBase::GetOverflowStrategy() const
 {
     return overflowStrategy;
 }
 
-std::string TypeCast::AddExtraComment() const
+std::string NumericCastBase::AddExtraComment() const
 {
     if (overflowStrategy != Cangjie::OverflowStrategy::NA) {
         return OverflowToString(overflowStrategy);
     }
     return "";
+}
+
+// StaticCast
+ClassStaticCast::ClassStaticCast(Value* operand, Block* parent)
+    : TypeCast(ExprKind::CLASS_STATIC_CAST, operand, {}, parent)
+{
+}
+
+ClassStaticCast* ClassStaticCast::Clone(CHIRBuilder& builder, Block& parent) const
+{
+    auto newNode = builder.CreateExpression<ClassStaticCast>(result->GetType(), GetSourceValue(), &parent);
+    parent.AppendExpression(newNode);
+    newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
+    newNode->Set<NeedCheckCast>(this->Get<NeedCheckCast>());
+    newNode->GetResult()->Set<EnumCaseIndex>(result->Get<EnumCaseIndex>());
+    return newNode;
+}
+
+// NumericCast
+NumericCast::NumericCast(Value* operand, Cangjie::OverflowStrategy overflow, Block* parent)
+    : NumericCastBase(ExprKind::NUMERIC_CAST, operand, overflow, {}, parent)
+{
+}
+
+NumericCast* NumericCast::Clone(CHIRBuilder& builder, Block& parent) const
+{
+    auto newNode =
+        builder.CreateExpression<NumericCast>(result->GetType(), GetSourceValue(), GetOverflowStrategy(), &parent);
+    parent.AppendExpression(newNode);
+    newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
+    newNode->Set<NeedCheckCast>(this->Get<NeedCheckCast>());
+    newNode->GetResult()->Set<EnumCaseIndex>(result->Get<EnumCaseIndex>());
+    return newNode;
 }
 
 // InstanceOf
@@ -1137,23 +1314,8 @@ std::string InstanceOf::OperandsToString() const
 
 // Box
 Box::Box(Value* operand, Block* parent)
-    : Expression(ExprKind::BOX, {operand}, {}, parent)
+    : TypeCast(ExprKind::BOX, operand, {}, parent)
 {
-}
-
-Value* Box::GetSourceValue() const
-{
-    return operands[0];
-}
-
-Type* Box::GetSourceTy() const
-{
-    return GetSourceValue()->GetType();
-}
-
-Type* Box::GetTargetTy() const
-{
-    return result->GetType();
 }
 
 Box* Box::Clone(CHIRBuilder& builder, Block& parent) const
@@ -1164,88 +1326,43 @@ Box* Box::Clone(CHIRBuilder& builder, Block& parent) const
     return newNode;
 }
 
-// UnBox
-UnBox::UnBox(Value* operand, Block* parent)
-    : Expression(ExprKind::UNBOX, {operand}, {}, parent)
+// UnBoxToValue
+UnBoxToValue::UnBoxToValue(Value* operand, Block* parent)
+    : TypeCast(ExprKind::UNBOX_TO_VALUE, operand, {}, parent)
 {
 }
 
-Value* UnBox::GetSourceValue() const
+UnBoxToValue* UnBoxToValue::Clone(CHIRBuilder& builder, Block& parent) const
 {
-    return operands[0];
-}
-
-Type* UnBox::GetSourceTy() const
-{
-    return GetSourceValue()->GetType();
-}
-
-Type* UnBox::GetTargetTy() const
-{
-    return result->GetType();
-}
-
-UnBox* UnBox::Clone(CHIRBuilder& builder, Block& parent) const
-{
-    auto newNode = builder.CreateExpression<UnBox>(result->GetType(), GetSourceValue(), &parent);
+    auto newNode = builder.CreateExpression<UnBoxToValue>(result->GetType(), GetSourceValue(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
 }
 
-// TransformToGeneric
-TransformToGeneric::TransformToGeneric(Value* operand, Block* parent)
-    : Expression(ExprKind::TRANSFORM_TO_GENERIC, {operand}, {}, parent)
+// CastToGeneric
+CastToGeneric::CastToGeneric(Value* operand, Block* parent)
+    : TypeCast(ExprKind::CAST_TO_GENERIC, operand, {}, parent)
 {
 }
 
-Value* TransformToGeneric::GetSourceValue() const
+CastToGeneric* CastToGeneric::Clone(CHIRBuilder& builder, Block& parent) const
 {
-    return operands[0];
-}
-
-Type* TransformToGeneric::GetSourceTy() const
-{
-    return GetSourceValue()->GetType();
-}
-
-Type* TransformToGeneric::GetTargetTy() const
-{
-    return result->GetType();
-}
-
-TransformToGeneric* TransformToGeneric::Clone(CHIRBuilder& builder, Block& parent) const
-{
-    auto newNode = builder.CreateExpression<TransformToGeneric>(result->GetType(), GetSourceValue(), &parent);
+    auto newNode = builder.CreateExpression<CastToGeneric>(result->GetType(), GetSourceValue(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
 }
 
-// TransformToConcrete
-TransformToConcrete::TransformToConcrete(Value* operand, Block* parent)
-    : Expression(ExprKind::TRANSFORM_TO_CONCRETE, {operand}, {}, parent)
+// CastToConcrete
+CastToConcrete::CastToConcrete(Value* operand, Block* parent)
+    : TypeCast(ExprKind::CAST_TO_CONCRETE, operand, {}, parent)
 {
 }
 
-Value* TransformToConcrete::GetSourceValue() const
+CastToConcrete* CastToConcrete::Clone(CHIRBuilder& builder, Block& parent) const
 {
-    return operands[0];
-}
-
-Type* TransformToConcrete::GetSourceTy() const
-{
-    return GetSourceValue()->GetType();
-}
-
-Type* TransformToConcrete::GetTargetTy() const
-{
-    return result->GetType();
-}
-
-TransformToConcrete* TransformToConcrete::Clone(CHIRBuilder& builder, Block& parent) const
-{
-    auto newNode = builder.CreateExpression<TransformToConcrete>(result->GetType(), GetSourceValue(), &parent);
+    auto newNode = builder.CreateExpression<CastToConcrete>(result->GetType(), GetSourceValue(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
@@ -1253,23 +1370,8 @@ TransformToConcrete* TransformToConcrete::Clone(CHIRBuilder& builder, Block& par
 
 // UnBoxToRef
 UnBoxToRef::UnBoxToRef(Value* operand, Block* parent)
-    : Expression(ExprKind::UNBOX_TO_REF, {operand}, {}, parent)
+    : TypeCast(ExprKind::UNBOX_TO_REF, operand, {}, parent)
 {
-}
-
-Value* UnBoxToRef::GetSourceValue() const
-{
-    return operands[0];
-}
-
-Type* UnBoxToRef::GetSourceTy() const
-{
-    return GetSourceValue()->GetType();
-}
-
-Type* UnBoxToRef::GetTargetTy() const
-{
-    return result->GetType();
 }
 
 UnBoxToRef* UnBoxToRef::Clone(CHIRBuilder& builder, Block& parent) const
@@ -1361,25 +1463,35 @@ FieldByName* FieldByName::Clone(CHIRBuilder& builder, Block& parent) const
 }
 
 // RawArrayAllocate
-RawArrayAllocate::RawArrayAllocate(Type* eleTy, Value* size, Block* parent)
-    : Expression(ExprKind::RAW_ARRAY_ALLOCATE, {size}, {}, parent), elementType(eleTy)
+RawArrayAllocateBase::RawArrayAllocateBase(
+    ExprKind kind, Type* eleTy, Value* size, const std::vector<Block*>& successors, Block* parent)
+    : Expression(kind, {size}, parent), elementType(eleTy)
 {
+    CJC_NULLPTR_CHECK(parent);
+    for (auto succ : successors) {
+        AppendOperand(*succ);
+    }
 }
 
-Value* RawArrayAllocate::GetSize() const
+Value* RawArrayAllocateBase::GetSize() const
 {
     CJC_ASSERT(!operands.empty());
     return operands[0];
 }
 
-Type* RawArrayAllocate::GetElementType() const
+Type* RawArrayAllocateBase::GetElementType() const
 {
     return elementType;
 }
 
-std::string RawArrayAllocate::OperandsToString() const
+std::string RawArrayAllocateBase::OperandsToString() const
 {
     return elementType->ToString() + ", " + GetSize()->GetIdentifier();
+}
+
+RawArrayAllocate::RawArrayAllocate(Type* eleTy, Value* size, Block* parent)
+    : RawArrayAllocateBase(ExprKind::RAW_ARRAY_ALLOCATE, eleTy, size, {}, parent)
+{
 }
 
 // RawArrayLiteralInit
@@ -1404,42 +1516,49 @@ size_t RawArrayLiteralInit::GetSize() const
     return operands.size() - 1;
 }
 
-std::vector<Value*> RawArrayLiteralInit::GetElements() const
+std::vector<Value*> RawArrayLiteralInit::GetElementValues() const
 {
     CJC_ASSERT(operands.size() > 0);
     return {operands.begin() + 1, operands.end()};
 }
 
-// Intrinsic
-Intrinsic::Intrinsic(const IntrisicCallContext& callContext, Block* parent)
-    : Expression(ExprKind::INTRINSIC, callContext.args, {}, parent),
-    intrinsicKind(callContext.kind),
-    instantiatedTypeArgs(callContext.instTypeArgs)
+// IntrinsicBase
+IntrinsicBase::IntrinsicBase(ExprKind kind, const IntrisicCallContext& callContext,
+    const std::vector<Block*>& successors, Block* parent)
+    : FuncCall(kind,
+          FuncCallContext{.args = callContext.args, .instTypeArgs = callContext.instTypeArgs, .thisType = nullptr},
+          parent),
+      intrinsicKind(callContext.kind)
 {
+    CJC_NULLPTR_CHECK(parent);
+    for (auto op : callContext.args) {
+        AppendOperand(*op);
+    }
+    for (auto succ : successors) {
+        AppendOperand(*succ);
+    }
 }
 
-IntrinsicKind Intrinsic::GetIntrinsicKind() const
+IntrinsicKind IntrinsicBase::GetIntrinsicKind() const
 {
     return intrinsicKind;
 }
 
-const std::vector<Type*>& Intrinsic::GetInstantiatedTypeArgs() const
+std::vector<Value*> IntrinsicBase::GetArgs() const
 {
-    return instantiatedTypeArgs;
+    auto end = GetSuccessorIndex(0);
+    return {operands.begin(), operands.begin() + static_cast<long>(end)};
 }
 
-const std::vector<Value*>& Intrinsic::GetArgs() const
+std::string IntrinsicBase::GetCalleeIdentifier() const
 {
-    return operands;
+    return IntrinsicKindToString(intrinsicKind);
 }
 
-std::string Intrinsic::OperandsToString() const
+// Intrinsic
+Intrinsic::Intrinsic(const IntrisicCallContext& callContext, Block* parent)
+    : IntrinsicBase(ExprKind::INTRINSIC, callContext, {}, parent)
 {
-    std::stringstream ss;
-    ss << IntrinsicKindToString(intrinsicKind);
-    ss << TypeVecToString("<", instantiatedTypeArgs, ">");
-    ss << ", " << ValueIdVecToString("", operands, "");
-    return ss.str();
 }
 
 // ForIn
@@ -1558,7 +1677,7 @@ std::vector<Value*> Lambda::GetCapturedVariables() const
 {
     std::vector<Value*> envs;
     auto preVisit = [&envs, this](Expression& e) {
-        for (auto op : e.GetOperands()) {
+        for (auto op : e.GetNonSuccessorOperands()) {
             bool isEnv = false;
             if (op->IsLocalVar()) {
                 auto localVar = static_cast<LocalVar*>(op);
@@ -1575,7 +1694,7 @@ std::vector<Value*> Lambda::GetCapturedVariables() const
                 envs.emplace_back(op);
             }
         }
-        if (e.IsLambda()) {
+        if (Is<Lambda>(e)) {
             return VisitResult::SKIP;
         }
         return VisitResult::CONTINUE;
@@ -1596,52 +1715,57 @@ std::string Debug::OperandsToString() const
     return GetValue()->GetIdentifier() + ", " + GetSrcCodeIdentifier();
 }
 
-Spawn::Spawn(Value* val, Block* parent)
-    : Expression(ExprKind::SPAWN, {val}, {}, parent)
+SpawnBase::SpawnBase(
+    ExprKind kind, const std::vector<Value*>& operands, const std::vector<Block*>& successors, Block* parent)
+    : Expression(kind, operands, parent)
 {
+    CJC_NULLPTR_CHECK(parent);
+    for (auto succ : successors) {
+        AppendOperand(*succ);
+    }
 }
 
-Spawn::Spawn(Value* val, Value* arg, Block* parent)
-    : Expression(ExprKind::SPAWN, {val, arg}, {}, parent)
-{
-}
-
-Value* Spawn::GetFuture() const
+Value* SpawnBase::GetFuture() const
 {
     CJC_ASSERT(!IsExecuteClosure());
     return operands[0];
 }
 
-Value* Spawn::GetSpawnArg() const
+Value* SpawnBase::GetSpawnArg() const
 {
-    if (operands.size() > 1) {
+    if (GetNumOfNonSuccessorOperands() > 1) {
         return operands[1];
     }
     return nullptr;
 }
 
-Value* Spawn::GetClosure() const
+Value* SpawnBase::GetObject() const
+{
+    return operands[0];
+}
+
+Value* SpawnBase::GetClosure() const
 {
     CJC_ASSERT(IsExecuteClosure());
     return operands[0];
 }
 
-Function* Spawn::GetExecuteClosure() const
+Function* SpawnBase::GetExecuteClosure() const
 {
     return executeClosure;
 }
 
-bool Spawn::IsExecuteClosure() const
+bool SpawnBase::IsExecuteClosure() const
 {
     return executeClosure != nullptr;
 }
 
-void Spawn::SetExecuteClosure(Function& func)
+void SpawnBase::SetExecuteClosure(Function& func)
 {
     executeClosure = &func;
 }
 
-std::string Spawn::AddExtraComment() const
+std::string SpawnBase::AddExtraComment() const
 {
     if (IsExecuteClosure()) {
         return "executeClosure: " + GetExecuteClosure()->GetIdentifier();
@@ -1649,10 +1773,37 @@ std::string Spawn::AddExtraComment() const
     return "";
 }
 
+Spawn::Spawn(Value* val, Block* parent)
+    : SpawnBase(ExprKind::SPAWN, {val}, {}, parent)
+{
+}
+
+Spawn::Spawn(Value* val, Value* arg, Block* parent)
+    : SpawnBase(ExprKind::SPAWN, {val, arg}, {}, parent)
+{
+}
+
+Spawn* Spawn::Clone(CHIRBuilder& builder, Block& parent) const
+{
+    Spawn* newNode = nullptr;
+    auto arg = GetSpawnArg();
+    if (arg != nullptr) {
+        newNode = builder.CreateExpression<Spawn>(result->GetType(), GetObject(), arg, &parent);
+    } else {
+        newNode = builder.CreateExpression<Spawn>(result->GetType(), GetObject(), &parent);
+    }
+    if (executeClosure) {
+        newNode->SetExecuteClosure(*executeClosure);
+    }
+    parent.AppendExpression(newNode);
+    newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
+    return newNode;
+}
+
 UnaryExpression* UnaryExpression::Clone(CHIRBuilder& builder, Block& parent) const
 {
     auto newNode = builder.CreateExpression<UnaryExpression>(
-        result->GetType(), GetExprKind(), GetOperand(), GetOverflowStrategy(), &parent);
+        result->GetType(), GetOpKind(), GetOperand(), GetOverflowStrategy(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
@@ -1661,7 +1812,7 @@ UnaryExpression* UnaryExpression::Clone(CHIRBuilder& builder, Block& parent) con
 BinaryExpression* BinaryExpression::Clone(CHIRBuilder& builder, Block& parent) const
 {
     auto newNode = builder.CreateExpression<BinaryExpression>(
-        result->GetType(), GetExprKind(), GetLHSOperand(), GetRHSOperand(), GetOverflowStrategy(), &parent);
+        result->GetType(), GetOpKind(), GetLHSOperand(), GetRHSOperand(), GetOverflowStrategy(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
@@ -1706,7 +1857,7 @@ Store* Store::Clone(CHIRBuilder& builder, Block& parent) const
 
 GetElementRef* GetElementRef::Clone(CHIRBuilder& builder, Block& parent) const
 {
-    auto newNode = builder.CreateExpression<GetElementRef>(result->GetType(), GetLocation(), GetPath(), &parent);
+    auto newNode = builder.CreateExpression<GetElementRef>(result->GetType(), GetBase(), GetPath(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
@@ -1716,7 +1867,7 @@ std::string StoreElementRef::OperandsToString() const
 {
     std::stringstream ss;
     ss << GetValue()->GetIdentifier() << ", ";
-    ss << GetLocation()->GetIdentifier();
+    ss << GetBase()->GetIdentifier();
     for (auto p : GetPath()) {
         ss << ", " << p;
     }
@@ -1726,7 +1877,7 @@ std::string StoreElementRef::OperandsToString() const
 StoreElementRef* StoreElementRef::Clone(CHIRBuilder& builder, Block& parent) const
 {
     auto newNode =
-        builder.CreateExpression<StoreElementRef>(result->GetType(), GetValue(), GetLocation(), GetPath(), &parent);
+        builder.CreateExpression<StoreElementRef>(result->GetType(), GetValue(), GetBase(), GetPath(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
@@ -1748,29 +1899,18 @@ Invoke* Invoke::Clone(CHIRBuilder& builder, Block& parent) const
     auto args = GetArgs();
     args.erase(args.begin());
     auto invokeInfo = InvokeCallContext {
+        .method = GetCallee(),
         .caller = GetObject(),
         .funcCallCtx = FuncCallContext {
             .args = args,
             .instTypeArgs = instantiatedTypeArgs,
             .thisType = thisType
         },
-        .virMethodCtx = virMethodCtx
+        .overflowStrategy = overflowStrategy
     };
     auto newNode = builder.CreateExpression<Invoke>(result->GetType(), invokeInfo, &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
-    return newNode;
-}
-
-TypeCast* TypeCast::Clone(CHIRBuilder& builder, Block& parent) const
-{
-    auto newNode =
-        builder.CreateExpression<TypeCast>(result->GetType(), GetSourceValue(), GetOverflowStrategy(), &parent);
-    parent.AppendExpression(newNode);
-    newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
-    // Need to keep the NeedCheckCast for TypeCast Clone
-    newNode->Set<NeedCheckCast>(this->Get<NeedCheckCast>());
-    newNode->GetResult()->Set<EnumCaseIndex>(result->Get<EnumCaseIndex>());
     return newNode;
 }
 
@@ -1811,6 +1951,11 @@ VArray::VArray(std::vector<Value*> elements, Block* parent)
 int64_t VArray::GetSize() const
 {
     return static_cast<int64_t>(operands.size());
+}
+
+std::vector<Value*> VArray::GetElementValues() const
+{
+    return operands;
 }
 
 VArrayBuilder::VArrayBuilder(Value* size, Value* item, Value* initFunc, Block* parent)
@@ -1874,7 +2019,7 @@ RaiseException* RaiseException::Clone(CHIRBuilder& builder, Block& parent) const
 
 Tuple* Tuple::Clone(CHIRBuilder& builder, Block& parent) const
 {
-    auto newNode = builder.CreateExpression<Tuple>(result->GetType(), GetOperands(), &parent);
+    auto newNode = builder.CreateExpression<Tuple>(result->GetType(), GetElementValues(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
@@ -1899,7 +2044,7 @@ RawArrayAllocate* RawArrayAllocate::Clone(CHIRBuilder& builder, Block& parent) c
 RawArrayLiteralInit* RawArrayLiteralInit::Clone(CHIRBuilder& builder, Block& parent) const
 {
     auto newNode =
-        builder.CreateExpression<RawArrayLiteralInit>(result->GetType(), GetRawArray(), GetElements(), &parent);
+        builder.CreateExpression<RawArrayLiteralInit>(result->GetType(), GetRawArray(), GetElementValues(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
@@ -1916,7 +2061,7 @@ RawArrayInitByValue* RawArrayInitByValue::Clone(CHIRBuilder& builder, Block& par
 
 VArray* VArray::Clone(CHIRBuilder& builder, Block& parent) const
 {
-    auto newNode = builder.CreateExpression<VArray>(result->GetType(), GetOperands(), &parent);
+    auto newNode = builder.CreateExpression<VArray>(result->GetType(), GetElementValues(), &parent);
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;
@@ -2011,23 +2156,6 @@ Lambda* Lambda::Clone(CHIRBuilder& builder, Block& parent) const
 Debug* Debug::Clone(CHIRBuilder& builder, Block& parent) const
 {
     auto newNode = builder.CreateExpression<Debug>(result->GetType(), GetValue(), GetSrcCodeIdentifier(), &parent);
-    parent.AppendExpression(newNode);
-    newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
-    return newNode;
-}
-
-Spawn* Spawn::Clone(CHIRBuilder& builder, Block& parent) const
-{
-    Spawn* newNode = nullptr;
-    auto arg = GetSpawnArg();
-    if (arg != nullptr) {
-        newNode = builder.CreateExpression<Spawn>(result->GetType(), GetFuture(), arg, &parent);
-    } else {
-        newNode = builder.CreateExpression<Spawn>(result->GetType(), GetFuture(), &parent);
-    }
-    if (executeClosure) {
-        newNode->SetExecuteClosure(*executeClosure);
-    }
     parent.AppendExpression(newNode);
     newNode->GetResult()->AppendAttributeInfo(result->GetAttributeInfo());
     return newNode;

@@ -12,7 +12,6 @@
  * This file implements factory class for names of different Objective-C interop entities.
  */
 
-#include "ASTFactory.h"
 #include "NameGenerator.h"
 #include "cangjie/AST/Match.h"
 #include "NativeFFI/Utils.h"
@@ -26,103 +25,61 @@ using namespace Cangjie::Native::FFI;
 namespace {
 constexpr auto WRAPPER_PREFIX = "CJImpl_ObjC_";
 constexpr auto DELETE_CJ_OBJECT_SUFFIX = "_deleteCJObject";
-constexpr auto LOCK_CJ_OBJECT_SUFFIX = "_lockCJObject";
-constexpr auto UNLOCK_CJ_OBJECT_SUFFIX = "_unlockCJObject";
 constexpr auto WRAPPER_GETTER_SUFFIX = "_get";
 constexpr auto WRAPPER_GETTER_SUFFIX_INNER_GENERIC_PROP = "get";
 constexpr auto WRAPPER_SETTER_SUFFIX = "_set";
 } // namespace
 
-NameGenerator::NameGenerator(const BaseMangler& mangler, TypeManager& typeManager)
-    : mangler(mangler), typeManager(typeManager)
+NameGenerator::NameGenerator(const BaseMangler& mangler) : mangler(mangler)
 {
 }
 
-std::string NameGenerator::GenerateInitCjObjectName(const VarDecl& target, const std::string* genericActualName)
+std::string NameGenerator::GenerateInitCjObjectName(const VarDecl& target)
 {
-    std::string name = genericActualName ? target.outerDecl->identifier.Val() + '_' + *genericActualName :
-        target.outerDecl->identifier.Val() + '_' + target.identifier.Val();
+    std::string name = target.outerDecl->identifier.Val() + '_' + target.identifier.Val();
     return WRAPPER_PREFIX + name;
 }
 
-std::string NameGenerator::GenerateInitCjObjectName(const FuncDecl& target, const std::string* genericActualName)
+std::string NameGenerator::GenerateInitCjObjectName(const FuncDecl& target)
 {
     auto& params =  target.funcBody->paramLists[0]->params;
     auto ctorName = GetObjCDeclName(target);
-    auto mangledCtorName = GetMangledMethodName(mangler, params, ctorName, typeManager);
-    auto name = GetObjCFullDeclName(*target.outerDecl, genericActualName) + "_" + mangledCtorName;
+    auto mangledCtorName = GetMangledMethodName(mangler, params, ctorName);
+    auto name = GetObjCFullDeclName(*target.outerDecl) + "_" + mangledCtorName;
     std::replace(name.begin(), name.end(), '.', '_');
     std::replace(name.begin(), name.end(), ':', '_');
 
     return WRAPPER_PREFIX + name;
 }
 
-std::string NameGenerator::GenerateInitCjObjectName(const Decl& target, const std::string* genericActualName)
+std::string NameGenerator::GenerateInitCjObjectName(const Decl& target)
 {
     if (auto funcDecl = DynamicCast<const FuncDecl*>(&target)) {
-        return GenerateInitCjObjectName(*funcDecl, genericActualName);
+        return GenerateInitCjObjectName(*funcDecl);
     } else if (auto varDecl = DynamicCast<const VarDecl*>(&target)) {
-        return GenerateInitCjObjectName(*varDecl, genericActualName);
+        return GenerateInitCjObjectName(*varDecl);
     }
     CJC_ABORT();
     return "";
 }
 
-std::string NameGenerator::GenerateDeleteCjObjectName(const Decl& target, const std::string* genericActualName)
+std::string NameGenerator::GenerateDeleteCjObjectName(const Decl& target)
 {
-    auto name = GetObjCFullDeclName(target, genericActualName);
+    auto name = GetObjCFullDeclName(target);
     std::replace(name.begin(), name.end(), '.', '_');
     std::replace(name.begin(), name.end(), ':', '_');
 
     return WRAPPER_PREFIX + name + DELETE_CJ_OBJECT_SUFFIX;
 }
 
-std::string NameGenerator::GenerateLockCjObjectName(const AST::Decl& target)
-{
-    auto name = GetObjCFullDeclName(target);
-    std::replace(name.begin(), name.end(), '.', '_');
-    std::replace(name.begin(), name.end(), ':', '_');
-
-    return WRAPPER_PREFIX + name + LOCK_CJ_OBJECT_SUFFIX;
-}
-
-std::string NameGenerator::GenerateUnlockCjObjectName(const AST::Decl& target)
-{
-    auto name = GetObjCFullDeclName(target);
-    std::replace(name.begin(), name.end(), '.', '_');
-    std::replace(name.begin(), name.end(), ':', '_');
-
-    return WRAPPER_PREFIX + name + UNLOCK_CJ_OBJECT_SUFFIX;
-}
-
-std::string NameGenerator::GenerateMethodWrapperName(const FuncDecl& target, const std::string* genericActualName, bool isInnerGeneric)
+std::string NameGenerator::GenerateMethodWrapperName(const FuncDecl& target)
 {
     auto& params = target.funcBody->paramLists[0]->params;
     auto methodName = GetObjCDeclName(target);
-    auto mangledMethodName = GetMangledMethodName(mangler, params, methodName, typeManager);
-    auto outerDeclName = genericActualName ? GetObjCFullDeclName(*target.outerDecl, genericActualName) :
-        GetObjCFullDeclName(*target.outerDecl);
+    auto mangledMethodName = GetMangledMethodName(mangler, params, methodName);
+    auto outerDeclName = GetObjCFullDeclName(*target.outerDecl);
 
     auto name = outerDeclName + "." + mangledMethodName;
-
-    /*
-        public enum A<T> where T <: ToString {
-            | E(T)
-
-            public prop p: Int64 {
-                get() {
-                var b: T
-                1
-                }
-            }
-        }
-        For prop inner local generic var.
-    */
-    if (isInnerGeneric) {
-        name.erase(std::remove_if(name.begin(), name.end(),
-            [](char c) { return c == '$'; }),
-            name.end());
-    }
 
     std::replace(name.begin(), name.end(), '.', '_');
     std::replace(name.begin(), name.end(), ':', '_');
@@ -190,6 +147,12 @@ Ptr<std::string> NameGenerator::GetUserDefinedObjCName(const Decl& target)
             continue;
         }
 
+        // A broken annotation (e.g. more than one argument) has already been diagnosed by the parser,
+        // there is no usable user-defined name in it.
+        if (anno->TestAttr(Attribute::IS_BROKEN)) {
+            return nullptr;
+        }
+
         CJC_ASSERT(anno->args.size() < 2);
         if (anno->args.empty()) {
             break;
@@ -205,7 +168,7 @@ Ptr<std::string> NameGenerator::GetUserDefinedObjCName(const Decl& target)
     return nullptr;
 }
 
-std::string NameGenerator::GetObjCDeclName(const Decl& target, const std::string* genericActualName)
+std::string NameGenerator::GetObjCDeclName(const Decl& target)
 {
     auto foreignName = GetUserDefinedObjCName(target);
     if (foreignName) {
@@ -216,31 +179,6 @@ std::string NameGenerator::GetObjCDeclName(const Decl& target, const std::string
     if (auto fd = DynamicCast<const FuncDecl*>(&target); fd) {
         // No params case
         if (!fd->funcBody || fd->funcBody->paramLists.empty() || fd->funcBody->paramLists[0]->params.empty()) {
-            /*
-                public enum GenericEnum<T> {
-                    | Red(T) | Green(T) | Blue(T)
-                    public prop value: T {
-                        get() {
-                            match (this) {
-                                case Red(n) => n
-                                case Green(n) => n
-                                case Blue(n) => n
-                            }
-                        }
-                    }
-                }
-                There exists Genericenum prop func get(): target->identifier = "$valueget",
-                but it actually needs to be named using "value_get" method.
-            */
-            if (target.GetTy()->HasGeneric() && !target.identifierForLsp.empty()) {
-                std::string actualEnumName = target.identifier;
-                actualEnumName.erase(std::remove(actualEnumName.begin(), actualEnumName.end(), '$'), actualEnumName.end());
-                size_t pos = actualEnumName.find(target.identifierForLsp);
-                if (pos != std::string::npos) {
-                    actualEnumName.insert(pos, "_");
-                }
-                return actualEnumName;
-            }
             return target.identifier;
         }
 
@@ -259,9 +197,6 @@ std::string NameGenerator::GetObjCDeclName(const Decl& target, const std::string
         }
     }
 
-    if (genericActualName) {
-        return *genericActualName;
-    }
     return target.identifier;
 }
 
@@ -360,4 +295,14 @@ std::string NameGenerator::GetObjCFullDeclName(const Decl& target, const std::st
     // For Generic ActualTy Name
     std::string actualName = genericActualName ? *genericActualName : target.identifier;
     return target.fullPackageName + "." + actualName;
+}
+
+std::string NameGenerator::GenerateHandleWrapperName(const ClassLikeDecl& mirror) noexcept
+{
+    return mirror.identifier + std::string(HANDLE_WRAPPER_SUFFIX);
+}
+
+std::string NameGenerator::GenerateRegistryCompanionName(const ClassDecl& impl) noexcept
+{
+    return impl.identifier + std::string(REGISTRY_COMPANION_SUFFIX);
 }

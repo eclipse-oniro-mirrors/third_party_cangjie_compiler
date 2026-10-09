@@ -98,7 +98,7 @@ std::vector<CGValue*> HandleSyscallIntrinsicArguments(
     return args;
 }
 
-llvm::Value* GenerateExceptionCatchIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateExceptionCatchIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
     switch (intrinsic.GetIntrinsicKind()) {
         case CHIR::BEGIN_CATCH: {
@@ -111,7 +111,7 @@ llvm::Value* GenerateExceptionCatchIntrinsics(IRBuilder2& irBuilder, const CHIRI
     }
 }
 
-llvm::Value* GenerateArrayIndex(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic, bool isChecked)
+llvm::Value* GenerateArrayIndex(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic, bool isChecked)
 {
     auto& cgMod = irBuilder.GetCGModule();
     auto arrayValue = cgMod | intrinsic.GetOperand(0); // array
@@ -119,7 +119,7 @@ llvm::Value* GenerateArrayIndex(IRBuilder2& irBuilder, const CHIRIntrinsicWrappe
     if (arrayValue && indexValue) {
         auto arrTy = static_cast<CHIR::RawArrayType*>(intrinsic.GetOperand(0)->GetType()->GetTypeArgs()[0]);
         CJC_NULLPTR_CHECK(arrTy);
-        if (intrinsic.GetNumOfOperands() >= 3) { // An argument length of at least 3 is required
+        if (intrinsic.GetArgs().size() >= 3) { // An argument length of at least 3 is required
             // set the value at an index in an array using arr[index] = value
             auto value = cgMod | intrinsic.GetOperand(2);
             irBuilder.CallArrayIntrinsicSet(*arrTy, **arrayValue, **indexValue, *value, isChecked);
@@ -133,9 +133,9 @@ llvm::Value* GenerateArrayIndex(IRBuilder2& irBuilder, const CHIRIntrinsicWrappe
 }
 
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-llvm::Value* GenerateVarrayIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateVarrayIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     auto varrPtr = parameters[0];
     bool needIdxCheck = intrinsic.Get<CHIR::NeedCheckArrayBound>();
     switch (intrinsic.GetIntrinsicKind()) {
@@ -173,10 +173,10 @@ llvm::Value* GenerateVarrayIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsic
 }
 
 // Get the address of an element of array.
-llvm::Value* GenerateArrayGetElemRef(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic, bool isChecked)
+llvm::Value* GenerateArrayGetElemRef(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic, bool isChecked)
 {
     CJC_ASSERT(intrinsic.GetIntrinsicKind() == CHIR::IntrinsicKind::ARRAY_GET_REF_UNCHECKED);
-    CJC_ASSERT(intrinsic.GetNumOfOperands() == 2U);
+    CJC_ASSERT(intrinsic.GetArgs().size() == 2U);
     auto& cgMod = irBuilder.GetCGModule();
     auto arrayCGValue = cgMod | intrinsic.GetOperand(0); // array
     auto indexCGValue = cgMod | intrinsic.GetOperand(1); // index
@@ -359,7 +359,7 @@ inline void InstrumentPointerOps(
 }
 
 inline void InsertAsanInstrument([[maybe_unused]] const CGModule& cgMod, [[maybe_unused]] IRBuilder2& irBuilder,
-    [[maybe_unused]] const CHIRIntrinsicWrapper& intrinsic, [[maybe_unused]] llvm::Value* gep,
+    [[maybe_unused]] const CHIR::IntrinsicBase& intrinsic, [[maybe_unused]] llvm::Value* gep,
     [[maybe_unused]] const std::string& asanFunc)
 {
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
@@ -375,9 +375,9 @@ inline void InsertAsanInstrument([[maybe_unused]] const CGModule& cgMod, [[maybe
 #endif
 }
 
-llvm::Value* GenerateVectorIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateVectorIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto cgValArgs = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto cgValArgs = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     std::vector<llvm::Value*> args;
     transform(cgValArgs.begin(), cgValArgs.end(), back_inserter(args),
         [](const CGValue* value) { return value->GetRawValue(); });
@@ -397,25 +397,25 @@ llvm::Value* GenerateVectorIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsic
     return nullptr;
 }
 
-llvm::Value* GenerateMathIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateMathIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     std::vector<llvm::Value*> args;
     transform(parameters.begin(), parameters.end(), back_inserter(args),
         [](const CGValue* value) { return value->GetRawValue(); });
     return irBuilder.CallMathIntrinsics(intrinsic, args);
 }
 
-llvm::Value* GenerateInteropIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateInteropIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     return irBuilder.CallInteropIntrinsics(intrinsic, parameters);
 }
 #endif
 
-llvm::Value* ConvertCStringToCPointer(const IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* ConvertCStringToCPointer(const IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    CJC_ASSERT(intrinsic.GetNumOfOperands() == 1);
+    CJC_ASSERT(intrinsic.GetArgs().size() == 1);
     return **(irBuilder.GetCGModule() | intrinsic.GetOperand(0));
 }
 
@@ -439,9 +439,9 @@ inline llvm::Type* GetPointerToWithSpecificAddrspace(llvm::Type* srcType, unsign
     return GetPointerElementType(srcType)->getPointerTo(dstAddrspace);
 }
 
-llvm::Value* CPointerGetAddress(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* CPointerGetAddress(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    CJC_ASSERT(intrinsic.GetNumOfOperands() == 1);
+    CJC_ASSERT(intrinsic.GetArgs().size() == 1);
     auto& cgMod = irBuilder.GetCGModule();
     auto pointerRefPtr = **(cgMod | intrinsic.GetOperand(0));
     auto cgRetTy = CGType::GetOrCreate(cgMod, intrinsic.GetResult()->GetType());
@@ -450,10 +450,10 @@ llvm::Value* CPointerGetAddress(IRBuilder2& irBuilder, const CHIRIntrinsicWrappe
     return retVal;
 }
 
-llvm::Value* CPointerRead(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* CPointerRead(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
     // The size of args must be 2.
-    CJC_ASSERT(intrinsic.GetNumOfOperands() == 2);
+    CJC_ASSERT(intrinsic.GetArgs().size() == 2);
     auto& cgMod = irBuilder.GetCGModule();
     auto retTy = intrinsic.GetResult()->GetType();
     auto pointerRefPtr = **(cgMod | intrinsic.GetOperand(0));
@@ -484,10 +484,10 @@ llvm::Value* CPointerRead(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& int
     return ret;
 }
 
-llvm::Value* CPointerWrite(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* CPointerWrite(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
     // The size of args must be 3.
-    CJC_ASSERT(intrinsic.GetNumOfOperands() == 3);
+    CJC_ASSERT(intrinsic.GetArgs().size() == 3);
 
     auto& cgMod = irBuilder.GetCGModule();
     auto pointerRefPtr = **(cgMod | intrinsic.GetOperand(0));
@@ -528,10 +528,10 @@ llvm::Value* CPointerWrite(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& in
     return nullptr;
 }
 
-llvm::Value* CPointerAdd(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* CPointerAdd(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
     // The size of args must be 2.
-    CJC_ASSERT(intrinsic.GetNumOfOperands() == 2);
+    CJC_ASSERT(intrinsic.GetArgs().size() == 2);
 
     auto& cgMod = irBuilder.GetCGModule();
     auto pointerRefPtr = **(cgMod | intrinsic.GetOperand(0));
@@ -553,18 +553,18 @@ llvm::Value* CPointerAdd(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intr
     return retVal;
 }
 
-llvm::Value* BitCast(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* BitCast(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    CJC_ASSERT(intrinsic.GetNumOfOperands() == 1);
+    CJC_ASSERT(intrinsic.GetArgs().size() == 1);
     auto& cgMod = irBuilder.GetCGModule();
     auto resTy = CGType::GetOrCreate(cgMod, intrinsic.GetResult()->GetType());
     auto fromVal = **(irBuilder.GetCGModule() | intrinsic.GetOperand(0));
     return irBuilder.CreateBitCast(fromVal, resTy->GetLLVMType());
 }
 
-llvm::Value* GenerateBuiltinCall(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateBuiltinCall(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     auto kind = intrinsic.GetIntrinsicKind();
     switch (kind) {
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
@@ -628,7 +628,7 @@ llvm::Value* GenerateBuiltinCall(IRBuilder2& irBuilder, const CHIRIntrinsicWrapp
     return nullptr;
 }
 
-llvm::Value* GenerateArraySyscall(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateArraySyscall(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
     auto& cgMod = irBuilder.GetCGModule();
     auto arrayValue = *(cgMod | intrinsic.GetOperand(0)); // array
@@ -647,7 +647,7 @@ llvm::Value* GenerateArraySyscall(IRBuilder2& irBuilder, const CHIRIntrinsicWrap
         }
 #endif
         case CHIR::IntrinsicKind::ARRAY_BUILT_IN_COPY_TO: {
-            GenerateArrayCopyTo(irBuilder, intrinsic.GetOperands());
+            GenerateArrayCopyTo(irBuilder, intrinsic.GetArgs());
             return irBuilder.CreateNullValue(*intrinsic.GetResult()->GetType());
         }
         case CHIR::IntrinsicKind::ARRAY_SIZE:
@@ -664,7 +664,7 @@ llvm::Value* GenerateArraySyscall(IRBuilder2& irBuilder, const CHIRIntrinsicWrap
             auto arr = intrinsic.GetOperand(0);
             auto arrTy = StaticCast<CHIR::RawArrayType*>(arr->GetType()->GetTypeArgs()[0]);
             const int expectedArgs = 3;
-            CJC_ASSERT(intrinsic.GetOperands().size() == expectedArgs);
+            CJC_ASSERT(intrinsic.GetArgs().size() == expectedArgs);
             auto elemValue = **(cgMod | intrinsic.GetOperand(1));
             auto size = **(cgMod | intrinsic.GetOperand(2));
             irBuilder.CallArrayInit(arrayValue.GetRawValue(), size, elemValue, *arrTy);
@@ -676,7 +676,7 @@ llvm::Value* GenerateArraySyscall(IRBuilder2& irBuilder, const CHIRIntrinsicWrap
     }
 }
 
-llvm::Value* GeneratePreInitializeIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GeneratePreInitializeIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
     auto& cgMod = irBuilder.GetCGModule();
     auto runtimePreInitializePackageFunc =
@@ -686,37 +686,37 @@ llvm::Value* GeneratePreInitializeIntrinsics(IRBuilder2& irBuilder, const CHIRIn
         runtimePreInitializePackageFunc, {llvm::ConstantPointerNull::get(i8Ptr)});
 }
 
-llvm::Value* GenerateRuntimeIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateRuntimeIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     return irBuilder.CallRuntimeIntrinsics(intrinsic, parameters);
 }
 
-llvm::Value* GenerateSyncIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateSyncIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     return irBuilder.CallSyncIntrinsics(intrinsic, parameters);
 }
 
-llvm::Value* GenerateStackTraceIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateStackTraceIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     return irBuilder.CallStackTraceIntrinsic(intrinsic, parameters);
 }
 
-llvm::Value* GenerateThreadInfoIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateThreadInfoIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     return irBuilder.CallThreadInfoIntrinsic(intrinsic, parameters);
 }
 
-llvm::Value* GenerateFutureIntrinsics(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateFutureIntrinsics(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+    auto parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     return irBuilder.CallIntrinsic(intrinsic, parameters);
 }
 
-llvm::Value* GenerateReflectIntrinsic(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateReflectIntrinsic(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     std::vector<CGValue*> parameters;
@@ -734,18 +734,18 @@ llvm::Value* GenerateReflectIntrinsic(IRBuilder2& irBuilder, const CHIRIntrinsic
         }
         return irBuilder.CreateBitCast(arg, llvm::Type::getInt8PtrTy(irBuilder.GetLLVMContext()));
     } else {
-        parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetOperands());
+        parameters = HandleSyscallIntrinsicArguments(irBuilder, intrinsic.GetArgs());
     }
     return irBuilder.CallIntrinsic(intrinsic, parameters);
 #endif
 }
 
-llvm::Value* GenerateCPointerInit(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateCPointerInit(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
     auto& cgMod = irBuilder.GetCGModule();
     auto retChirType = intrinsic.GetResult()->GetType();
-    CJC_ASSERT(intrinsic.GetNumOfOperands() <= 1);
-    auto retVal = intrinsic.GetNumOfOperands() == 0 ? irBuilder.CreateNullValue(*retChirType)
+    CJC_ASSERT(intrinsic.GetArgs().size() <= 1);
+    auto retVal = intrinsic.GetArgs().size() == 0 ? irBuilder.CreateNullValue(*retChirType)
                                                     : **(cgMod | intrinsic.GetOperand(0));
     if (IsFuncPtrType(retVal->getType())) {
         retVal = irBuilder.CreatePointerCast(retVal, CGType::GetOrCreate(cgMod, retChirType)->GetLLVMType());
@@ -753,13 +753,13 @@ llvm::Value* GenerateCPointerInit(IRBuilder2& irBuilder, const CHIRIntrinsicWrap
     return retVal;
 }
 
-llvm::Value* GenerateCStringInit(const IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateCStringInit(const IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    CJC_ASSERT(intrinsic.GetNumOfOperands() == 1);
+    CJC_ASSERT(intrinsic.GetArgs().size() == 1);
     return **(irBuilder.GetCGModule() | intrinsic.GetOperand(0));
 }
 
-llvm::Value* GenerateInout(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateInout(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     auto& cgCtx = irBuilder.GetCGContext();
@@ -770,7 +770,7 @@ llvm::Value* GenerateInout(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& in
     }
 #endif
     auto& cgMod = irBuilder.GetCGModule();
-    CJC_ASSERT(intrinsic.GetNumOfOperands() == 1);
+    CJC_ASSERT(intrinsic.GetArgs().size() == 1);
     auto argVal = **(cgMod | intrinsic.GetOperand(0));
     // All of CPointer<T> will be translated to i8*.
     auto i8PtrTy = llvm::Type::getInt8PtrTy(cgMod.GetLLVMContext());
@@ -782,7 +782,7 @@ llvm::Value* GenerateInout(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& in
     return irBuilder.CreatePointerCast(argVal, i8PtrTy);
 }
 
-llvm::Value* GenerateExclusiveScope(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateExclusiveScope(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
     auto& cgMod = irBuilder.GetCGModule();
     auto exec = cgMod | intrinsic.GetOperand(0);
@@ -792,9 +792,9 @@ llvm::Value* GenerateExclusiveScope(IRBuilder2& irBuilder, const CHIRIntrinsicWr
         ty->GetLLVMType(), PREFIX_OF_BACKEND_SYMS + "ExclusiveScope", {exec, closure}, {});
 }
 
-llvm::Value* GenerateIntrinsic(IRBuilder2& irBuilder, const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* GenerateIntrinsic(IRBuilder2& irBuilder, const CHIR::IntrinsicBase& intrinsic)
 {
-    using GenerateFunc = std::function<llvm::Value*(IRBuilder2&, const CHIRIntrinsicWrapper&)>;
+    using GenerateFunc = std::function<llvm::Value*(IRBuilder2&, const CHIR::IntrinsicBase&)>;
 
     static const std::unordered_map<CGIntrinsicKind, GenerateFunc> generateFuncMap = {
         {CGIntrinsicKind::REFLECT, &GenerateReflectIntrinsic},

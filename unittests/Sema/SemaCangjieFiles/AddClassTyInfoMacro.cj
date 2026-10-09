@@ -6,13 +6,13 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-// macro package macrodef
+macro package macrodef
 import std.ast.*
 
 public macro M0 (input : Tokens) {
     quote(
-        public class Class3 <: InteropType < Class3 > {
-            public func retClass(a: HashMapEx < String, Class3 >): Unit {
+        public class Class3 <: MyInteropType < Class3 > {
+            public func retClass(a: MyHashMapEx < String, Class3 >): Unit {
             }
         }
     )

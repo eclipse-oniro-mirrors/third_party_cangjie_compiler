@@ -10,8 +10,13 @@
 #define CANGJIE_CHIR_CALLGRAPH_ANALYSIS_H
 
 #include "cangjie/CHIR/IR/Package.h"
-#include "cangjie/CHIR/Optimization/Devirtualization.h"
+#include "cangjie/CHIR/IR/Expression/Expression.h"
 #include "cangjie/CHIR/IR/Value/Value.h"
+
+#include <map>
+#include <memory>
+#include <unordered_set>
+#include <vector>
 
 namespace Cangjie::CHIR {
 
@@ -84,7 +89,7 @@ public:
         std::pair<Node*, Kind> edgeValue;
     };
 
-    explicit CallGraph(const Package* package, DevirtualizationInfo& devirtFuncInfo);
+    explicit CallGraph(const Package* package);
 
     /// This will insert a new call graph node for
     /// Function if one does not already exist.
@@ -109,8 +114,6 @@ public:
         const std::pair<std::string, std::vector<Type*>>& method) const;
 
 private:
-    DevirtualizationInfo& devirtFuncInfo;
-
     using FunctionMapTy = std::map<const Function*, std::unique_ptr<Node>>;
 
     /// A map from Function* to Node*.
@@ -124,15 +127,14 @@ private:
     /// or calling an external function.
     std::unique_ptr<Node> exitNode;
 
-    void AddVirtualEdgeToNode(Node& node, const Expression& expression);
+    void AddVirtualEdgeToNode(Node& node, const InvokeBase& expression);
 
-    void AddDirectEdgeToNode(Node& node, const Expression& expression);
+    void AddDirectEdgeToNode(Node& node, const ApplyBase& expression);
 };
 
 class CallGraphAnalysis {
 public:
-    explicit CallGraphAnalysis(const Package* package, DevirtualizationInfo& devirtFuncInfo)
-        : package(package), devirtFuncInfo(devirtFuncInfo)
+    explicit CallGraphAnalysis(const Package* package) : package(package)
     {
     }
     /// Call Graph Analysis for specific Package.
@@ -144,7 +146,6 @@ public:
 
 private:
     const Package* package;
-    DevirtualizationInfo& devirtFuncInfo;
 
     /// Build the SCCs for Call Graph.
     void BuildSCC(const CallGraph& callGraph);

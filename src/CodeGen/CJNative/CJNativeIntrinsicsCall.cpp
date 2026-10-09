@@ -22,7 +22,7 @@
 namespace Cangjie::CodeGen {
 
 llvm::Value* IRBuilder2::CallIntrinsic(
-    const CHIRIntrinsicWrapper& intrinsic, const std::vector<CGValue*>& parameters, [[maybe_unused]] bool isC)
+    const CHIR::IntrinsicBase& intrinsic, const std::vector<CGValue*>& parameters, [[maybe_unused]] bool isC)
 {
     if (auto it = INTRINSIC_KIND_TO_FUNCNAME_MAP.find(intrinsic.GetIntrinsicKind());
         it != INTRINSIC_KIND_TO_FUNCNAME_MAP.end()) {
@@ -44,7 +44,7 @@ bool IsPlatformDependent(CHIR::IntrinsicKind intrinsicKind)
 }
 }
 llvm::Value* IRBuilder2::CallIntrinsic(
-    const CHIRIntrinsicWrapper& intrinsic, const std::vector<llvm::Value*>& args, const std::vector<llvm::Type*>& tys)
+    const CHIR::IntrinsicBase& intrinsic, const std::vector<llvm::Value*>& args, const std::vector<llvm::Type*>& tys)
 {
     if (auto iter = INTRINSIC_KIND_TO_ID_MAP.find(intrinsic.GetIntrinsicKind());
         iter != INTRINSIC_KIND_TO_ID_MAP.end()) {
@@ -105,7 +105,7 @@ llvm::Value* IRBuilder2::CallPostThrowExceptionIntrinsic(llvm::Value* exceptionV
     return CreateCall(beginCatch, {exceptionValue});
 }
 
-llvm::Value* IRBuilder2::CallStackTraceIntrinsic(const CHIRIntrinsicWrapper& syscall, std::vector<CGValue*>& parameters)
+llvm::Value* IRBuilder2::CallStackTraceIntrinsic(const CHIR::IntrinsicBase& syscall, std::vector<CGValue*>& parameters)
 {
     auto intrinsicKind = syscall.GetIntrinsicKind();
     if (intrinsicKind == CHIR::IntrinsicKind::FILL_IN_STACK_TRACE) {
@@ -150,7 +150,7 @@ llvm::Value* IRBuilder2::CallStackTraceIntrinsic(const CHIRIntrinsicWrapper& sys
 // 1) CJ_MCC_GetAllThreadSnapshot(TypeInfo* Array<ThreadSnapInfo>, TypeInfo* Array<StackTraceData>, TypeInfo*
 // RawArray<UInt8>) : RawArray<ThreadSnapshotInfo> 2) CJ_MCC_GetCurrentThreadSnapshot(TypeInfo* Array<StackTraceData>,
 // TypeInfo* RawArray<UInt8>) : ThreadSnapshotInfo
-llvm::Value* IRBuilder2::CallThreadInfoIntrinsic(const CHIRIntrinsicWrapper& syscall, std::vector<CGValue*>& parameters)
+llvm::Value* IRBuilder2::CallThreadInfoIntrinsic(const CHIR::IntrinsicBase& syscall, std::vector<CGValue*>& parameters)
 {
     auto intrinsicKind = syscall.GetIntrinsicKind();
     auto& cgCtx = GetCGContext();
@@ -316,10 +316,10 @@ llvm::Value* IRBuilder2::CallArrayIntrinsicGet(
     return loadInst;
 }
 
-llvm::Value* IRBuilder2::AcquireRawData(const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* IRBuilder2::AcquireRawData(const CHIR::IntrinsicBase& intrinsic)
 {
     std::vector<llvm::Value*> args;
-    for (auto arg : intrinsic.GetOperands()) {
+    for (auto arg : intrinsic.GetArgs()) {
         args.emplace_back(**(cgMod | arg));
     }
     CJC_ASSERT(args.size() == 1);
@@ -335,10 +335,10 @@ llvm::Value* IRBuilder2::AcquireRawData(const CHIRIntrinsicWrapper& intrinsic)
     return CreateCallOrInvoke(func, {args[0], isCopyPtr});
 }
 
-llvm::Value* IRBuilder2::ReleaseRawData(const CHIRIntrinsicWrapper& intrinsic)
+llvm::Value* IRBuilder2::ReleaseRawData(const CHIR::IntrinsicBase& intrinsic)
 {
     std::vector<llvm::Value*> args;
-    for (auto arg : intrinsic.GetOperands()) {
+    for (auto arg : intrinsic.GetArgs()) {
         args.emplace_back(**(cgMod | arg));
     }
     // The size of parameters must be 2.
@@ -904,7 +904,7 @@ void IRBuilder2::CreateEPrintlnCall(const std::string& eMsg)
 }
 
 llvm::Value* IRBuilder2::CallSyncIntrinsics(
-    const CHIRIntrinsicWrapper& intrinsic, const std::vector<CGValue*>& parameters)
+    const CHIR::IntrinsicBase& intrinsic, const std::vector<CGValue*>& parameters)
 {
     if (IsAtomicIntrinsic(intrinsic.GetIntrinsicKind())) {
         return CallAtomicIntrinsics(intrinsic, parameters);
@@ -912,7 +912,7 @@ llvm::Value* IRBuilder2::CallSyncIntrinsics(
     return CallIntrinsic(intrinsic, parameters);
 }
 
-llvm::Value* IRBuilder2::CallAtomicIntrinsics(const CHIRIntrinsicWrapper& intrinsic, const std::vector<CGValue*>& args)
+llvm::Value* IRBuilder2::CallAtomicIntrinsics(const CHIR::IntrinsicBase& intrinsic, const std::vector<CGValue*>& args)
 {
     llvm::Value* fieldPtr = CreateGEP(*args[0], {0U}).GetRawValue();
     auto atomicIntrinsicGenericTypeInfo = intrinsic.GetInstantiatedTypeArgs();
@@ -975,7 +975,7 @@ llvm::Value* IRBuilder2::CallAtomicIntrinsics(const CHIRIntrinsicWrapper& intrin
 }
 
 llvm::Value* IRBuilder2::CallAtomicPrimitiveIntrinsics(
-    const CHIRIntrinsicWrapper& intrinsic, const std::vector<CGValue*>& args, llvm::Value* fieldPtr)
+    const CHIR::IntrinsicBase& intrinsic, const std::vector<CGValue*>& args, llvm::Value* fieldPtr)
 {
     llvm::Type* fieldType = llvm::cast<llvm::GetElementPtrInst>(fieldPtr)->getResultElementType();
     if (intrinsic.GetIntrinsicKind() == CHIR::IntrinsicKind::ATOMIC_COMPARE_AND_SWAP) {
@@ -1015,7 +1015,7 @@ llvm::Value* IRBuilder2::CallAtomicPrimitiveIntrinsics(
 }
 
 llvm::Value* IRBuilder2::CallMathIntrinsics(
-    const CHIRIntrinsicWrapper& intrinsic, std::vector<llvm::Value*>& parameters)
+    const CHIR::IntrinsicBase& intrinsic, std::vector<llvm::Value*>& parameters)
 {
     switch (intrinsic.GetIntrinsicKind()) {
         case CHIR::IntrinsicKind::POWI: {
@@ -1071,7 +1071,7 @@ llvm::Value* IRBuilder2::CallIntrinsicForUninitialized(const CHIR::Type& ty)
 }
 
 llvm::Value* IRBuilder2::CallRuntimeIntrinsics(
-    const CHIRIntrinsicWrapper& syscall, const std::vector<CGValue*>& parameters)
+    const CHIR::IntrinsicBase& syscall, const std::vector<CGValue*>& parameters)
 {
     return CallIntrinsic(syscall, parameters);
 }
@@ -1409,12 +1409,8 @@ llvm::Value* IRBuilder2::CreateTypeInfo(const CHIR::Type& gt,
         genericArgs = funcType.GetParamTypes();
         genericArgs.insert(genericArgs.begin(), funcType.GetReturnType());
     } else if (baseType->IsVArray()) {
-        auto& varrayType = StaticCast<CHIR::VArrayType&>(*baseType);
-        tt = CGType::GetOrCreate(cgMod, baseType)->GetOrCreateTypeTemplate();
-        auto argType = varrayType.GetElementType();
-        for (int64_t arrayIdx = 0; arrayIdx < varrayType.GetSize(); arrayIdx++) {
-            genericArgs.emplace_back(argType);
-        }
+        CJC_ASSERT_WITH_MSG(false, "Dynamic generic VArray is unsupported.");
+        return nullptr;
     } else if (baseType->IsRawArray()) {
         auto& rawArrayType = StaticCast<CHIR::RawArrayType&>(*baseType);
         tt = CGType::GetOrCreate(cgMod, baseType)->GetOrCreateTypeTemplate();
@@ -1481,7 +1477,7 @@ llvm::Value* IRBuilder2::CreateTypeInfo(const CHIR::Type* type, bool canChangeBB
 }
 
 llvm::Value* IRBuilder2::CallInteropIntrinsics(
-    const CHIRIntrinsicWrapper& intrinsic, const std::vector<CGValue*>& parameters)
+    const CHIR::IntrinsicBase& intrinsic, const std::vector<CGValue*>& parameters)
 {
     return CallIntrinsic(intrinsic, parameters);
 }

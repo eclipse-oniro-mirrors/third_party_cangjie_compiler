@@ -168,11 +168,12 @@ void FFIParserImpl::CheckForeignNameAnnotation(Decl& decl) const
         if (it->kind != AnnotationKind::FOREIGN_NAME) {
             continue;
         }
-        if (!decl.outerDecl || !decl.outerDecl->TestAnyAttr(Attribute::JAVA_MIRROR, Attribute::JAVA_MIRROR_SUBTYPE,
-            Attribute::OBJ_C_MIRROR, Attribute::OBJ_C_MIRROR_SUBTYPE)) {
-                p.diag.DiagnoseRefactor(DiagKindRefactor::parse_foreign_name_on_ffi_decl_member, decl);
-                decl.EnableAttr(Attribute::IS_BROKEN);
-                return;
+        if (!decl.outerDecl ||
+            (!decl.outerDecl->IsJavaMirror() && !decl.outerDecl->IsJavaImpl() &&
+                !decl.outerDecl->TestAnyAttr(Attribute::OBJ_C_MIRROR, Attribute::OBJ_C_IMPL))) {
+            p.diag.DiagnoseRefactor(DiagKindRefactor::parse_foreign_name_on_ffi_decl_member, decl);
+            decl.EnableAttr(Attribute::IS_BROKEN);
+            return;
         }
     }
 }
@@ -187,7 +188,7 @@ OCFFIParserImpl FFIParserImpl::ObjC() const
     return op;
 }
 
-void FFIParserImpl::CheckZeroOrSingleStringLitArgAnnotation(const AST::Annotation &anno,
+void FFIParserImpl::CheckZeroOrSingleStringLitArgAnnotation(AST::Annotation &anno,
                                                             const std::string &annotationName) const
 {
     if (anno.args.size() == 0) {
@@ -196,17 +197,19 @@ void FFIParserImpl::CheckZeroOrSingleStringLitArgAnnotation(const AST::Annotatio
 
     if (anno.args.size() > 1 || !IsLitString(anno.args[0]->expr)) {
         p.DiagAnnotationMoreThanOneArgs(anno, annotationName, "'String' literal");
+        anno.EnableAttr(Attribute::IS_BROKEN);
         return;
     }
 }
 
-void FFIParserImpl::CheckNoArgAnnotation(const AST::Annotation &anno, const std::string &annotationName) const
+void FFIParserImpl::CheckNoArgAnnotation(AST::Annotation &anno, const std::string &annotationName) const
 {
     if (anno.args.empty()) {
         return;
     }
 
     p.DiagAnnotationShouldNotHaveArgs(anno, annotationName);
+    anno.EnableAttr(Attribute::IS_BROKEN);
 }
 
 

@@ -13,6 +13,10 @@
 #include "DesugarJavaImplSuperConstructorCall.h"
 #include "DesugarJavaImplSuperMethodCall.h"
 #include "GenerateInJavaImplReferenceWrapper.h"
+#include "NativeFFI/Java/AfterTypeCheck/AfterTypeCheckContext.h"
+#include "NativeFFI/Java/AfterTypeCheck/GenerateJavaMirrorApiStub.h"
+#include "NativeFFI/Java/AfterTypeCheck/GenerateJavaReferenceFieldInJObject.h"
+#include "NativeFFI/Java/AfterTypeCheck/PopulateJavaMirrorStubs.h"
 #include "RewriteJavaImplReferenceWrapperFields.h"
 #include "GenerateNativeBridgeForJavaImpl.h"
 #include "DesugarTypeCheckingAndCasting.h"
@@ -22,56 +26,29 @@
 
 namespace Cangjie::Interop::Java {
 
-void JavaDesugarManager::ProcessJavaMirrorImplStage(AfterTypeCheckContext& ctx,
+void JavaDesugarManager::ProcessJavaMirrorImplStages(AfterTypeCheckContext& ctx,
     std::function<void(AST::Node&)> desugarPropRef)
 {
-    for (auto& file : ctx.pkg.files) {
-        GenerateInMirrors(*file, true);
-    }
-
+    Process<GenerateJavaReferenceFieldInJObject>(ctx, lib);
+    Process<GenerateJavaMirrorApiStub>(ctx, typeManager, lib, utils, memberMap);
     Process<GenerateJavaImplApiStub>(ctx, typeManager, lib, jniBridge);
 
     for (auto& file : ctx.pkg.files) {
-        GenerateInMirrors(*file, false);
+        GenerateInMirrors(*file);
     }
 
     Process<GenerateInJavaImplRegistryCompanion>(ctx, typeManager, lib);
     Process<DesugarJavaImplSuperConstructorCall>(ctx, typeManager, lib, jniBridge, diag, utils);
-    Process<GenerateInJavaImplReferenceWrapper>(ctx, typeManager, importManager, lib, utils);
-    Process<DesugarJavaImplSuperMethodCall>(ctx, lib, utils);
+    Process<GenerateInJavaImplReferenceWrapper>(ctx, typeManager, importManager, lib, factory);
+    Process<DesugarJavaImplSuperMethodCall>(ctx, lib, factory);
     Process<RewriteJavaImplReferenceWrapperFields>(ctx, typeManager, utils, desugarPropRef);
     Process<GenerateNativeBridgeForJavaImpl>(ctx, typeManager, importManager, lib, jniBridge);
 
-    for (auto& file : ctx.pkg.files) {
-        DesugarMirrors(*file);
-    }
+    Process<PopulateJavaMirrorStubs>(ctx, typeManager, lib, factory);
 
     Process<DesugarJArray>(ctx, typeManager, importManager, lib);
     GenerateJavaSourceCode(ctx);
     Process<DesugarTypeCheckingAndCasting>(ctx, lib, diag, utils);
-}
-
-void JavaDesugarManager::ProcessCJImplStage(DesugarCJImplStage stage, File& file)
-{
-    switch (stage) {
-        case DesugarCJImplStage::PRE_GENERATE:
-            PreGenerateInCJMapping(file);
-            break;
-        case DesugarCJImplStage::FWD_GENERATE:
-            GenerateFwdClassInCJMapping(file);
-            break;
-        case DesugarCJImplStage::IMPL_GENERATE:
-            GenerateInCJMapping(file);
-            break;
-        case DesugarCJImplStage::IMPL_DESUGAR:
-            DesugarInCJMapping(file);
-            break;
-        default:
-            CJC_ABORT(); // unreachable state
-    }
-
-    std::move(generatedDecls.begin(), generatedDecls.end(), std::back_inserter(file.decls));
-    generatedDecls.clear();
 }
 
 void JavaInteropManager::DesugarPackage(Package& pkg,
@@ -79,11 +56,11 @@ void JavaInteropManager::DesugarPackage(Package& pkg,
     MemberMap>& memberMap,
     std::function<void(AST::Node&)> desugarPropRef)
 {
-    if (!(hasMirrorOrImpl || targetInteropLanguage == GlobalOptions::InteropLanguage::Java)) {
+    if (!hasMirrorOrImpl) {
         return;
     }
     JavaDesugarManager desugarer{
-        importManager, typeManager, diag, mangler, javagenOutputPath, outputPath, memberMap, pkg};
+        importManager, typeManager, diag, mangler, javagenOutputPath, outputPath, memberMap};
 
     if (!InteropLibBridge::IsInteropLibAccessible(importManager)) {
         return;
@@ -91,25 +68,7 @@ void JavaInteropManager::DesugarPackage(Package& pkg,
 
     if (hasMirrorOrImpl) {
         AfterTypeCheckContext ctx{importManager, typeManager, pkg};
-        desugarer.ProcessJavaMirrorImplStage(ctx, desugarPropRef);
-    }
-
-    // Currently CJMapping is enable by compile config --enable-interop-cjmapping
-    if (targetInteropLanguage == GlobalOptions::InteropLanguage::Java) {
-        auto nbegin = static_cast<uint8_t>(DesugarCJImplStage::BEGIN);
-        auto nend = static_cast<uint8_t>(DesugarCJImplStage::END);
-        for (uint8_t nstage = nbegin; nstage != nend; nstage++) {
-            auto stage = static_cast<DesugarCJImplStage>(nstage);
-            if (stage == DesugarCJImplStage::BEGIN) {
-                continue;
-            }
-            if (stage == DesugarCJImplStage::PRE_GENERATE) {
-                desugarer.GenerateTuplesGlueCode(pkg);
-            }
-            for (auto& file : pkg.files) {
-                desugarer.ProcessCJImplStage(stage, *file);
-            }
-        }
+        desugarer.ProcessJavaMirrorImplStages(ctx, desugarPropRef);
     }
 }
 

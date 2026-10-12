@@ -67,6 +67,29 @@ void TryEmitNullInitForDebugLocalClass(IRBuilder2& irBuilder, const CHIR::Alloca
     storeInst->setDebugLoc(llvm::DebugLoc());
     irBuilder.restoreIP(savedIP);
 }
+
+bool IsNoOpStoreToRet(CGModule& cgMod, const CHIR::Store& store)
+{
+    auto value = store.GetValue();
+    auto addr = store.GetLocation();
+    auto var = DynamicCast<CHIR::LocalVar*>(addr);
+    if (!var || !var->IsRetValue()) {
+        return false;
+    }
+    if (value->GetType()->IsUnit()) {
+        return true;
+    }
+    if (cgMod.GetCGContext().GetCompileOptions().optimizationLevel == GlobalOptions::OptimizationLevel::O0) {
+        return false;
+    }
+    if (!value->IsLocalVar()) {
+        return false;
+    }
+
+    auto* valueCG = cgMod | value;
+    auto* addrCG = cgMod | addr;
+    return valueCG && addrCG && valueCG->GetRawValue() == addrCG->GetRawValue();
+}
 } // namespace
 
 llvm::Value* HandleLoadExpr(IRBuilder2& irBuilder, const CHIR::Load& load)
@@ -81,7 +104,7 @@ llvm::Value* HandleLoadExpr(IRBuilder2& irBuilder, const CHIR::Load& load)
         auto localVar = StaticCast<const CHIR::LocalVar*>(load.GetLocation());
         if (IsGetElementRefOfClass(*localVar->GetExpr(), irBuilder.GetCGContext().GetCHIRBuilder())) {
             auto getEleRefExpr = StaticCast<const CHIR::GetElementRef*>(localVar->GetExpr());
-            auto locationCHIRType = DeRef(*getEleRefExpr->GetLocation()->GetType());
+            auto locationCHIRType = DeRef(*getEleRefExpr->GetBase()->GetType());
             if (locationCHIRType->IsClass() &&
                 IsWeakRefClass(*StaticCast<CHIR::ClassType*>(locationCHIRType)->GetClassDef())) {
                 auto addr = value.GetRawValue();
@@ -103,8 +126,8 @@ llvm::Value* HandleStoreExpr(IRBuilder2& irBuilder, const CHIR::Store& store)
     if (auto node = DynamicCast<CHIR::LocalVar*>(value);
         node && node->GetExpr()->IsConstantNull() && value->GetType()->IsClass()) {
         return nullptr;
-    } else if (auto var = DynamicCast<CHIR::LocalVar*>(addr); var && var->IsRetValue() && value->GetType()->IsUnit()) {
-        // If stored location is function's ret of unit type, do nothing.
+    }
+    if (IsNoOpStoreToRet(cgMod, store)) {
         return nullptr;
     }
     irBuilder.EmitLocation(CHIRExprWrapper(store), true);
@@ -182,7 +205,7 @@ llvm::Value* GetElementRefOfOptionLikeT(
 llvm::Value* HandleGetElementRef(IRBuilder2& irBuilder, const CHIR::GetElementRef& getEleRef)
 {
     auto& cgMod = irBuilder.GetCGModule();
-    auto base = getEleRef.GetLocation();
+    auto base = getEleRef.GetBase();
     CJC_ASSERT(base->GetType()->IsRef() || base->GetType()->IsGeneric());
     irBuilder.EmitLocation(CHIRExprWrapper(getEleRef));
     llvm::Value* retValue = nullptr;
@@ -235,7 +258,7 @@ void HandleStoreElementRef(IRBuilder2& irBuilder, const CHIR::StoreElementRef& s
 {
     auto& cgMod = irBuilder.GetCGModule();
     auto rhs = storeElementRef.GetValue();
-    auto lhs = storeElementRef.GetLocation();
+    auto lhs = storeElementRef.GetBase();
     auto& path = storeElementRef.GetPath();
     CJC_ASSERT(lhs->GetType()->IsRef() && !path.empty());
     auto value = cgMod | rhs;
@@ -287,7 +310,7 @@ llvm::Value* HandleMemoryExpression(IRBuilder2& irBuilder, const CHIR::Expressio
                 return retValueStorage;
             }
             irBuilder.EmitLocation(CHIRExprWrapper(alloca));
-            auto result = GenerateAllocate(irBuilder, CHIRAllocateWrapper(alloca));
+            auto result = GenerateAllocate(irBuilder, alloca);
             TryEmitNullInitForDebugLocalClass(irBuilder, alloca, result);
             return result;
         }

@@ -251,7 +251,6 @@ void InsertMirrorVarProp(ClassDecl& decl, Attribute attrToBeSet);
 namespace Cangjie::Interop::Java {
 using namespace Cangjie::AST;
 
-
 bool IsImpl(const Node& decl);
 bool IsImplRegistryCompanion(const Node& node);
 bool IsImplReferenceWrapper(const Node& node);
@@ -261,39 +260,11 @@ bool IsJObject(const Decl& decl);
  */
 bool IsJObject(const Decl& decl, const std::string& packageName);
 bool IsMirror(const Node& node);
-bool IsCJMapping(const Node& node);
+/**
+ * For interface and abstract class mirror the synthetic class is generated to store $javaref field.
+ */
+bool IsSyntheticMirrorWrapper(const AST::Node& node);
 bool IsObject(const Node& node);
-
-/**
- * The forward class is used to forward the method call to Java side.
- * An example of a forward class is as follows(pseudocode):
- *
- * public class A_fwd <: A {
- *     public func foo() {
- *         jniCall("Java/A", "foo", "()V", [])
- *     }
- * }
- */
-bool IsFwdClass(const Node& decl);
 } // namespace Cangjie::Interop::Java
-
-namespace Cangjie::Interop::ObjC {
-
-bool IsDeclAppropriateForSyntheticClassGeneration(const AST::Decl& decl);
-
-/**
- * Generates and inserts the synthetic class declaration.
- * The synthetic class implements the given interface and has the following structure:
- *
- * Example of generated synthetic
- * ```
- * interface CL <: ObjCId {}
- *
- * class CL$impl <: CL {}
- * ```
- */
-void InsertSyntheticClassDecl(AST::ClassLikeDecl& decl, AST::File& file);
-
-}
 
 #endif

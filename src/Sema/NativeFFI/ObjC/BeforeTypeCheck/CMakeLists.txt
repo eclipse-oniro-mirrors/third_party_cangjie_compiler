@@ -7,4 +7,5 @@
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 file(GLOB SEMA_NATIVE_FFI_OBJ_C_BEFORE_TYPECHECK_SRC *.cpp)
+add_subdirectory(Utils)
 set(SEMA_NATIVE_FFI_OBJ_C_SRC ${SEMA_NATIVE_FFI_OBJ_C_SRC} ${SEMA_NATIVE_FFI_OBJ_C_BEFORE_TYPECHECK_SRC} PARENT_SCOPE)

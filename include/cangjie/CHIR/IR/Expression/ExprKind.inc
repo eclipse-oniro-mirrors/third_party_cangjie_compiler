@@ -8,7 +8,10 @@
 
 // Tips:
 // 1. EXPRKIND(expression kind, exression name for human reading, Expression class)
-// 2. Remember to modify CHIRCasting.h and PackageFormat.fbs after adding a new expression
+// 2. Remember to modify CHIRCasting.h and StdxChirFormat.fbs after adding a new expression
+// 3. When adding a new unary/binary expression (including TRY_*), also update
+//    UNARY_EXPR_KIND_TABLE / BINARY_EXPR_KIND_TABLE in Expression.cpp, and the matching
+//    UnaryExprKind / BinaryExprKind enumerators if needed
 
 #if defined(MAJORKIND) && defined(EXPRKIND)
 
@@ -17,16 +20,24 @@ EXPRKIND(GOTO, "GoTo", GoTo)
 EXPRKIND(BRANCH, "Branch", Branch)
 EXPRKIND(MULTIBRANCH, "MultiBranch", MultiBranch)
 EXPRKIND(EXIT, "Exit", Exit)
-EXPRKIND(APPLY_WITH_EXCEPTION, "ApplyWithException", ApplyWithException)
-EXPRKIND(INVOKE_WITH_EXCEPTION, "InvokeWithException", InvokeWithException)
-EXPRKIND(INVOKESTATIC_WITH_EXCEPTION, "InvokeStaticWithException", InvokeStaticWithException)
+EXPRKIND(TRY_APPLY, "TryApply", TryApply)
+EXPRKIND(TRY_INVOKE, "TryInvoke", TryInvoke)
+EXPRKIND(TRY_INVOKESTATIC, "TryInvokeStatic", TryInvokeStatic)
 EXPRKIND(RAISE_EXCEPTION, "RaiseException", RaiseException)
-EXPRKIND(INT_OP_WITH_EXCEPTION, "IntOpWithException", IntOpWithException)
-EXPRKIND(SPAWN_WITH_EXCEPTION, "SpawnWithException", SpawnWithException)
-EXPRKIND(TYPECAST_WITH_EXCEPTION, "TypeCastWithException", TypeCastWithException)
-EXPRKIND(INTRINSIC_WITH_EXCEPTION, "IntrinsicWithException", IntrinsicWithException)
-EXPRKIND(ALLOCATE_WITH_EXCEPTION, "AllocateWithException", AllocateWithException)
-EXPRKIND(RAW_ARRAY_ALLOCATE_WITH_EXCEPTION, "RawArrayAllocateWithException", RawArrayAllocateWithException)
+EXPRKIND(TRY_NEG, "TryNeg", TryUnaryExpression)
+EXPRKIND(TRY_ADD, "TryAdd", TryBinaryExpression)
+EXPRKIND(TRY_SUB, "TrySub", TryBinaryExpression)
+EXPRKIND(TRY_MUL, "TryMul", TryBinaryExpression)
+EXPRKIND(TRY_DIV, "TryDiv", TryBinaryExpression)
+EXPRKIND(TRY_MOD, "TryMod", TryBinaryExpression)
+EXPRKIND(TRY_EXP, "TryExp", TryBinaryExpression)
+EXPRKIND(TRY_LSHIFT, "TryLShift", TryBinaryExpression)
+EXPRKIND(TRY_RSHIFT, "TryRShift", TryBinaryExpression)
+EXPRKIND(TRY_SPAWN, "TrySpawn", TrySpawn)
+EXPRKIND(TRY_NUMERIC_CAST, "TryNumericCast", TryNumericCast)
+EXPRKIND(TRY_INTRINSIC, "TryIntrinsic", TryIntrinsic)
+EXPRKIND(TRY_ALLOCATE, "TryAllocate", TryAllocate)
+EXPRKIND(TRY_RAW_ARRAY_ALLOCATE, "TryRawArrayAllocate", TryRawArrayAllocate)
 )
 
 MAJORKIND(UNARY_EXPR,
@@ -84,7 +95,8 @@ EXPRKIND(APPLY, "Apply", Apply)
 EXPRKIND(INVOKE, "Invoke", Invoke)
 EXPRKIND(INVOKESTATIC, "InvokeStatic", InvokeStatic)
 EXPRKIND(INSTANCEOF, "InstanceOf", InstanceOf)
-EXPRKIND(TYPECAST, "TypeCast", TypeCast)
+EXPRKIND(CLASS_STATIC_CAST, "ClassStaticCast", ClassStaticCast)
+EXPRKIND(NUMERIC_CAST, "NumericCast", NumericCast)
 EXPRKIND(GET_EXCEPTION, "GetException", GetException)
 
 EXPRKIND(RAW_ARRAY_ALLOCATE, "RawArrayAllocate", RawArrayAllocate)
@@ -97,9 +109,9 @@ EXPRKIND(SPAWN, "Spawn", Spawn)
 EXPRKIND(GET_INSTANTIATE_VALUE, "GetInstantiateValue", GetInstantiateValue)
 
 EXPRKIND(BOX, "Box", Box)
-EXPRKIND(UNBOX, "UnBox", Unbox)
-EXPRKIND(TRANSFORM_TO_GENERIC, "TransformToGeneric", TransformToGeneric)
-EXPRKIND(TRANSFORM_TO_CONCRETE, "TransformToConcrete", TransformToConcrete)
+EXPRKIND(UNBOX_TO_VALUE, "UnBoxToValue", UnBoxToValue)
+EXPRKIND(CAST_TO_GENERIC, "CastToGeneric", CastToGeneric)
+EXPRKIND(CAST_TO_CONCRETE, "CastToConcrete", CastToConcrete)
 EXPRKIND(UNBOX_TO_REF, "UnBoxToRef", UnBoxToRef)
 
 EXPRKIND(GET_RTTI, "GetRTTI", GetRTTI)

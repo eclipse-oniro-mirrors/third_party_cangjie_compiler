@@ -43,56 +43,6 @@ void DumpForDebug(const Ptr<Expression> expr, const Ptr<Function> func, bool isD
     std::cout << message;
 }
 
-bool AllUsersIsExprKind(const std::vector<Expression*>& users, const ExprKind& kind)
-{
-    return std::all_of(users.begin(), users.end(), [&kind](auto user) {
-        auto res = user->GetExprKind() == kind;
-        auto args = user->GetOperands();
-        auto it = std::find_if(args.begin(), args.end(), [](auto item) { return item->GetType()->IsNothing(); });
-        if (res && (it != args.end())) {
-            return true;
-        }
-        return false;
-    });
-}
-
-bool CheckUsersOfExpr(const Expression& expr)
-{
-    // If the expression is the arg of apply, we should use the pos of this expression, not pos of apply.
-    // Example code:
-    // var a = 2
-    // A(1, 2,return A(), a + 2)
-    if (expr.GetResult()) {
-        auto users = expr.GetResult()->GetUsers();
-        if (AllUsersIsExprKind(users, ExprKind::TUPLE)) {
-            return true;
-        }
-        if (AllUsersIsExprKind(users, ExprKind::APPLY)) {
-            return true;
-        }
-        if (AllUsersIsExprKind(users, ExprKind::RAW_ARRAY_LITERAL_INIT)) {
-            return true;
-        }
-        /*  If expr has user of store, but the store has zero position, then DCE use the position of this expr.
-
-            func foo() {
-                return 1
-                1       // have user of store
-            }
-        */
-        if (expr.GetResult()->GetUsers().size() == 1 && // 1 denote that if epxr has one user of store.
-            expr.GetResult()->GetUsers()[0]->GetExprKind() == ExprKind::STORE) {
-            auto storeNode = expr.GetResult()->GetUsers()[0];
-            auto [res, nodeRange] = ToRangeIfNotZero(storeNode->GetDebugLocation());
-            if (!res) {
-                return true;
-            }
-        }
-        return false;
-    }
-    return true;
-}
-
 std::string GetFuncIdent(const Function& func)
 {
     if (func.GetFuncKind() == FuncKind::GETTER) {
@@ -136,38 +86,6 @@ bool ReflectPackageIsUsed(const Package& package) {
     return false;
 }
 }  // namespace
-
-static inline const std::unordered_map<ExprKind, std::string> EXPR_KIND_TO_STR = {
-    {ExprKind::NEG, "-"},
-    {ExprKind::NOT, "!"},
-    {ExprKind::BITNOT, "~"},
-    {ExprKind::ADD, "+"},
-    {ExprKind::SUB, "-"},
-    {ExprKind::MUL, "*"},
-    {ExprKind::DIV, "/"},
-    {ExprKind::MOD, "%"},
-    {ExprKind::EXP, "**"},
-    {ExprKind::LSHIFT, "<<"},
-    {ExprKind::RSHIFT, ">>"},
-    {ExprKind::BITAND, "&"},
-    {ExprKind::BITOR, "|"},
-    {ExprKind::BITXOR, "^"},
-    {ExprKind::LT, "<"},
-    {ExprKind::GT, ">"},
-    {ExprKind::LE, "<="},
-    {ExprKind::GE, ">="},
-    {ExprKind::EQUAL, "=="},
-    {ExprKind::NOTEQUAL, "!="},
-    {ExprKind::AND, "&&"},
-    {ExprKind::OR, "||"},
-};
-
-std::string DeadCodeElimination::GetLiteralFromExprKind(const ExprKind& kind) const
-{
-    auto it = EXPR_KIND_TO_STR.find(kind);
-    CJC_ASSERT(it != EXPR_KIND_TO_STR.end());
-    return it->second;
-}
 
 void DeadCodeElimination::UselessFuncElimination(Package& package, const GlobalOptions& opts)
 {
@@ -347,7 +265,7 @@ void DeadCodeElimination::DiagUnusedLambdaVariable(const Debug& expr)
     auto closureExpr = StaticCast<LocalVar*>(expr.GetOperand(0));
     if (closureExpr->GetExpr()->GetExprKind() == ExprKind::TUPLE) {
         auto realVar = StaticCast<LocalVar*>(closureExpr->GetExpr()->GetOperand(1));
-        if (realVar->GetExpr()->GetExprKind() == ExprKind::TYPECAST) {
+        if (realVar->GetExpr()->GetExprKind() == ExprKind::CLASS_STATIC_CAST) {
             auto typecastVar = StaticCast<LocalVar*>(realVar->GetExpr()->GetOperand(0));
             auto users = typecastVar->GetUsers();
             if (users.back() == realVar->GetExpr()) {
@@ -486,11 +404,12 @@ void DeadCodeElimination::ReportUnusedExpression(Expression& expr)
             if (expr.GetExprKind() == ExprKind::LAMBDA) {
                 DiagUnusedCode(res, DiagKindRefactor::chir_dce_unused_function,
                     StaticCast<const Lambda&>(expr).GetSrcCodeIdentifier());
-            } else if (expr.IsUnaryExpr() || expr.IsBinaryExpr() || expr.IsIntOpWithException()) {
-                auto kind = expr.GetExprKind() == ExprKind::INT_OP_WITH_EXCEPTION
-                    ? GetLiteralFromExprKind(StaticCast<IntOpWithException*>(&expr)->GetOpKind())
-                    : GetLiteralFromExprKind(expr.GetExprKind());
-                diag.DiagnoseRefactor(DiagKindRefactor::chir_dce_unused_operator, res.second, kind);
+            } else if (auto unary = DynamicCast<const UnaryExpressionBase*>(&expr)) {
+                diag.DiagnoseRefactor(DiagKindRefactor::chir_dce_unused_operator,
+                    res.second, GetUnaryExprKindLiteral(unary->GetOpKind()));
+            } else if (auto binary = DynamicCast<const BinaryExpressionBase*>(&expr)) {
+                diag.DiagnoseRefactor(DiagKindRefactor::chir_dce_unused_operator, res.second,
+                    GetBinaryExprKindLiteral(binary->GetOpKind()));
             } else {
                 diag.DiagnoseRefactor(DiagKindRefactor::chir_dce_unused_expression, res.second);
             }
@@ -523,7 +442,7 @@ void DeadCodeElimination::UselessExprEliminationForFunc(const Function& func, bo
         worklist.pop();
         worklistSet.erase(expr);
 
-        auto ops = expr->GetOperands();
+        auto ops = expr->GetNonSuccessorOperands();
         DumpForDebug(expr, nullptr, isDebug);
         expr->RemoveSelfFromBlock();
 
@@ -610,13 +529,13 @@ bool HandleFuncWithNothingParamter(CHIRBuilder& builder, const BlockGroup& funcB
 template <typename TApply> void HandleNothingTerminator(CHIRBuilder& builder, TApply* expr, BlockGroup& funcBody)
 {
     CJC_ASSERT(Cangjie::Utils::In(expr->GetExprKind(),
-        {ExprKind::APPLY_WITH_EXCEPTION, ExprKind::INVOKE_WITH_EXCEPTION, ExprKind::INVOKESTATIC_WITH_EXCEPTION}));
+        {ExprKind::TRY_APPLY, ExprKind::TRY_INVOKE, ExprKind::TRY_INVOKESTATIC}));
     auto newSuccessBlock = builder.CreateBlock(&funcBody);
     CreateNullReturnValue(builder, newSuccessBlock, funcBody);
     newSuccessBlock->AppendExpression(builder.CreateTerminator<Exit>(newSuccessBlock));
 
     auto oldSuccessBlock = expr->GetSuccessBlock();
-    expr->ReplaceSuccessor(*oldSuccessBlock, *newSuccessBlock);
+    expr->ReplaceOperand(oldSuccessBlock, newSuccessBlock);
 }
 } // namespace
 
@@ -637,14 +556,14 @@ void DeadCodeElimination::NothingTypeExprEliminationForFunc(BlockGroup& funcBody
                     continue;
                 } else {
                     switch (expr->GetExprKind()) {
-                        case ExprKind::APPLY_WITH_EXCEPTION:
-                            HandleNothingTerminator(builder, StaticCast<ApplyWithException*>(expr), funcBody);
+                        case ExprKind::TRY_APPLY:
+                            HandleNothingTerminator(builder, StaticCast<TryApply*>(expr), funcBody);
                             break;
-                        case ExprKind::INVOKE_WITH_EXCEPTION:
-                            HandleNothingTerminator(builder, StaticCast<InvokeWithException*>(expr), funcBody);
+                        case ExprKind::TRY_INVOKE:
+                            HandleNothingTerminator(builder, StaticCast<TryInvoke*>(expr), funcBody);
                             break;
-                        case ExprKind::INVOKESTATIC_WITH_EXCEPTION:
-                            HandleNothingTerminator(builder, StaticCast<InvokeStaticWithException*>(expr), funcBody);
+                        case ExprKind::TRY_INVOKESTATIC:
+                            HandleNothingTerminator(builder, StaticCast<TryInvokeStatic*>(expr), funcBody);
                             break;
                         default:
 #ifndef NDEBUG
@@ -689,61 +608,6 @@ void DeadCodeElimination::UnreachableBlockElimination(const std::vector<const Fu
     }
 }
 
-void DeadCodeElimination::UnreachableBlockWarningReporter(const Package& package,
-    size_t threadsNum, const std::unordered_map<Block*, Terminator*>& maybeUnreachableBlocks)
-{
-    if (threadsNum == 1) {
-        UnreachableBlockWarningReporterInSerial(package, maybeUnreachableBlocks);
-    } else {
-        UnreachableBlockWarningReporterInParallel(package, threadsNum, maybeUnreachableBlocks);
-    }
-}
-
-void DeadCodeElimination::UnreachableBlockWarningReporterInSerial(
-    const Package& package, const std::unordered_map<Block*, Terminator*>& maybeUnreachableBlocks)
-{
-    for (auto func : package.GetGlobalFuncsWithBody()) {
-        bool isPrinted = false;
-        Visitor::Visit(*func, [this, &isPrinted, &maybeUnreachableBlocks](Block& block) {
-            auto it = maybeUnreachableBlocks.find(&block);
-            if (it != maybeUnreachableBlocks.end()) {
-                auto terminator = it->second;
-                if (CheckUselessBlock(block)) {
-                    PrintUnreachableBlockWarning(block, *terminator, isPrinted);
-                }
-            }
-            return VisitResult::CONTINUE;
-        });
-    }
-}
-
-void DeadCodeElimination::UnreachableBlockWarningReporterInParallel(const Package& package,
-    size_t threadsNum, const std::unordered_map<Block*, Terminator*>& maybeUnreachableBlocks)
-{
-    Utils::TaskQueue taskQueue(threadsNum);
-    for (auto func : package.GetGlobalFuncsWithBody()) {
-        bool isCommonFunctionWithoutBody = func->TestAttr(Attribute::SKIP_ANALYSIS);
-        if (isCommonFunctionWithoutBody) {
-            continue; // Nothing to visit
-        }
-
-        taskQueue.AddTask<void>([this, func, &maybeUnreachableBlocks]() {
-            bool isPrinted = false;
-            Visitor::Visit(*func, [this, &isPrinted, &maybeUnreachableBlocks](Block& block) {
-                auto it = maybeUnreachableBlocks.find(&block);
-                if (it != maybeUnreachableBlocks.end()) {
-                    auto terminator = it->second;
-                    if (CheckUselessBlock(block)) {
-                        PrintUnreachableBlockWarning(block, *terminator, isPrinted);
-                    }
-                }
-                return VisitResult::CONTINUE;
-            });
-        });
-    }
-    taskQueue.RunAndWaitForAllTasksCompleted();
-}
-
 namespace {
 std::optional<Block*> GetBranchTargetSucc(const Branch& branch)
 {
@@ -763,7 +627,8 @@ std::optional<Block*> GetMultiBranchTargetSucc(const MultiBranch& branch)
         return std::nullopt;
     }
     auto condExpr = Cangjie::StaticCast<LocalVar*>(branch.GetCondition())->GetExpr();
-    if (condExpr->GetExprKind() == ExprKind::TYPECAST) {
+    if (condExpr->GetExprKind() == ExprKind::NUMERIC_CAST ||
+        condExpr->GetExprKind() == ExprKind::CLASS_STATIC_CAST) {
         if (!condExpr->GetOperand(0)->IsLocalVar()) {
             return std::nullopt;
         }
@@ -867,7 +732,7 @@ void DeadCodeElimination::BreakBranchConnection(const Block& block) const
         } else {
             auto multi = StaticCast<MultiBranch*>(predTerminator);
             CJC_ASSERT(&block == multi->GetDefaultBlock());
-            multi->ReplaceSuccessor(0, *multi->GetSuccessor(1));
+            multi->ReplaceOperand(multi->GetSuccessorIndex(0), multi->GetSuccessor(1));
         }
     }
 }
@@ -965,108 +830,13 @@ bool DeadCodeElimination::CheckUselessBlock(const Block& block) const
     return !block.IsEntry() && block.GetPredecessors().empty() && !block.TestAttr(Attribute::UNREACHABLE);
 }
 
-Ptr<Expression> DeadCodeElimination::GetUnreachableExpression(const CHIR::Block& block, bool& isNormal) const
-{
-    auto expressions = block.GetExpressions();
-    Ptr<Expression> resExpression = nullptr;
-    auto it = std::find_if(expressions.begin(), expressions.end(), [&isNormal, &resExpression, this](auto expression) {
-        auto posForWarning = expression->template Get<DebugLocationInfoForWarning>();
-        auto [res, warningRange] = ToRangeIfNotZero(posForWarning);
-        if (res) {
-            // when report deadcode in BinaryExpr, it has 4 situations in tests/LLT/CHIR/DCE/testUnusedOp03.cj
-            // if operand in binaryExpr is nothing, use warninglocation as report position
-            // if all operand in binaryExpr is normal, use binaryExpr location as report position
-            if (expression->IsBinaryExpr() || expression->IsIntOpWithException()) {
-                auto args = expression->GetOperands();
-                auto it =
-                    std::find_if(args.begin(), args.end(), [](auto item) { return item->GetType()->IsNothing(); });
-                if (it == args.end()) {
-                    resExpression = expression;
-                    isNormal = true;
-                    return true;
-                }
-            }
-            if (expression->GetExprKind() != ExprKind::DEBUGEXPR) {
-                // variable debug node has warn position, but we want get it's normal position.
-                resExpression = expression;
-                isNormal = false;
-                return true;
-            }
-        }
-        if (!CheckUsersOfExpr(*expression)) {
-            return false;
-        }
-        auto& debugInfo = expression->GetDebugLocation();
-        auto [newResult, debugRange] = ToRangeIfNotZero(debugInfo);
-        if (newResult && !IsCrossPackage(debugRange.begin, curPkg.GetName(), diag)) {
-            resExpression = expression;
-            isNormal = true;
-            return true;
-        }
-        return false;
-    });
-    if (it != expressions.end()) {
-        return resExpression;
-    }
-    return nullptr;
-}
-
-void DeadCodeElimination::PrintUnreachableBlockWarning(
-    const CHIR::Block& block, const CHIR::Terminator& terminator, bool& isPrinted)
-{
-    // Get position of nothing type node.
-    auto& debugInfo = terminator.GetDebugLocation();
-    auto [res, terminalNodeRange] = ToRangeIfNotZero(debugInfo);
-
-    if (res && !isPrinted) {
-        auto expressions = block.GetExpressions();
-        bool isNormal = true;
-        if (auto unreableExpr = GetUnreachableExpression(block, isNormal)) {
-            auto range = isNormal ? ToRange(unreableExpr->GetDebugLocation())
-                : ToRange(unreableExpr->Get<DebugLocationInfoForWarning>());
-            // Need to remove after find the cause.
-            if (terminalNodeRange.begin == range.begin) {
-                return;
-            }
-            if (IsCrossPackage(terminalNodeRange.begin, curPkg.GetName(), diag)) {
-                return;
-            }
-            if (unreableExpr->Get<SkipCheck>() == SkipKind::SKIP_DCE_WARNING) {
-                return;
-            }
-            // Note: For the code:`if (let a <- 1) {return 1}`
-            // the position of the Unit node is the position of the ifExpr,so it will generate a wrong
-            // warnging,we should skip this scenario.
-            if (unreableExpr->GetExprKind() == ExprKind::CONSTANT &&
-                StaticCast<Constant*>(unreableExpr)->IsUnitLit()) {
-                if (unreableExpr->GetResult()->TestAttr(Attribute::COMPILER_ADD)) {
-                    return;
-                }
-            }
-            if (!isNormal && (unreableExpr->IsBinaryExpr() || unreableExpr->IsUnaryExpr())) {
-                auto diagBuilder = diag.DiagnoseRefactor(DiagKindRefactor::chir_dce_unreachable, range, "operator");
-                diagBuilder.AddMainHintArguments("operator");
-                diagBuilder.AddHint(terminalNodeRange);
-            } else if (!isNormal && unreableExpr->GetExprKind() == ExprKind::APPLY) {
-                auto diagBuilder = diag.DiagnoseRefactor(DiagKindRefactor::chir_dce_unreachable, range, "call");
-                diagBuilder.AddMainHintArguments("call");
-                diagBuilder.AddHint(terminalNodeRange);
-            } else {
-                auto diagBuilder =
-                    diag.DiagnoseRefactor(DiagKindRefactor::chir_dce_unreachable_expression_hint, range);
-                diagBuilder.AddHint(terminalNodeRange);
-            }
-            isPrinted = true;
-        }
-    }
-}
-
 bool DeadCodeElimination::CheckUselessExpr(const Expression& expr, bool isReportWarning) const
 {
     if (expr.GetResult() && !expr.GetResult()->GetUsers().empty()) {
         return false;
     }
-    if (expr.GetExprKind() == ExprKind::INT_OP_WITH_EXCEPTION && expr.Get<NeverOverflowInfo>() && isReportWarning) {
+    if ((Is<TryUnaryExpression>(expr) || Is<TryBinaryExpression>(expr)) &&
+        expr.Get<NeverOverflowInfo>() && isReportWarning) {
         return true;
     }
     if (expr.IsTerminator()) {
@@ -1088,13 +858,13 @@ bool DeadCodeElimination::CheckUselessExpr(const Expression& expr, bool isReport
                 kind == ExprKind::RSHIFT) {
                 // MOD/DIV may throw div_by_zero exception; LSHIFT/RSHIFT may throw overshift exception.
                 return false;
-            } else if (kind >= ExprKind::ADD && kind <= ExprKind::EXP) {
-                // all the other arithemetic operations and bitwise shift operations.
-                auto binary = StaticCast<const BinaryExpression*>(&expr);
-                return binary->GetOverflowStrategy() != OverflowStrategy::THROWING;
-            } else {
-                return true;
             }
+            auto binary = StaticCast<const BinaryExpression*>(&expr);
+            if (binary->IsMathematicalOperator()) {
+                // all the other arithemetic operations.
+                return binary->GetOverflowStrategy() != OverflowStrategy::THROWING;
+            }
+            return true;
         }
         case ExprMajorKind::MEMORY_EXPR: {
             return kind == ExprKind::LOAD || kind == ExprKind::GET_ELEMENT_REF;

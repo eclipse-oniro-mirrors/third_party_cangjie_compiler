@@ -24,20 +24,21 @@ namespace {
 
 constexpr auto INTEROPLIB_OBJ_C_ID = "ObjCId";
 constexpr auto INTEROPLIB_NATIVE_OBJ_C_ID = "NativeObjCId";
+constexpr auto INTEROPLIB_NATIVE_OBJ_C_ID_MARKER_INSTANCE = "__NATIVE_OBJC_ID_MARKER";
 constexpr auto INTEROPLIB_NATIVE_OBJ_C_SEL = "NativeObjCSel";
 constexpr auto INTEROPLIB_NATIVE_OBJ_C_SUPER_PTR = "NativeObjCSuperPtr";
 constexpr auto INTEROPLIB_NATIVE_OBJ_C_CLASS = "NativeObjCClass";
 constexpr auto INTEROPLIB_REGISTRY_ID = "RegistryId";
 constexpr auto INTEROPLIB_OBJ_C_UNREACHABLE_CODE_EXCEPTION = "ObjCUnreachableCodeException";
 constexpr auto INTEROPLIB_OBJ_C_OPTIONAL_METHOD_UNIMPLEMENTED_EXCEPTION = "ObjCOptionalMethodUnimplementedException";
+constexpr auto INTEROPLIB_OBJ_C_INIT_EXCEPTION = "ObjCInitException";
 constexpr auto INTEROPLIB_OBJ_C_STATIC_METHOD_CALL_ON_INTERFACE_EXCEPTION = "ObjCStaticMethodCallOnInterfaceException";
 constexpr auto INTEROPLIB_NATIVE_BLOCK_ABI = "NativeBlockABI";
 constexpr auto INTEROPLIB_CANGJIE_BLOCK_ABI = "CangjieBlockABI";
-constexpr auto INTEROPLIB_OBJ_C_GET_FROM_REGISTRY_BY_NATIVE_HANDLE = "getFromRegistryByNativeHandle";
 constexpr auto INTEROPLIB_OBJ_C_GET_FROM_REGISTRY_BY_ID = "getFromRegistryById";
 constexpr auto INTEROPLIB_OBJ_C_PUT_TO_REGISTRY = "putToRegistry";
 constexpr auto INTEROPLIB_OBJ_C_REMOVE_FROM_REGISTRY = "removeFromRegistry";
-constexpr auto INTEROPLIB_OBJ_C_ALLOC = "alloc";
+constexpr auto INTEROPLIB_OBJ_C_ALLOC = "objCAlloc";
 constexpr auto INTEROPLIB_OBJ_C_WITH_AUTORELEASE_POOL = "withAutoreleasePool";
 constexpr auto INTEROPLIB_OBJ_C_WITH_AUTORELEASE_POOL_OBJ = "withAutoreleasePoolObj";
 constexpr auto INTEROPLIB_OBJ_C_REGISTER_NAME = "registerName";
@@ -55,9 +56,6 @@ constexpr auto INTEROPLIB_OBJ_C_RELEASE = "objCRelease";
 constexpr auto INTEROPLIB_OBJ_C_RESPONSE_TO_SELECTOR = "respondsToSelector";
 constexpr auto INTEROPLIB_OBJ_C_AUTO_RELEASE = "objCAutorelease";
 constexpr auto INTEROPLIB_OBJ_C_RETAIN = "objCRetain";
-constexpr auto INTEROPLIB_FORWARDER_MUTEX = "ForwarderMutex";
-constexpr auto MUTEX_LOCK_IDENT = "lock";
-constexpr auto MUTEX_UNLOCK_IDENT = "unlock";
 constexpr auto INTEROPLIB_OBJC_STORE_LAMBDA_AS_BLOCK = "registerCangjieLambdaAsBlock";
 constexpr auto INTEROPLIB_OBJC_GET_LAMBDA_FROM_BLOCK = "getCangjieLambdaFromBlock";
 constexpr auto INTEROPLIB_OBJ_C_OBJECT_GET_CLASS = "objectGetClass";
@@ -66,6 +64,8 @@ constexpr auto INTEROPLIB_OBJ_C_CONFORMS_TO_PROTOCOL = "conformsToProtocol";
 constexpr auto INTEROPLIB_OBJ_C_CONVERT_TO_NSSTRING = "convertToNSString";
 constexpr auto INTEROPLIB_OBJ_C_DESCRIPTION_AS_STRING = "descriptionAsString";
 constexpr auto INTEROPLIB_OBJ_C_RETAIN_AUTORELEASED_RETURN_VALUE = "objCRetainAutoreleasedReturnValue";
+constexpr auto INTEROPLIB_OBJ_C_SET_REGISTRY_ID = "setRegistryId";
+constexpr auto INTEROPLIB_OBJ_C_GET_REGISTRY_ID = "getRegistryId";
 
 // objc.lang
 constexpr auto OBJ_C_FUNC_GET_FPOINTER = "unsafeGetFunctionPointer";
@@ -85,80 +85,21 @@ Ptr<T> GetMemberOfDecl(Decl& decl, std::function<bool(const Decl&)> pred)
 }
 } // namespace
 
-/**
- * Gets ForwarderMutex declaration.
- */
-Ptr<TypeAliasDecl> InteropLibBridge::GetForwarderMutexDecl()
+Ptr<TypeAliasDecl> InteropLibBridge::GetNativeObjCIdDecl() const noexcept
 {
-    static auto decl = GetInteropLibDecl<ASTKind::TYPE_ALIAS_DECL>(INTEROPLIB_FORWARDER_MUTEX);
+    static auto decl = GetInteropLibDecl<ASTKind::TYPE_ALIAS_DECL>(INTEROPLIB_NATIVE_OBJ_C_ID);
     return decl;
 }
 
-/**
- * Gets ForwarderMutex semantic type (std.sync.Mutex).
- */
-Ptr<Ty> InteropLibBridge::GetForwarderMutexTy()
+Ptr<StructDecl> InteropLibBridge::GetNativeObjCIdMarkerDecl() const noexcept
 {
-    return GetForwarderMutexDecl()->type->GetTy();
+    static auto decl = GetInteropLibDecl<ASTKind::STRUCT_DECL>(NATIVE_OBJ_C_ID_MARKER_IDENT);
+    return decl;
 }
 
-/**
- * Gets the lock decl of ForwarderMutex (std.sync.Mutex).
- */
-Ptr<FuncDecl> InteropLibBridge::GetMutexLock()
+Ptr<VarDecl> InteropLibBridge::GetNativeObjCIdMarkerInstance() const noexcept
 {
-    static Ptr<FuncDecl> result = nullptr;
-    if (result) {
-        return result;
-    }
-    auto decl = Ty::GetDeclOfTy(GetForwarderMutexTy());
-    CJC_NULLPTR_CHECK(decl);
-    result = GetMemberOfDecl<FuncDecl>(*decl, [](const Decl& mem) {
-        return mem.identifier == MUTEX_LOCK_IDENT;
-    });
-    CJC_NULLPTR_CHECK(result);
-    return result;
-}
-
-/**
- * Gets the unlock decl of ForwarderMutex (std.sync.Mutex).
- */
-Ptr<FuncDecl> InteropLibBridge::GetMutexUnlock()
-{
-    static Ptr<FuncDecl> result = nullptr;
-    if (result) {
-        return result;
-    }
-    auto decl = Ty::GetDeclOfTy(GetForwarderMutexTy());
-    CJC_NULLPTR_CHECK(decl);
-    result = GetMemberOfDecl<FuncDecl>(*decl, [](const Decl& mem) {
-        return mem.identifier == MUTEX_UNLOCK_IDENT;
-    });
-    CJC_NULLPTR_CHECK(result);
-    return result;
-}
-
-/**
- * Gets the constructor decl of ForwarderMutex.
- */
-Ptr<FuncDecl> InteropLibBridge::GetMutexConstructor()
-{
-    static Ptr<FuncDecl> result = nullptr;
-    if (result) {
-        return result;
-    }
-    auto decl = Ty::GetDeclOfTy(GetForwarderMutexTy());
-    CJC_NULLPTR_CHECK(decl);
-    result = GetMemberOfDecl<FuncDecl>(*decl, [](const Decl& mem) {
-        return mem.TestAttr(Attribute::CONSTRUCTOR);
-    });
-    CJC_NULLPTR_CHECK(result);
-    return result;
-}
-
-Ptr<TypeAliasDecl> InteropLibBridge::GetNativeObjCIdDecl()
-{
-    static auto decl = GetInteropLibDecl<ASTKind::TYPE_ALIAS_DECL>(INTEROPLIB_NATIVE_OBJ_C_ID);
+    static auto decl = GetInteropLibDecl<ASTKind::VAR_DECL>(INTEROPLIB_NATIVE_OBJ_C_ID_MARKER_INSTANCE);
     return decl;
 }
 
@@ -168,9 +109,14 @@ Ptr<InterfaceDecl> InteropLibBridge::GetObjCIdDecl()
     return decl;
 }
 
-Ptr<Ty> InteropLibBridge::GetNativeObjCIdTy()
+Ptr<Ty> InteropLibBridge::GetNativeObjCIdTy() const noexcept
 {
     return GetNativeObjCIdDecl()->type->GetTy();
+}
+
+Ptr<Ty> InteropLibBridge::GetNativeObjCIdMarkerTy() const noexcept
+{
+    return GetNativeObjCIdMarkerDecl()->GetTy();
 }
 
 Ptr<TypeAliasDecl> InteropLibBridge::GetNativeObjCSelDecl()
@@ -201,13 +147,13 @@ Ptr<Ty> InteropLibBridge::GetNativeObjCSuperPtrTy()
     return GetNativeObjCSuperPtrDecl()->type->GetTy();
 }
 
-Ptr<TypeAliasDecl> InteropLibBridge::GetRegistryIdDecl()
+Ptr<TypeAliasDecl> InteropLibBridge::GetRegistryIdDecl() const noexcept
 {
     static auto decl = GetInteropLibDecl<ASTKind::TYPE_ALIAS_DECL>(INTEROPLIB_REGISTRY_ID);
     return decl;
 }
 
-Ptr<Ty> InteropLibBridge::GetRegistryIdTy()
+Ptr<Ty> InteropLibBridge::GetRegistryIdTy() const noexcept
 {
     return GetRegistryIdDecl()->type->GetTy();
 }
@@ -224,6 +170,12 @@ Ptr<ClassDecl> InteropLibBridge::GetObjCOptionalMethodUnimplementedExceptionDecl
     return decl;
 }
 
+Ptr<ClassDecl> InteropLibBridge::GetObjCInitException()
+{
+    static auto decl = GetObjCLangDecl<ASTKind::CLASS_DECL>(INTEROPLIB_OBJ_C_INIT_EXCEPTION);
+    return decl;
+}
+
 Ptr<ClassDecl> InteropLibBridge::GetObjCStaticMethodCallOnIntefaceExceptionDecl()
 {
     static auto decl = GetInteropLibDecl<ASTKind::CLASS_DECL>(
@@ -231,19 +183,13 @@ Ptr<ClassDecl> InteropLibBridge::GetObjCStaticMethodCallOnIntefaceExceptionDecl(
     return decl;
 }
 
-Ptr<FuncDecl> InteropLibBridge::GetGetFromRegistryByNativeHandleDecl()
-{
-    static auto decl = GetInteropLibDecl<ASTKind::FUNC_DECL>(INTEROPLIB_OBJ_C_GET_FROM_REGISTRY_BY_NATIVE_HANDLE);
-    return decl;
-}
-
-Ptr<FuncDecl> InteropLibBridge::GetGetFromRegistryByIdDecl()
+Ptr<FuncDecl> InteropLibBridge::GetGetFromRegistryByIdDecl() const noexcept
 {
     static auto decl = GetInteropLibDecl<ASTKind::FUNC_DECL>(INTEROPLIB_OBJ_C_GET_FROM_REGISTRY_BY_ID);
     return decl;
 }
 
-Ptr<FuncDecl> InteropLibBridge::GetPutToRegistryDecl()
+Ptr<FuncDecl> InteropLibBridge::GetPutToRegistryDecl() const noexcept
 {
     static auto decl = GetInteropLibDecl<ASTKind::FUNC_DECL>(INTEROPLIB_OBJ_C_PUT_TO_REGISTRY);
     return decl;
@@ -255,7 +201,7 @@ Ptr<FuncDecl> InteropLibBridge::GetRemoveFromRegistryDecl()
     return decl;
 }
 
-Ptr<FuncDecl> InteropLibBridge::GetAllocDecl()
+Ptr<FuncDecl> InteropLibBridge::GetAllocDecl() const noexcept
 {
     static auto decl = GetInteropLibDecl<ASTKind::FUNC_DECL>(INTEROPLIB_OBJ_C_ALLOC);
     return decl;
@@ -387,9 +333,21 @@ Ptr<FuncDecl> InteropLibBridge::GetDescriptionAsStringDecl()
     return decl;
 }
 
-Ptr<FuncDecl> InteropLibBridge::GetObjCRetainAutoreleasedReturnValue()
+Ptr<FuncDecl> InteropLibBridge::GetObjCRetainAutoreleasedReturnValueDecl() const noexcept
 {
     static auto decl = GetInteropLibDecl<ASTKind::FUNC_DECL>(INTEROPLIB_OBJ_C_RETAIN_AUTORELEASED_RETURN_VALUE);
+    return decl;
+}
+
+Ptr<FuncDecl> InteropLibBridge::GetSetRegistryIdDecl() const noexcept
+{
+    static auto decl = GetInteropLibDecl<ASTKind::FUNC_DECL>(INTEROPLIB_OBJ_C_SET_REGISTRY_ID);
+    return decl;
+}
+
+Ptr<FuncDecl> InteropLibBridge::GetGetRegistryIdDecl() const noexcept
+{
+    static auto decl = GetInteropLibDecl<ASTKind::FUNC_DECL>(INTEROPLIB_OBJ_C_GET_REGISTRY_ID);
     return decl;
 }
 
@@ -592,7 +550,7 @@ Ptr<FuncDecl> InteropLibBridge::GetObjectGetClassDecl()
 
 bool InteropLibBridge::IsInteropLibAccessible(ImportManager& importManager)
 {
-    return importManager.GetPackageDecl(INTEROPLIB_PACKAGE_NAME);
+    return importManager.GetPackageDecl(OBJ_C_INTERNAL_PACKAGE_IDENT);
 }
 
 bool InteropLibBridge::IsInteropLibAccessible() const

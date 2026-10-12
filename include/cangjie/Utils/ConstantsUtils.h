@@ -85,6 +85,7 @@ constexpr std::string_view IF_AVAILABLE{"IfAvailable"};
 // std::string and std::map types across translation units is undefined,especially on the Windows platform.
 inline const std::string DEFAULT_PACKAGE_NAME = "default";
 inline constexpr const char CORE_PACKAGE_NAME[] = "std.core";
+inline constexpr const char COLLECTION_PACKAGE_NAME[] = "std.collection";
 inline constexpr const char SYNC_PACKAGE_NAME[] = "std.sync";
 inline constexpr const char MATH_PACKAGE_NAME[] = "std.math";
 inline constexpr const char OVERFLOW_PACKAGE_NAME[] = "std.overflow";
@@ -128,14 +129,9 @@ inline const std::string INTEROP_JSTRING_NAME = "JString";
 inline const std::string INTEROP_JARRAY_NAME = "JArray";
 inline const std::string INTEROP_JAVA_LANG_PACKAGE = "java.lang";
 inline const std::string JAVA_REF_FIELD_NAME = "$javaref";
-inline const std::string JAVA_FWD_CLASS_SUFFIX = "_fwd";
-inline const std::string JAVA_INTERFACE_FWD_CLASS_DEFAULT_METHOD_SUFFIX = "_default_impl";
 inline const std::string JAVA_SELF_OBJECT = "selfobj";
 constexpr auto JAVA_REF_GETTER_FUNC_NAME = "$getJavaRef";
 constexpr auto INTEROPLIB_CFFI_JAVA_ENTITY = "Java_CFFI_JavaEntity";
-constexpr auto JAVA_OBJECT_CONTROLLER = "JavaObjectController";
-constexpr auto JAVA_OBJECT_CONTROLLER_NAME = "controller";
-constexpr auto JAVA_OVERRIDE_MASK_NAME = "overrideMask";
 constexpr auto ENV = "env";
 } // namespace Cangjie::Interop::Java
 
@@ -145,13 +141,21 @@ inline const std::string OBJ_C_POINTER_IDENT = "ObjCPointer";
 inline const std::string OBJ_C_FUNC_IDENT = "ObjCFunc";
 inline const std::string OBJ_C_BLOCK_IDENT = "ObjCBlock";
 inline const std::string OBJ_C_LANG_PACKAGE_IDENT = "objc.lang";
+inline const std::string OBJ_C_INTERNAL_PACKAGE_IDENT = "objc.internal";
+inline const std::string NATIVE_OBJ_C_ID_MARKER_IDENT = "NativeObjCIdMarker";
 inline const std::string NATIVE_HANDLE_IDENT = "$obj";
+inline const std::string NATIVE_HANDLE_MARKER = "$mrk";
 inline const std::string GET_OBJ_C_CLASS_IDENT = "$getObjCClass";
 inline const std::string REGISTRY_ID_IDENT = "$registryId";
-inline const std::string REGISTRY_ID_SETTER_SELECTOR = "set$registryId:";
-inline const std::string SYNTHETIC_CLASS_SUFFIX = "$impl";
+inline constexpr std::string_view HANDLE_WRAPPER_SUFFIX = "$wrap";
+inline constexpr std::string_view REGISTRY_COMPANION_SUFFIX = "$reg";
+inline constexpr std::string_view REGISTRY_COMPANION_FIELD_IDENT = "$reg";
+inline constexpr std::string_view REGISTRY_DATA_PARAM_IDENT = "$regData";
+inline constexpr std::string_view INIT_IDENT = "init";
+inline constexpr std::string_view TO_STRING_METHOD_IDENT = "toString";
+inline constexpr std::string_view NSOBJECT_CLASS_IDENT = "NSObject";
+inline constexpr std::string_view NSSTRING_CLASS_IDENT = "NSString";
 inline const std::string NATIVE_HANDLE_GETTER_IDENT = "$getObj";
-inline const std::string OBJ_C_FWD_CLASS_SUFFIX = "_fwd";
 } // namespace Interop::ObjC
 
 // Headless instrinsics

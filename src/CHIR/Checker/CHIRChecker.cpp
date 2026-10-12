@@ -343,7 +343,7 @@ Value* GetOwnerFuncOrLambda(const BlockGroup& blockGroup)
     }
     auto ownerExpr = blockGroup.GetOwnerExpression();
     CJC_NULLPTR_CHECK(ownerExpr);
-    if (ownerExpr->IsLambda()) {
+    if (Cangjie::Is<Lambda>(ownerExpr)) {
         return ownerExpr->GetResult();
     }
     auto parentBG = ownerExpr->GetParentBlockGroup();
@@ -546,7 +546,7 @@ void CHIRChecker::TypeCheckError(
 
 bool CHIRChecker::OperandNumIsEqual(size_t expectedNum, const Expression& expr, const Function& topLevelFunc)
 {
-    auto realNum = expr.GetOperands().size();
+    auto realNum = expr.GetNumOfNonSuccessorOperands();
     if (expectedNum != realNum) {
         auto errMsg = "expect " + std::to_string(expectedNum) +
             " operand(s), but there are " + std::to_string(realNum) + " in fact.";
@@ -560,7 +560,7 @@ bool CHIRChecker::OperandNumIsEqual(
     const std::vector<size_t>& expectedNum, const Expression& expr, const Function& topLevelFunc)
 {
     CJC_ASSERT(!expectedNum.empty());
-    auto realNum = expr.GetOperands().size();
+    auto realNum = expr.GetNumOfNonSuccessorOperands();
     for (auto n : expectedNum) {
         if (n == realNum) {
             return true;
@@ -580,7 +580,7 @@ bool CHIRChecker::OperandNumIsEqual(
     return false;
 }
 
-bool CHIRChecker::SuccessorNumIsEqual(size_t expectedNum, const Terminator& expr, const Function& topLevelFunc)
+bool CHIRChecker::SuccessorNumIsEqual(size_t expectedNum, const Expression& expr, const Function& topLevelFunc)
 {
     auto realNum = expr.GetSuccessors().size();
     if (expectedNum != realNum) {
@@ -594,7 +594,7 @@ bool CHIRChecker::SuccessorNumIsEqual(size_t expectedNum, const Terminator& expr
 
 bool CHIRChecker::OperandNumAtLeast(size_t expectedNum, const Expression& expr, const Function& topLevelFunc)
 {
-    auto realNum = expr.GetOperands().size();
+    auto realNum = expr.GetNumOfNonSuccessorOperands();
     if (expectedNum > realNum) {
         auto errMsg = "expect at least " + std::to_string(expectedNum) +
             " operand(s), but there are " + std::to_string(realNum) + " in fact.";
@@ -604,7 +604,7 @@ bool CHIRChecker::OperandNumAtLeast(size_t expectedNum, const Expression& expr, 
     return true;
 }
 
-bool CHIRChecker::SuccessorNumAtLeast(size_t expectedNum, const Terminator& expr, const Function& topLevelFunc)
+bool CHIRChecker::SuccessorNumAtLeast(size_t expectedNum, const Expression& expr, const Function& topLevelFunc)
 {
     auto realNum = expr.GetSuccessors().size();
     if (expectedNum > realNum) {
@@ -626,7 +626,7 @@ bool CHIRChecker::CheckHaveResult(const Expression& expr, const Function& topLev
     return true;
 }
 
-void CHIRChecker::ShouldNotHaveResult(const Terminator& expr, const Function& topLevelFunc)
+void CHIRChecker::ShouldNotHaveResult(const Expression& expr, const Function& topLevelFunc)
 {
     if (expr.GetResult()) {
         ErrorInExpr(topLevelFunc, expr, "this terminator shouldn't have result.");
@@ -1411,8 +1411,8 @@ void CHIRChecker::CheckLocalId(BlockGroup& blockGroup, const Function& topLevelF
         } else if (!allIds.emplace(result->GetIdentifier()).second) {
             duplicatedLocalIds.emplace(result->GetIdentifier());
         }
-        if (expr.IsLambda()) {
-            for (auto p : StaticCast<Lambda&>(expr).GetParams()) {
+        if (auto lambda = DynamicCast<Lambda*>(&expr)) {
+            for (auto p : lambda->GetParams()) {
                 if (!allIds.emplace(p->GetIdentifier()).second) {
                     duplicatedLocalIds.emplace(p->GetIdentifier());
                 }
@@ -1449,8 +1449,7 @@ void CHIRChecker::CheckUnreachableOpAndGenericTyInBG(const BlockGroup& blockGrou
 {
     auto valSize = reachableValues.size();
     auto tySize = reachableGenericTypes.size();
-    if (auto e = blockGroup.GetOwnerExpression(); e && e->IsLambda()) {
-        auto lambda = StaticCast<Lambda*>(e);
+    if (auto lambda = DynamicCast<Lambda*>(blockGroup.GetOwnerExpression())) {
         for (auto genericTy : lambda->GetGenericTypeParams()) {
             reachableGenericTypes.emplace_back(genericTy);
         }
@@ -1526,8 +1525,7 @@ void CHIRChecker::CheckUnreachableOpAndGenericTyInBlock(const Block& block, std:
         }
         // 3. check successor blocks
         if (expr->IsTerminator()) {
-            auto terminator = Cangjie::StaticCast<Terminator*>(expr);
-            for (auto suc : terminator->GetSuccessors()) {
+            for (auto suc : expr->GetSuccessors()) {
                 CheckUnreachableOpAndGenericTyInBlock(*suc, reachableValues, reachableGenericTypes, visitedBlocks);
             }
         }
@@ -1549,7 +1547,7 @@ void CHIRChecker::CheckUnreachableOpAndGenericTyInExpr(
 
 void CHIRChecker::CheckUnreachableOperandInExpr(const Expression& expr, std::vector<Value*>& reachableValues)
 {
-    for (auto op : expr.GetOperands()) {
+    for (auto op : expr.GetNonSuccessorOperands()) {
         if (op->IsLiteral() || op->IsGlobal()) {
             continue;
         }
@@ -1570,19 +1568,16 @@ void CHIRChecker::CheckUnreachableGenericTypeInExpr(
             ErrorInFunc(*expr.GetTopLevelFunc(), errMsg);
         }
     }
-    auto eKind = expr.GetExprKind();
-    if (eKind == ExprKind::ALLOCATE || eKind == ExprKind::ALLOCATE_WITH_EXCEPTION) {
-        auto base = AllocateBase(&expr);
+    if (auto allocate = DynamicCast<const AllocateBase*>(&expr)) {
         // 2. generic type in Allocate must be reachable
-        if (!GenericTypeIsInContainer(*base.GetType(), reachableGenericTypes)) {
-            auto errMsg = "generic type " + base.GetType()->ToString() +
+        if (!GenericTypeIsInContainer(*allocate->GetType(), reachableGenericTypes)) {
+            auto errMsg = "generic type " + allocate->GetType()->ToString() +
                 " is unreachable, the type is allocated type in expression " + expr.ToString(0) + ".";
             ErrorInFunc(*expr.GetTopLevelFunc(), errMsg);
         }
-    } else if (Is<FuncCall>(expr) || Is<FuncCallWithException>(expr)) {
-        auto base = FuncCallBase(&expr);
+    } else if (auto funcCall = DynamicCast<const FuncCall*>(&expr)) {
         // 3. generic type in instantiated type args must be reachable
-        const auto& instantiatedTypeArgs = base.GetInstantiatedTypeArgs();
+        const auto& instantiatedTypeArgs = funcCall->GetInstantiatedTypeArgs();
         for (size_t i = 0; i < instantiatedTypeArgs.size(); ++i) {
             if (!GenericTypeIsInContainer(*instantiatedTypeArgs[i], reachableGenericTypes)) {
                 auto errMsg = "generic type " + instantiatedTypeArgs[i]->ToString() + "is unreachable, the type is " +
@@ -1591,7 +1586,7 @@ void CHIRChecker::CheckUnreachableGenericTypeInExpr(
             }
         }
         // 4. generic type in ThisType must be reachable
-        if (auto thisType = base.GetThisType()) {
+        if (auto thisType = funcCall->GetThisType()) {
             if (!GenericTypeIsInContainer(*thisType, reachableGenericTypes)) {
                 auto errMsg = "generic type " + thisType->ToString() +
                     " is unreachable, the type is ThisType in expression " + expr.ToString(0) + ".";
@@ -1612,24 +1607,12 @@ void CHIRChecker::CheckUnreachableGenericTypeInExpr(
                 " is unreachable, the type is instanceOf type in expression " + expr.ToString(0) + ".";
             ErrorInFunc(*expr.GetTopLevelFunc(), errMsg);
         }
-    } else if (eKind == ExprKind::RAW_ARRAY_ALLOCATE || eKind == ExprKind::RAW_ARRAY_ALLOCATE_WITH_EXCEPTION) {
-        auto base = RawArrayAllocateBase(&expr);
+    } else if (auto rawArrayAllocate = DynamicCast<const RawArrayAllocateBase*>(&expr)) {
         // 7. generic type in RawArrayAllocate must be reachable
-        if (!GenericTypeIsInContainer(*base.GetElementType(), reachableGenericTypes)) {
-            auto errMsg = "generic type " + base.GetElementType()->ToString() +
+        if (!GenericTypeIsInContainer(*rawArrayAllocate->GetElementType(), reachableGenericTypes)) {
+            auto errMsg = "generic type " + rawArrayAllocate->GetElementType()->ToString() +
                 " is unreachable, the type is element type in expression " + expr.ToString(0) + ".";
             ErrorInFunc(*expr.GetTopLevelFunc(), errMsg);
-        }
-    } else if (eKind == ExprKind::INTRINSIC || eKind == ExprKind::INTRINSIC_WITH_EXCEPTION) {
-        auto base = IntrinsicBase(&expr);
-        // 8. generic type in Intrinsic must be reachable
-        auto instantiatedTypeArgs = base.GetInstantiatedTypeArgs();
-        for (size_t i = 0; i < instantiatedTypeArgs.size(); ++i) {
-            if (!GenericTypeIsInContainer(*instantiatedTypeArgs[i], reachableGenericTypes)) {
-                auto errMsg = "generic type " + instantiatedTypeArgs[i]->ToString() + "is unreachable, the type is " +
-                    std::to_string(i) + "-th instantiated type args in expression " + expr.ToString(0) + ".";
-                ErrorInFunc(*expr.GetTopLevelFunc(), errMsg);
-            }
         }
     }
 }
@@ -1740,7 +1723,7 @@ void CHIRChecker::CheckBlock(const Block& block, const Function& topLevelFunc)
                 "the last expression in block " + block.GetIdentifier() + " is not terminator.");
         } else {
             // 7. check terminator's jump
-            CheckTerminatorJump(*StaticCast<Terminator*>(exprs.back()), topLevelFunc);
+            CheckTerminatorJump(*exprs.back(), topLevelFunc);
         }
     }
 
@@ -1753,7 +1736,7 @@ void CHIRChecker::CheckBlock(const Block& block, const Function& topLevelFunc)
     }
 }
 
-void CHIRChecker::CheckTerminatorJump(const Terminator& terminator, const Function& topLevelFunc)
+void CHIRChecker::CheckTerminatorJump(const Expression& terminator, const Function& topLevelFunc)
 {
     // 1. terminator can't jump to another block group
     auto curBlockGroup = terminator.GetParentBlock()->GetParentBlockGroup();
@@ -1818,25 +1801,40 @@ void CHIRChecker::CheckTerminator(const Expression& expr, const Function& topLev
             CheckBranch(StaticCast<const Branch&>(expr), topLevelFunc); }},
         {ExprKind::MULTIBRANCH, [this, &expr, &topLevelFunc]() {
             CheckMultiBranch(StaticCast<const MultiBranch&>(expr), topLevelFunc); }},
-        {ExprKind::APPLY_WITH_EXCEPTION, [this, &expr, &topLevelFunc]() {
-            CheckApplyWithException(StaticCast<const ApplyWithException&>(expr), topLevelFunc); }},
-        {ExprKind::INVOKE_WITH_EXCEPTION, [this, &expr, &topLevelFunc]() {
-            CheckInvokeWithException(StaticCast<const InvokeWithException&>(expr), topLevelFunc); }},
-        {ExprKind::INVOKESTATIC_WITH_EXCEPTION, [this, &expr, &topLevelFunc]() {
-            CheckInvokeStaticWithException(StaticCast<const InvokeStaticWithException&>(expr), topLevelFunc); }},
-        {ExprKind::INT_OP_WITH_EXCEPTION, [this, &expr, &topLevelFunc]() {
-            CheckIntOpWithException(StaticCast<const IntOpWithException&>(expr), topLevelFunc); }},
-        {ExprKind::SPAWN_WITH_EXCEPTION, [this, &expr, &topLevelFunc]() {
-            CheckSpawnWithException(StaticCast<const SpawnWithException&>(expr), topLevelFunc); }},
-        {ExprKind::TYPECAST_WITH_EXCEPTION, [this, &expr, &topLevelFunc]() {
-            CheckTypeCastWithException(StaticCast<const TypeCastWithException&>(expr), topLevelFunc); }},
-        {ExprKind::INTRINSIC_WITH_EXCEPTION, [this, &expr, &topLevelFunc]() {
-            CheckIntrinsicWithException(StaticCast<const IntrinsicWithException&>(expr), topLevelFunc); }},
-        {ExprKind::ALLOCATE_WITH_EXCEPTION, [this, &expr, &topLevelFunc]() {
-            CheckAllocateWithException(StaticCast<const AllocateWithException&>(expr), topLevelFunc); }},
-        {ExprKind::RAW_ARRAY_ALLOCATE_WITH_EXCEPTION, [this, &expr, &topLevelFunc]() {
-            CheckRawArrayAllocateWithException(
-                StaticCast<const RawArrayAllocateWithException&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_APPLY, [this, &expr, &topLevelFunc]() {
+            CheckTryApply(StaticCast<const TryApply&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_INVOKE, [this, &expr, &topLevelFunc]() {
+            CheckTryInvoke(StaticCast<const TryInvoke&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_INVOKESTATIC, [this, &expr, &topLevelFunc]() {
+            CheckTryInvokeStatic(StaticCast<const TryInvokeStatic&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_NEG, [this, &expr, &topLevelFunc]() {
+            CheckTryUnaryExpression(StaticCast<const TryUnaryExpression&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_ADD, [this, &expr, &topLevelFunc]() {
+            CheckTryBinaryExpression(StaticCast<const TryBinaryExpression&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_SUB, [this, &expr, &topLevelFunc]() {
+            CheckTryBinaryExpression(StaticCast<const TryBinaryExpression&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_MUL, [this, &expr, &topLevelFunc]() {
+            CheckTryBinaryExpression(StaticCast<const TryBinaryExpression&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_DIV, [this, &expr, &topLevelFunc]() {
+            CheckTryBinaryExpression(StaticCast<const TryBinaryExpression&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_MOD, [this, &expr, &topLevelFunc]() {
+            CheckTryBinaryExpression(StaticCast<const TryBinaryExpression&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_EXP, [this, &expr, &topLevelFunc]() {
+            CheckTryBinaryExpression(StaticCast<const TryBinaryExpression&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_LSHIFT, [this, &expr, &topLevelFunc]() {
+            CheckTryBinaryExpression(StaticCast<const TryBinaryExpression&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_RSHIFT, [this, &expr, &topLevelFunc]() {
+            CheckTryBinaryExpression(StaticCast<const TryBinaryExpression&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_SPAWN, [this, &expr, &topLevelFunc]() {
+            CheckTrySpawn(StaticCast<const TrySpawn&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_NUMERIC_CAST, [this, &expr, &topLevelFunc]() {
+            CheckTryNumericCast(StaticCast<const TryNumericCast&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_INTRINSIC, [this, &expr, &topLevelFunc]() {
+            CheckTryIntrinsic(StaticCast<const TryIntrinsic&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_ALLOCATE, [this, &expr, &topLevelFunc]() {
+            CheckTryAllocate(StaticCast<const TryAllocate&>(expr), topLevelFunc); }},
+        {ExprKind::TRY_RAW_ARRAY_ALLOCATE, [this, &expr, &topLevelFunc]() {
+            CheckTryRawArrayAllocate(StaticCast<const TryRawArrayAllocate&>(expr), topLevelFunc); }},
     };
     if (auto it = actionMap.find(expr.GetExprKind()); it != actionMap.end()) {
         it->second();
@@ -1887,11 +1885,11 @@ void CHIRChecker::CheckRaiseException(const RaiseException& expr, const Function
     }
     // 4. exception value's type must be equal or sub type of class Exception or class Error
     auto isEqualOrSubTypeOfClassInCore = [this](ClassType& type, const std::string& className) {
-        if (CheckCustomTypeDefIsExpected(*type.GetClassDef(), CORE_PACKAGE_NAME, className)) {
+        if (IsExpectedCustomType(type, CORE_PACKAGE_NAME, className)) {
             return true;
         }
         for (auto superType : type.GetSuperTypesRecusively(builder)) {
-            if (CheckCustomTypeDefIsExpected(*superType->GetClassDef(), CORE_PACKAGE_NAME, className)) {
+            if (IsExpectedCustomType(*superType, CORE_PACKAGE_NAME, className)) {
                 return true;
             }
         }
@@ -1900,11 +1898,11 @@ void CHIRChecker::CheckRaiseException(const RaiseException& expr, const Function
     auto isLegalExceptionValueType = [&isEqualOrSubTypeOfClassInCore](ClassType& type) {
         return isEqualOrSubTypeOfClassInCore(type, CLASS_EXCEPTION) ||
             isEqualOrSubTypeOfClassInCore(type, CLASS_ERROR) ||
-            CheckCustomTypeDefIsExpected(*type.GetClassDef(), CORE_PACKAGE_NAME, OBJECT_NAME) ||
+            IsExpectedCustomType(type, CORE_PACKAGE_NAME, OBJECT_NAME) ||
             // these three classes are from effect handler plan, we set white list temprorarily
-            CheckCustomTypeDefIsExpected(*type.GetClassDef(), EFFECT_PACKAGE_NAME, "ImmediateEarlyReturn") ||
-            CheckCustomTypeDefIsExpected(*type.GetClassDef(), EFFECT_PACKAGE_NAME, "ImmediateFrameErrorWrapper") ||
-            CheckCustomTypeDefIsExpected(*type.GetClassDef(), EFFECT_PACKAGE_NAME, "ImmediateFrameExceptionWrapper");
+            IsExpectedCustomType(type, EFFECT_PACKAGE_NAME, "ImmediateEarlyReturn") ||
+            IsExpectedCustomType(type, EFFECT_PACKAGE_NAME, "ImmediateFrameErrorWrapper") ||
+            IsExpectedCustomType(type, EFFECT_PACKAGE_NAME, "ImmediateFrameExceptionWrapper");
     };
     auto derefType = exceptionType->StripAllRefs();
     if (auto classType = DynamicCast<ClassType*>(derefType)) {
@@ -1988,7 +1986,7 @@ void CHIRChecker::CheckMultiBranch(const MultiBranch& expr, const Function& topL
     }
 }
 
-void CHIRChecker::CheckApplyWithException(const ApplyWithException& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckTryApply(const TryApply& expr, const Function& topLevelFunc)
 {
     // 1. have result
     if (!CheckHaveResult(expr, topLevelFunc)) {
@@ -2005,7 +2003,7 @@ void CHIRChecker::CheckApplyWithException(const ApplyWithException& expr, const 
         return;
     }
 
-    CheckApplyBase(ApplyBase(&expr), topLevelFunc);
+    CheckApplyBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckApplyBase(const ApplyBase& expr, const Function& topLevelFunc)
@@ -2016,7 +2014,7 @@ void CHIRChecker::CheckApplyBase(const ApplyBase& expr, const Function& topLevel
     }
 
     // 2. check callee
-    if (!CheckCallee(*expr.GetCallee(), *expr.GetRawExpr(), topLevelFunc)) {
+    if (!CheckCallee(*expr.GetCallee(), expr, topLevelFunc)) {
         return;
     }
 
@@ -2030,12 +2028,12 @@ void CHIRChecker::CheckApplyBase(const ApplyBase& expr, const Function& topLevel
         }
     }
     auto instTypeArgs = expr.GetInstantiatedTypeArgs();
-    if (!CheckInstantiatedTypeArgs(instTypeArgs, genericTypeParams, *expr.GetRawExpr(), topLevelFunc)) {
+    if (!CheckInstantiatedTypeArgs(instTypeArgs, genericTypeParams, expr, topLevelFunc)) {
         return;
     }
 
     // 4. check thisType
-    if (!CheckApplyThisType(*expr.GetCallee(), expr.GetThisType(), *expr.GetRawExpr(), topLevelFunc)) {
+    if (!CheckApplyThisType(*expr.GetCallee(), expr.GetThisType(), expr, topLevelFunc)) {
         return;
     }
 
@@ -2044,10 +2042,10 @@ void CHIRChecker::CheckApplyBase(const ApplyBase& expr, const Function& topLevel
     auto instFuncType = CalculateInstFuncType(
         *calleeType, instTypeArgs, genericTypeParams, expr.GetInstParentCustomTyOfCallee(builder));
     CheckApplyFuncArgs(
-        expr.GetArgs(), instFuncType->GetParamTypes(), calleeType->HasVarArg(), *expr.GetRawExpr(), topLevelFunc);
+        expr.GetArgs(), instFuncType->GetParamTypes(), calleeType->HasVarArg(), expr, topLevelFunc);
 
     // 6. check return value
-    CheckApplyFuncRetValue(*instFuncType->GetReturnType(), *expr.GetRawExpr(), topLevelFunc);
+    CheckApplyFuncRetValue(*instFuncType->GetReturnType(), expr, topLevelFunc);
 }
 
 bool CHIRChecker::CheckCallee(const Value& callee, const Expression& expr, const Function& topLevelFunc)
@@ -2232,7 +2230,7 @@ void CHIRChecker::CheckApplyFuncRetValue(const Type& instRetType, const Expressi
     }
 }
 
-void CHIRChecker::CheckInvokeWithException(const InvokeWithException& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckTryInvoke(const TryInvoke& expr, const Function& topLevelFunc)
 {
     // 1. have result
     if (!CheckHaveResult(expr, topLevelFunc)) {
@@ -2249,7 +2247,7 @@ void CHIRChecker::CheckInvokeWithException(const InvokeWithException& expr, cons
         return;
     }
 
-    CheckInvokeBase(InvokeBase(&expr), topLevelFunc);
+    CheckInvokeBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckInvokeBase(const InvokeBase& expr, const Function& topLevelFunc)
@@ -2257,12 +2255,12 @@ void CHIRChecker::CheckInvokeBase(const InvokeBase& expr, const Function& topLev
     // 1. check instantiated type args
     const auto& genericTypeParams = expr.GetGenericTypeParams();
     auto instTypeArgs = expr.GetInstantiatedTypeArgs();
-    if (!CheckInstantiatedTypeArgs(instTypeArgs, genericTypeParams, *expr.GetRawExpr(), topLevelFunc)) {
+    if (!CheckInstantiatedTypeArgs(instTypeArgs, genericTypeParams, expr, topLevelFunc)) {
         return;
     }
 
     // 2. check thisType
-    if (!CheckInvokeThisType(*expr.GetObject()->GetType(), expr.GetThisType(), *expr.GetRawExpr(), topLevelFunc)) {
+    if (!CheckInvokeThisType(*expr.GetObject()->GetType(), expr.GetThisType(), expr, topLevelFunc)) {
         return;
     }
 
@@ -2278,14 +2276,14 @@ void CHIRChecker::CheckInvokeBase(const InvokeBase& expr, const Function& topLev
             .thisType = thisType,
             .srcParentType = expr.GetInstSrcParentCustomTypeOfMethod(builder)
         };
-        if (!CheckVirtualMethod(virMethodCtx, *expr.GetRawExpr(), topLevelFunc)) {
+        if (!CheckVirtualMethod(virMethodCtx, expr, topLevelFunc)) {
             return;
         }
     }
 
     // 4. check func args
     auto paramTypes = expr.GetMethodType()->GetParamTypes();
-    CheckInvokeFuncArgs(expr.GetArgs(), paramTypes, *expr.GetRawExpr(), topLevelFunc);
+    CheckInvokeFuncArgs(expr.GetArgs(), paramTypes, expr, topLevelFunc);
 }
 
 bool CHIRChecker::CheckInvokeThisType(
@@ -2415,11 +2413,11 @@ bool CHIRChecker::CheckVirtualMethod(
         std::to_string(methodCtx.offset) + "-th ";
     // 3. `InvokeStatic` must call a static member method
     // 4. `Invoke` must call a non-static member method
-    if (expr.IsInvokeStaticBase() && !funcInfo.TestAttr(Attribute::STATIC)) {
+    if (Is<InvokeStaticBase>(expr) && !funcInfo.TestAttr(Attribute::STATIC)) {
         auto errMsg = errMsgBase + "virtual method is not static, `InvokeStatic` should call a static method.";
         ErrorInFunc(topLevelFunc, errMsg);
         return false;
-    } else if (!expr.IsInvokeStaticBase() && funcInfo.TestAttr(Attribute::STATIC)) {
+    } else if (!Is<InvokeStaticBase>(expr) && funcInfo.TestAttr(Attribute::STATIC)) {
         auto errMsg = errMsgBase + "virtual method is static, `Invoke` shouldn't call a static method.";
         ErrorInFunc(topLevelFunc, errMsg);
         return false;
@@ -2671,7 +2669,7 @@ const std::vector<VirtualMethodInfo>* CHIRChecker::CheckVTableExist(
     return res;
 }
 
-void CHIRChecker::CheckInvokeStaticWithException(const InvokeStaticWithException& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckTryInvokeStatic(const TryInvokeStatic& expr, const Function& topLevelFunc)
 {
     // 1. have result
     if (!CheckHaveResult(expr, topLevelFunc)) {
@@ -2688,7 +2686,7 @@ void CHIRChecker::CheckInvokeStaticWithException(const InvokeStaticWithException
         return;
     }
 
-    CheckInvokeStaticBase(InvokeStaticBase(&expr), topLevelFunc);
+    CheckInvokeStaticBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckInvokeStaticBase(const InvokeStaticBase& expr, const Function& topLevelFunc)
@@ -2696,7 +2694,7 @@ void CHIRChecker::CheckInvokeStaticBase(const InvokeStaticBase& expr, const Func
     // 1. check instantiated type args
     const auto& genericTypeParams = expr.GetGenericTypeParams();
     auto instTypeArgs = expr.GetInstantiatedTypeArgs();
-    if (!CheckInstantiatedTypeArgs(instTypeArgs, genericTypeParams, *expr.GetRawExpr(), topLevelFunc)) {
+    if (!CheckInstantiatedTypeArgs(instTypeArgs, genericTypeParams, expr, topLevelFunc)) {
         return;
     }
 
@@ -2704,7 +2702,7 @@ void CHIRChecker::CheckInvokeStaticBase(const InvokeStaticBase& expr, const Func
     auto rtti = DynamicCast<LocalVar*>(expr.GetRTTIValue());
     if (rtti == nullptr) {
         auto errMsg = "its first operand must be from `GetRTTI` or `GetRTTIStatic`.";
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), errMsg);
+        ErrorInExpr(topLevelFunc, expr, errMsg);
         return;
     }
     Type* objectType = nullptr;
@@ -2714,12 +2712,12 @@ void CHIRChecker::CheckInvokeStaticBase(const InvokeStaticBase& expr, const Func
         objectType = getRttiStatic->GetRTTIType();
     } else {
         auto errMsg = "its first operand must be from `GetRTTI` or `GetRTTIStatic`.";
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), errMsg);
+        ErrorInExpr(topLevelFunc, expr, errMsg);
         return;
     }
 
     // 3. check thisType
-    if (!CheckInvokeThisType(*objectType, expr.GetThisType(), *expr.GetRawExpr(), topLevelFunc)) {
+    if (!CheckInvokeThisType(*objectType, expr.GetThisType(), expr, topLevelFunc)) {
         return;
     }
 
@@ -2732,24 +2730,24 @@ void CHIRChecker::CheckInvokeStaticBase(const InvokeStaticBase& expr, const Func
         .thisType = expr.GetThisType()->StripAllRefs(),
         .srcParentType = expr.GetInstSrcParentCustomTypeOfMethod(builder)
     };
-    if (!CheckVirtualMethod(virMethodCtx, *expr.GetRawExpr(), topLevelFunc)) {
+    if (!CheckVirtualMethod(virMethodCtx, expr, topLevelFunc)) {
         return;
     }
 
     // 5. check func args
     auto paramTypes = expr.GetMethodType()->GetParamTypes();
-    CheckInvokeFuncArgs(expr.GetArgs(), paramTypes, *expr.GetRawExpr(), topLevelFunc);
+    CheckInvokeFuncArgs(expr.GetArgs(), paramTypes, expr, topLevelFunc);
 }
 
-void CHIRChecker::CheckIntOpWithException(const IntOpWithException& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckTryUnaryExpression(const TryUnaryExpression& expr, const Function& topLevelFunc)
 {
     // 1. must have result
     if (!CheckHaveResult(expr, topLevelFunc)) {
         return;
     }
 
-    // 2. only have 1 or 2 operands
-    if (!OperandNumIsEqual({1, 2}, expr, topLevelFunc)) {
+    // 2. only have 1 operand
+    if (!OperandNumIsEqual(1, expr, topLevelFunc)) {
         return;
     }
 
@@ -2758,18 +2756,32 @@ void CHIRChecker::CheckIntOpWithException(const IntOpWithException& expr, const 
         return;
     }
 
-    // 4. check all kinds of expressions
-    auto exprKind = expr.GetOpKind();
-    if (exprKind >= ExprKind::NEG && exprKind <= ExprKind::BITNOT) {
-        CheckUnaryExprBase(UnaryExprBase(&expr), topLevelFunc);
-    } else if (exprKind >= ExprKind::ADD && exprKind <= ExprKind::OR) {
-        CheckBinaryExprBase(BinaryExprBase(&expr), topLevelFunc);
-    } else {
-        WarningInExpr(topLevelFunc, expr, "find unrecongnized ExprKind " + expr.GetOpKindName() + ".");
-    }
+    // 4. check unary expression
+    CheckUnaryExprBase(expr, topLevelFunc);
 }
 
-void CHIRChecker::CheckUnaryExprBase(const UnaryExprBase& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckTryBinaryExpression(const TryBinaryExpression& expr, const Function& topLevelFunc)
+{
+    // 1. must have result
+    if (!CheckHaveResult(expr, topLevelFunc)) {
+        return;
+    }
+
+    // 2. only have 2 operands
+    if (!OperandNumIsEqual(2, expr, topLevelFunc)) {
+        return;
+    }
+
+    // 3. have 2 successors
+    if (!SuccessorNumIsEqual(2, expr, topLevelFunc)) {
+        return;
+    }
+
+    // 4. check binary expression
+    CheckBinaryExprBase(expr, topLevelFunc);
+}
+
+void CHIRChecker::CheckUnaryExprBase(const UnaryExpressionBase& expr, const Function& topLevelFunc)
 {
     // 1. skip checking if operand type is Nothing
     auto operand = expr.GetOperand();
@@ -2779,31 +2791,31 @@ void CHIRChecker::CheckUnaryExprBase(const UnaryExprBase& expr, const Function& 
     }
 
     // 2. check operand type
-    if (expr.GetOpKind() == ExprKind::NOT && !operandType->IsBoolean()) {
+    if (expr.GetOpKind() == UnaryExprKind::NOT && !operandType->IsBoolean()) {
         // 2.1 must be Bool when it's NOT (!a)
-        TypeCheckError(*expr.GetRawExpr(), *operand, "Bool", topLevelFunc);
-    } else if (expr.GetOpKind() == ExprKind::BITNOT && !operandType->IsInteger()) {
+        TypeCheckError(expr, *operand, "Bool", topLevelFunc);
+    } else if (expr.GetOpKind() == UnaryExprKind::BITNOT && !operandType->IsInteger()) {
         // 2.2 must be Int when it's BITNOT (!a)
-        TypeCheckError(*expr.GetRawExpr(), *operand, "Int", topLevelFunc);
-    } else if (expr.GetOpKind() == ExprKind::NEG && !operandType->IsInteger() && !operandType->IsFloat()) {
+        TypeCheckError(expr, *operand, "Int", topLevelFunc);
+    } else if (expr.GetOpKind() == UnaryExprKind::NEG && !operandType->IsInteger() && !operandType->IsFloat()) {
         // 2.3 must be Int or Float when it's NEG (-a)
-        TypeCheckError(*expr.GetRawExpr(), *operand, "Int or Float", topLevelFunc);
+        TypeCheckError(expr, *operand, "Int or Float", topLevelFunc);
     }
 
     // 3. result type must equal to operand type
     auto result = expr.GetResult();
     auto resultType = result->GetType();
     if (operandType != resultType) {
-        TypeCheckError(*expr.GetRawExpr(), *result, operandType->ToString(), topLevelFunc);
+        TypeCheckError(expr, *result, operandType->ToString(), topLevelFunc);
     }
 
     // 4. check overflow strategy
-    if (expr.GetOpKind() == ExprKind::NEG) {
-        OverflowStrategyMustBeValid(expr.GetOverflowStrategy(), *expr.GetRawExpr(), topLevelFunc);
+    if (expr.GetOpKind() == UnaryExprKind::NEG) {
+        OverflowStrategyMustBeValid(expr.GetOverflowStrategy(), expr, topLevelFunc);
     }
 }
 
-void CHIRChecker::CheckBinaryExprBase(const BinaryExprBase& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckBinaryExprBase(const BinaryExpressionBase& expr, const Function& topLevelFunc)
 {
     // 1. skip checking if operand type is Nothing
     if (expr.GetLHSOperand()->GetType()->IsNothing() || expr.GetRHSOperand()->GetType()->IsNothing()) {
@@ -2811,19 +2823,20 @@ void CHIRChecker::CheckBinaryExprBase(const BinaryExprBase& expr, const Function
     }
 
     // 2. check all kinds of binary expressions
-    auto exprKind = expr.GetOpKind();
-    if (exprKind >= ExprKind::ADD && exprKind <= ExprKind::MOD) {
-        CheckCalculExpression(expr, topLevelFunc);
-    } else if (exprKind == ExprKind::EXP) {
-        CheckExponentiationExpression(expr, topLevelFunc);
-    } else if (exprKind >= ExprKind::LSHIFT && exprKind <= ExprKind::BITXOR) {
+    if (expr.IsMathematicalOperator()) {
+        if (expr.GetOpKind() == BinaryExprKind::EXP) {
+            CheckExponentiationExpression(expr, topLevelFunc);
+        } else {
+            CheckCalculExpression(expr, topLevelFunc);
+        }
+    } else if (expr.IsBitwiseOperator()) {
         CheckBitExpression(expr, topLevelFunc);
-    } else if (exprKind >= ExprKind::LT && exprKind <= ExprKind::NOTEQUAL) {
+    } else if (expr.IsComparisonOperator()) {
         CheckCompareExpression(expr, topLevelFunc);
-    } else if (exprKind >= ExprKind::AND && exprKind <= ExprKind::OR) {
+    } else if (expr.IsLogicalOperator()) {
         CheckLogicExpression(expr, topLevelFunc);
     } else {
-        WarningInExpr(topLevelFunc, *expr.GetRawExpr(), "find unrecongnized ExprKind " + expr.GetExprKindName() + ".");
+        WarningInExpr(topLevelFunc, expr, "find unrecongnized ExprKind " + expr.GetExprKindName() + ".");
     }
 }
 
@@ -2831,12 +2844,12 @@ void CHIRChecker::OverflowStrategyMustBeValid(
     const OverflowStrategy& ofs, const Expression& expr, const Function& topLevelFunc)
 {
     // we will add `NA` later
-    if (ofs == OverflowStrategy::OVERFLOW_STRATEGY_END) {
+    if (ofs == OverflowStrategy::OVERFLOW_STRATEGY_END || ofs == OverflowStrategy::CHECKED) {
         ErrorInExpr(topLevelFunc, expr, "overflow strategy is invalid.");
     }
 }
 
-void CHIRChecker::CheckCalculExpression(const BinaryExprBase& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckCalculExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc)
 {
     auto leftOperand = expr.GetLHSOperand();
     auto rightOperand = expr.GetRHSOperand();
@@ -2844,21 +2857,21 @@ void CHIRChecker::CheckCalculExpression(const BinaryExprBase& expr, const Functi
     auto rightOpType = rightOperand->GetType();
     auto result = expr.GetResult();
     // 1. check operand type
-    if (expr.GetOpKind() == ExprKind::MOD) {
+    if (expr.GetOpKind() == BinaryExprKind::MOD) {
         // 1.1 mod's operands' type must be Int or UInt, can't be Bool or Float
         if (!leftOpType->IsInteger()) {
-            TypeCheckError(*expr.GetRawExpr(), *leftOperand, "Int or UInt", topLevelFunc);
+            TypeCheckError(expr, *leftOperand, "Int or UInt", topLevelFunc);
         }
         if (!rightOpType->IsInteger()) {
-            TypeCheckError(*expr.GetRawExpr(), *rightOperand, "Int or UInt", topLevelFunc);
+            TypeCheckError(expr, *rightOperand, "Int or UInt", topLevelFunc);
         }
     } else {
         // 1.2 other operands' type must be numeric type
         if (!leftOpType->IsNumeric()) {
-            TypeCheckError(*expr.GetRawExpr(), *leftOperand, "numeric", topLevelFunc);
+            TypeCheckError(expr, *leftOperand, "numeric", topLevelFunc);
         }
         if (!rightOpType->IsNumeric()) {
-            TypeCheckError(*expr.GetRawExpr(), *rightOperand, "numeric", topLevelFunc);
+            TypeCheckError(expr, *rightOperand, "numeric", topLevelFunc);
         }
     }
 
@@ -2872,10 +2885,10 @@ void CHIRChecker::CheckCalculExpression(const BinaryExprBase& expr, const Functi
     }
 
     // 3. check overflow strategy
-    OverflowStrategyMustBeValid(expr.GetOverflowStrategy(), *expr.GetRawExpr(), topLevelFunc);
+    OverflowStrategyMustBeValid(expr.GetOverflowStrategy(), expr, topLevelFunc);
 }
 
-void CHIRChecker::CheckExponentiationExpression(const BinaryExprBase& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckExponentiationExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc)
 {
     auto leftOperand = expr.GetLHSOperand();
     auto rightOperand = expr.GetRHSOperand();
@@ -2884,35 +2897,35 @@ void CHIRChecker::CheckExponentiationExpression(const BinaryExprBase& expr, cons
     // 1. left operand's type must be Int64 or Float64
     if (leftOpType->GetTypeKind() != Type::TypeKind::TYPE_INT64 &&
         leftOpType->GetTypeKind() != Type::TypeKind::TYPE_FLOAT64) {
-        TypeCheckError(*expr.GetRawExpr(), *leftOperand, "Int64 or Float64", topLevelFunc);
+        TypeCheckError(expr, *leftOperand, "Int64 or Float64", topLevelFunc);
     }
     auto result = expr.GetResult();
     auto resultType = result->GetType();
     if (leftOpType->GetTypeKind() == Type::TypeKind::TYPE_INT64) {
         // 2. if left operand's type is Int64, right operand's type must be UInt64, and result type must be Int64
         if (rightOpType->GetTypeKind() != Type::TypeKind::TYPE_UINT64) {
-            TypeCheckError(*expr.GetRawExpr(), *rightOperand, "UInt64", topLevelFunc);
+            TypeCheckError(expr, *rightOperand, "UInt64", topLevelFunc);
         }
         if (resultType->GetTypeKind() != Type::TypeKind::TYPE_INT64) {
-            TypeCheckError(*expr.GetRawExpr(), *result, "Int64", topLevelFunc);
+            TypeCheckError(expr, *result, "Int64", topLevelFunc);
         }
     } else if (leftOpType->GetTypeKind() == Type::TypeKind::TYPE_FLOAT64) {
         // 3. if left operand's type is Float64, right operand's type must be Int64 or Float64,
         // and result type must be Float64
         if (rightOpType->GetTypeKind() != Type::TypeKind::TYPE_INT64 &&
             rightOpType->GetTypeKind() != Type::TypeKind::TYPE_FLOAT64) {
-            TypeCheckError(*expr.GetRawExpr(), *rightOperand, "Int64 or Float64", topLevelFunc);
+            TypeCheckError(expr, *rightOperand, "Int64 or Float64", topLevelFunc);
         }
         if (resultType->GetTypeKind() != Type::TypeKind::TYPE_FLOAT64) {
-            TypeCheckError(*expr.GetRawExpr(), *result, "Float64", topLevelFunc);
+            TypeCheckError(expr, *result, "Float64", topLevelFunc);
         }
     }
 
     // 4. check overflow strategy
-    OverflowStrategyMustBeValid(expr.GetOverflowStrategy(), *expr.GetRawExpr(), topLevelFunc);
+    OverflowStrategyMustBeValid(expr.GetOverflowStrategy(), expr, topLevelFunc);
 }
 
-void CHIRChecker::CheckBitExpression(const BinaryExprBase& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckBitExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc)
 {
     auto leftOperand = expr.GetLHSOperand();
     auto rightOperand = expr.GetRHSOperand();
@@ -2920,19 +2933,19 @@ void CHIRChecker::CheckBitExpression(const BinaryExprBase& expr, const Function&
     auto rightOpType = rightOperand->GetType();
     // 1. operands' type must be Int
     if (!leftOpType->IsInteger()) {
-        TypeCheckError(*expr.GetRawExpr(), *leftOperand, "Int", topLevelFunc);
+        TypeCheckError(expr, *leftOperand, "Int", topLevelFunc);
     }
     if (!rightOpType->IsInteger()) {
-        TypeCheckError(*expr.GetRawExpr(), *rightOperand, "Int", topLevelFunc);
+        TypeCheckError(expr, *rightOperand, "Int", topLevelFunc);
     }
 
     // 2. check overflow strategy
-    if (expr.GetOpKind() == ExprKind::LSHIFT || expr.GetOpKind() == ExprKind::RSHIFT) {
-        OverflowStrategyMustBeValid(expr.GetOverflowStrategy(), *expr.GetRawExpr(), topLevelFunc);
+    if (expr.GetOpKind() == BinaryExprKind::LSHIFT || expr.GetOpKind() == BinaryExprKind::RSHIFT) {
+        OverflowStrategyMustBeValid(expr.GetOverflowStrategy(), expr, topLevelFunc);
     }
 }
 
-void CHIRChecker::CheckCompareExpression(const BinaryExprBase& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckCompareExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc)
 {
     auto leftOperand = expr.GetLHSOperand();
     auto rightOperand = expr.GetRHSOperand();
@@ -2947,11 +2960,11 @@ void CHIRChecker::CheckCompareExpression(const BinaryExprBase& expr, const Funct
 
     // 2. result type must be Bool
     if (!result->GetType()->IsBoolean()) {
-        TypeCheckError(*expr.GetRawExpr(), *result, "Bool", topLevelFunc);
+        TypeCheckError(expr, *result, "Bool", topLevelFunc);
     }
 }
 
-void CHIRChecker::CheckLogicExpression(const BinaryExprBase& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckLogicExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc)
 {
     auto leftOperand = expr.GetLHSOperand();
     auto rightOperand = expr.GetRHSOperand();
@@ -2959,19 +2972,19 @@ void CHIRChecker::CheckLogicExpression(const BinaryExprBase& expr, const Functio
     auto rightOpType = rightOperand->GetType();
     // 1. operands' type must be Bool
     if (!leftOpType->IsBoolean()) {
-        TypeCheckError(*expr.GetRawExpr(), *leftOperand, "Bool", topLevelFunc);
+        TypeCheckError(expr, *leftOperand, "Bool", topLevelFunc);
     }
     if (!rightOpType->IsBoolean()) {
-        TypeCheckError(*expr.GetRawExpr(), *rightOperand, "Bool", topLevelFunc);
+        TypeCheckError(expr, *rightOperand, "Bool", topLevelFunc);
     }
     // 2. result type must be Bool
     auto result = expr.GetResult();
     if (!result->GetType()->IsBoolean()) {
-        TypeCheckError(*expr.GetRawExpr(), *result, "Bool", topLevelFunc);
+        TypeCheckError(expr, *result, "Bool", topLevelFunc);
     }
 }
 
-void CHIRChecker::CheckSpawnWithException(const SpawnWithException& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckTrySpawn(const TrySpawn& expr, const Function& topLevelFunc)
 {
     // 1. must have result
     if (!CheckHaveResult(expr, topLevelFunc)) {
@@ -2988,7 +3001,7 @@ void CHIRChecker::CheckSpawnWithException(const SpawnWithException& expr, const 
         return;
     }
 
-    CheckSpawnBase(SpawnBase(&expr), topLevelFunc);
+    CheckSpawnBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckSpawnBase(const SpawnBase& expr, const Function& topLevelFunc)
@@ -2997,7 +3010,7 @@ void CHIRChecker::CheckSpawnBase(const SpawnBase& expr, const Function& topLevel
     auto obj = expr.GetObject();
     auto objType = obj->GetType();
     if (!objType->IsRef() || !StaticCast<RefType>(objType)->GetBaseType()->IsClass()) {
-        TypeCheckError(*expr.GetRawExpr(), *obj, "Class&", topLevelFunc);
+        TypeCheckError(expr, *obj, "Class&", topLevelFunc);
         return;
     }
 
@@ -3006,22 +3019,22 @@ void CHIRChecker::CheckSpawnBase(const SpawnBase& expr, const Function& topLevel
     if (!IsCoreFuture(*def) && !IsFuncTypeOrClosureBaseRefType(*objType)) {
         auto errMsg = "the first operand's type is `" + objType->ToString() +
             "`, but Class-Future& type or closure type are expected.";
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), errMsg);
+        ErrorInExpr(topLevelFunc, expr, errMsg);
     }
 
     // 3. if the first operand's type is closure type, `spawn` must set function `executeClosure`
     if (IsFuncTypeOrClosureBaseRefType(*objType) && !expr.IsExecuteClosure()) {
         auto errMsg = "the first operand's type is closure type but you don't set `executeClosure` function";
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), errMsg);
+        ErrorInExpr(topLevelFunc, expr, errMsg);
     }
 }
 
-void CHIRChecker::CheckTypeCastWithException(
-    [[maybe_unused]] const TypeCastWithException& expr, [[maybe_unused]] const Function& topLevelFunc)
+void CHIRChecker::CheckTryNumericCast(
+    [[maybe_unused]] const TryNumericCast& expr, [[maybe_unused]] const Function& topLevelFunc)
 {
 }
 
-void CHIRChecker::CheckIntrinsicWithException(const IntrinsicWithException& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckTryIntrinsic(const TryIntrinsic& expr, const Function& topLevelFunc)
 {
     // 1. must have result
     if (!CheckHaveResult(expr, topLevelFunc)) {
@@ -3033,7 +3046,7 @@ void CHIRChecker::CheckIntrinsicWithException(const IntrinsicWithException& expr
         return;
     }
 
-    CheckIntrinsicBase(IntrinsicBase(&expr), topLevelFunc);
+    CheckIntrinsicBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckInoutOpSrc(const Value& op, const IntrinsicBase& expr, const Function& topLevelFunc)
@@ -3041,12 +3054,11 @@ void CHIRChecker::CheckInoutOpSrc(const Value& op, const IntrinsicBase& expr, co
     auto type = op.GetType()->StripAllRefs();
     if (!IsCTypeInInout(*type)) {
         auto errMsg = "`inout` operand's type is `" + type->ToString() + "`, but C-type (exclude CString) is expected.";
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), errMsg);
+        ErrorInExpr(topLevelFunc, expr, errMsg);
         return;
     }
     if (op.IsBlock() || op.IsBlockGroup() || op.IsFunc() || op.IsLiteral()) {
-        ErrorInExpr(
-            topLevelFunc, *expr.GetRawExpr(), "`inout` operand can't be Block, BlockGroup, Literal or Function.");
+        ErrorInExpr(topLevelFunc, expr, "`inout` operand can't be Block, BlockGroup, Literal or Function.");
         return;
     }
     if (auto localVar = DynamicCast<const LocalVar*>(&op)) {
@@ -3054,7 +3066,7 @@ void CHIRChecker::CheckInoutOpSrc(const Value& op, const IntrinsicBase& expr, co
         if (auto load = DynamicCast<const Load*>(localExpr)) {
             CheckInoutOpSrc(*load->GetLocation(), expr, topLevelFunc);
         } else if (auto ger = DynamicCast<const GetElementRef*>(localExpr)) {
-            auto locationType = ger->GetLocation()->GetType()->StripAllRefs();
+            auto locationType = ger->GetBase()->GetType()->StripAllRefs();
             for (auto p : ger->GetPath()) {
                 locationType = GetFieldOfType(*locationType, p, builder);
                 if (locationType == nullptr) {
@@ -3063,11 +3075,11 @@ void CHIRChecker::CheckInoutOpSrc(const Value& op, const IntrinsicBase& expr, co
                 if (!IsCTypeInInout(*locationType)) {
                     auto errMsg = "there is " + locationType->ToString() + " type that is calculated by path in " +
                         op.ToString(0) + ", but C-type (exclude CString) is expected in `inout` operand chain.";
-                    ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), errMsg);
+                    ErrorInExpr(topLevelFunc, expr, errMsg);
                     return;
                 }
             }
-            CheckInoutOpSrc(*ger->GetLocation(), expr, topLevelFunc);
+            CheckInoutOpSrc(*ger->GetBase(), expr, topLevelFunc);
         } else if (auto field = DynamicCast<const Field*>(localExpr)) {
             auto locationType = field->GetBase()->GetType()->StripAllRefs();
             for (auto p : field->GetPath()) {
@@ -3078,17 +3090,15 @@ void CHIRChecker::CheckInoutOpSrc(const Value& op, const IntrinsicBase& expr, co
                 if (!IsCTypeInInout(*locationType)) {
                     auto errMsg = "there is " + locationType->ToString() + " type that is calculated by path in " +
                         op.ToString(0) + ", but C-type (exclude CString) is expected in `inout` operand chain.";
-                    ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), errMsg);
+                    ErrorInExpr(topLevelFunc, expr, errMsg);
                     return;
                 }
             }
             CheckInoutOpSrc(*field->GetBase(), expr, topLevelFunc);
-        } else if (Is<TypeCastWithException>(localExpr) || Is<TypeCast>(localExpr)) {
+        } else if (Is<NumericCastBase>(localExpr)) {
             CheckInoutOpSrc(*localExpr->GetOperand(0), expr, topLevelFunc);
-        } else if (!Is<FuncCallWithException>(localExpr) && !Is<FuncCall>(localExpr) &&
-                   !Is<AllocateWithException>(localExpr) && !Is<Allocate>(localExpr)) {
-            ErrorInExpr(topLevelFunc, *expr.GetRawExpr(),
-                "a wrong expression `" + op.ToString(0) + "` in `inout` operand chain.");
+        } else if (!Is<FuncCall>(localExpr) && !Is<AllocateBase>(localExpr)) {
+            ErrorInExpr(topLevelFunc, expr, "a wrong expression `" + op.ToString(0) + "` in `inout` operand chain.");
             return;
         }
     }
@@ -3103,25 +3113,25 @@ void CHIRChecker::CheckInout(const IntrinsicBase& expr, const Function& topLevel
 
     // 1. can't have type args
     if (!expr.GetInstantiatedTypeArgs().empty()) {
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), "`inout` intrinsic can't have type args.");
+        ErrorInExpr(topLevelFunc, expr, "`inout` intrinsic can't have type args.");
     }
 
     // 2. only have 1 operand
-    if (!OperandNumIsEqual(1, *expr.GetRawExpr(), topLevelFunc)) {
+    if (!OperandNumIsEqual(1, expr, topLevelFunc)) {
         return;
     }
 
     // 3. operand type must be ref, but can't be type&&
-    auto operands = expr.GetOperands();
+    auto operands = expr.GetArgs();
     auto opType = operands[0]->GetType();
     if (!opType->IsRef()) {
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(),
+        ErrorInExpr(topLevelFunc, expr,
             "`inout` operand's type is `" + opType->ToString() + "`, but ref type is expected.");
         return;
     }
     auto baseType = StaticCast<RefType*>(opType)->GetBaseType();
     if (baseType->IsRef()) {
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(),
+        ErrorInExpr(topLevelFunc, expr,
             "`inout` operand's type is `" + opType->ToString() + "`, but type&& is NOT allowed.");
         return;
     }
@@ -3132,7 +3142,7 @@ void CHIRChecker::CheckInout(const IntrinsicBase& expr, const Function& topLevel
     // 5. result type must be CPointer
     auto resultType = expr.GetResult()->GetType();
     if (!resultType->IsCPointer()) {
-        TypeCheckError(*expr.GetRawExpr(), *expr.GetResult(), "CPointer", topLevelFunc);
+        TypeCheckError(expr, *expr.GetResult(), "CPointer", topLevelFunc);
         return;
     }
 
@@ -3141,38 +3151,38 @@ void CHIRChecker::CheckInout(const IntrinsicBase& expr, const Function& topLevel
         auto errMsg = "the pointed type of result CPointer is `" +
             StaticCast<CPointerType*>(resultType)->GetElementType()->ToString() +
             "`, but CType (exclude CString) is expected.";
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), errMsg);
+        ErrorInExpr(topLevelFunc, expr, errMsg);
         return;
     }
 
     // 7. result must be Function's or Intrinsic/pointerInit1's arg
-    std::function<void(const LocalVar&)> checkUsers = [this, &checkUsers, &expr, &topLevelFunc](const LocalVar& localVar) {
-        for (auto user : localVar.GetUsers()) {
-            auto errMsgBase = "the result is used in a wrong expression `" + user->ToString(0) + "`, ";
-            if (Is<ApplyWithException>(user) || Is<Apply>(user)) {
-                continue;
-            } else if (Is<InvokeWithException>(user) || Is<Invoke>(user)) {
-                auto funcName = InvokeBase(user).GetMethodName();
-                if (funcName != INST_VIRTUAL_FUNC && funcName != GENERIC_VIRTUAL_FUNC) {
-                    ErrorInExpr(topLevelFunc, *expr.GetRawExpr(),
-                        errMsgBase + "the result can't be used as virtual method's argument.");
+    std::function<void(const LocalVar&)> checkUsers =
+        [this, &checkUsers, &expr, &topLevelFunc](const LocalVar& localVar) {
+            for (auto user : localVar.GetUsers()) {
+                auto errMsgBase = "the result is used in a wrong expression `" + user->ToString(0) + "`, ";
+                if (Is<ApplyBase>(user)) {
+                    continue;
+                } else if (auto invoke = DynamicCast<InvokeBase*>(user)) {
+                    auto funcName = invoke->GetMethodName();
+                    if (funcName != INST_VIRTUAL_FUNC && funcName != GENERIC_VIRTUAL_FUNC) {
+                        ErrorInExpr(topLevelFunc, expr,
+                            errMsgBase + "the result can't be used as virtual method's argument.");
+                    }
+                    continue;
+                } else if (auto userBase = DynamicCast<IntrinsicBase*>(user)) {
+                    if (userBase->GetIntrinsicKind() != IntrinsicKind::CPOINTER_INIT1) {
+                        ErrorInExpr(topLevelFunc, expr,
+                            errMsgBase + "the result must be used as pointerInit1's argument.");
+                    }
+                    continue;
+                } else if (Is<ClassStaticCast>(user)) {
+                    checkUsers(*user->GetResult());
+                    continue;
                 }
-                continue;
-            } else if (Is<IntrinsicWithException>(user) || Is<Intrinsic>(user)) {
-                auto userBase = IntrinsicBase(user);
-                if (userBase.GetIntrinsicKind() != IntrinsicKind::CPOINTER_INIT1) {
-                    ErrorInExpr(topLevelFunc, *expr.GetRawExpr(),
-                        errMsgBase + "the result must be used as pointerInit1's argument.");
-                }
-                continue;
-            } else if (Is<TypeCast>(user)) {
-                checkUsers(*user->GetResult());
-                continue;
+                ErrorInExpr(topLevelFunc, expr,
+                    errMsgBase + "the result must be used as Function's or Intrinsic/pointerInit1's argument.");
             }
-            ErrorInExpr(topLevelFunc, *expr.GetRawExpr(),
-                errMsgBase + "the result must be used as Function's or Intrinsic/pointerInit1's argument.");
-        }
-    };
+        };
     checkUsers(*expr.GetResult());
 }
 void CHIRChecker::CheckIntrinsicBase(const IntrinsicBase& expr, const Function& topLevelFunc)
@@ -3185,14 +3195,14 @@ void CHIRChecker::CheckIntrinsicBase(const IntrinsicBase& expr, const Function& 
     // 1. must have valid intrinsic kind
     if (expr.GetIntrinsicKind() == IntrinsicKind::NOT_INTRINSIC ||
         expr.GetIntrinsicKind() == IntrinsicKind::NOT_IMPLEMENTED) {
-        ErrorInExpr(topLevelFunc, *expr.GetRawExpr(), "intrinsic kind must be valid.");
+        ErrorInExpr(topLevelFunc, expr, "intrinsic kind must be valid.");
     }
 
     // 2. check inout
     CheckInout(expr, topLevelFunc);
 }
 
-void CHIRChecker::CheckAllocateWithException(const AllocateWithException& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckTryAllocate(const TryAllocate& expr, const Function& topLevelFunc)
 {
     // 1. must have result
     if (!CheckHaveResult(expr, topLevelFunc)) {
@@ -3209,7 +3219,7 @@ void CHIRChecker::CheckAllocateWithException(const AllocateWithException& expr, 
         return;
     }
 
-    CheckAllocateBase(AllocateBase(&expr), topLevelFunc);
+    CheckAllocateBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckAllocateBase(const AllocateBase& expr, const Function& topLevelFunc)
@@ -3219,7 +3229,7 @@ void CHIRChecker::CheckAllocateBase(const AllocateBase& expr, const Function& to
     auto allocatedType = expr.GetType();
     // 1. result type must be ref of allocated type
     if (!resultTy->IsRef() || StaticCast<RefType*>(resultTy)->GetBaseType() != allocatedType) {
-        TypeCheckError(*expr.GetRawExpr(), *result, allocatedType->ToString() + "&", topLevelFunc);
+        TypeCheckError(expr, *result, allocatedType->ToString() + "&", topLevelFunc);
     }
 
     // 2. can't allocate `Void` type
@@ -3228,7 +3238,7 @@ void CHIRChecker::CheckAllocateBase(const AllocateBase& expr, const Function& to
     }
 
     // 3. if allocated type is CustomType, then must be a valid type
-    CheckTypeIsValid(*allocatedType, "allocated", *expr.GetRawExpr(), topLevelFunc);
+    CheckTypeIsValid(*allocatedType, "allocated", expr, topLevelFunc);
 }
 
 bool CHIRChecker::CheckTypeIsValid(
@@ -3249,8 +3259,7 @@ bool CHIRChecker::CheckTypeIsValid(
     return true;
 }
 
-void CHIRChecker::CheckRawArrayAllocateWithException(
-    const RawArrayAllocateWithException& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckTryRawArrayAllocate(const TryRawArrayAllocate& expr, const Function& topLevelFunc)
 {
     // 1. must have result
     if (!CheckHaveResult(expr, topLevelFunc)) {
@@ -3267,7 +3276,7 @@ void CHIRChecker::CheckRawArrayAllocateWithException(
         return;
     }
 
-    CheckRawArrayAllocateBase(RawArrayAllocateBase(&expr), topLevelFunc);
+    CheckRawArrayAllocateBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckRawArrayAllocateBase(const RawArrayAllocateBase& expr, const Function& topLevelFunc)
@@ -3275,12 +3284,12 @@ void CHIRChecker::CheckRawArrayAllocateBase(const RawArrayAllocateBase& expr, co
     // 1. result type must be RawArray&
     auto result = expr.GetResult();
     if (!result->GetType()->IsRef() || !result->GetType()->StripAllRefs()->IsRawArray()) {
-        TypeCheckError(*expr.GetRawExpr(), *result, "RawArray&", topLevelFunc);
+        TypeCheckError(expr, *result, "RawArray&", topLevelFunc);
         return;
     }
 
     // 2. if element type is CustomType, then must be a valid type
-    if (!CheckTypeIsValid(*expr.GetElementType(), "element", *expr.GetRawExpr(), topLevelFunc)) {
+    if (!CheckTypeIsValid(*expr.GetElementType(), "element", expr, topLevelFunc)) {
         return;
     }
 
@@ -3288,13 +3297,13 @@ void CHIRChecker::CheckRawArrayAllocateBase(const RawArrayAllocateBase& expr, co
     auto resultTypeArg = StaticCast<RawArrayType*>(result->GetType()->StripAllRefs())->GetElementType();
     if (resultTypeArg != expr.GetElementType()) {
         TypeCheckError(
-            *expr.GetRawExpr(), *result, "RawArray<" + expr.GetElementType()->ToString() + ">&", topLevelFunc);
+            expr, *result, "RawArray<" + expr.GetElementType()->ToString() + ">&", topLevelFunc);
     }
 
     // 4. size type must be Int64
     auto size = expr.GetSize();
     if (size->GetType()->GetTypeKind() != Type::TypeKind::TYPE_INT64) {
-        TypeCheckError(*expr.GetRawExpr(), *size, "Int64", topLevelFunc);
+        TypeCheckError(expr, *size, "Int64", topLevelFunc);
     }
 }
 
@@ -3303,7 +3312,7 @@ void CHIRChecker::CheckUnaryExpression(const UnaryExpression& expr, const Functi
     if (!OperandNumIsEqual(1, expr, topLevelFunc)) {
         return;
     }
-    CheckUnaryExprBase(UnaryExprBase(&expr), topLevelFunc);
+    CheckUnaryExprBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckBinaryExpression(const BinaryExpression& expr, const Function& topLevelFunc)
@@ -3312,7 +3321,7 @@ void CHIRChecker::CheckBinaryExpression(const BinaryExpression& expr, const Func
     if (!OperandNumIsEqual(2, expr, topLevelFunc)) {
         return;
     }
-    CheckBinaryExprBase(BinaryExprBase(&expr), topLevelFunc);
+    CheckBinaryExprBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckControlFlowExpression(const Expression& expr, const Function& topLevelFunc)
@@ -3385,7 +3394,9 @@ void CHIRChecker::CheckOtherExpression(const Expression& expr, const Function& t
             CheckInvokeStatic(StaticCast<const InvokeStatic&>(expr), topLevelFunc); }},
         {ExprKind::INSTANCEOF, [this, &expr, &topLevelFunc]() {
             CheckInstanceOf(StaticCast<const InstanceOf&>(expr), topLevelFunc); }},
-        {ExprKind::TYPECAST, [this, &expr, &topLevelFunc]() {
+        {ExprKind::CLASS_STATIC_CAST, [this, &expr, &topLevelFunc]() {
+            CheckTypeCast(StaticCast<const TypeCast&>(expr), topLevelFunc); }},
+        {ExprKind::NUMERIC_CAST, [this, &expr, &topLevelFunc]() {
             CheckTypeCast(StaticCast<const TypeCast&>(expr), topLevelFunc); }},
         {ExprKind::GET_EXCEPTION, [this, &expr, &topLevelFunc]() {
             CheckGetException(StaticCast<const GetException&>(expr), topLevelFunc); }},
@@ -3405,12 +3416,12 @@ void CHIRChecker::CheckOtherExpression(const Expression& expr, const Function& t
             CheckIntrinsic(StaticCast<const Intrinsic&>(expr), topLevelFunc); }},
         {ExprKind::BOX, [this, &expr, &topLevelFunc]() {
             CheckBox(StaticCast<const Box&>(expr), topLevelFunc); }},
-        {ExprKind::UNBOX, [this, &expr, &topLevelFunc]() {
-            CheckUnBox(StaticCast<const UnBox&>(expr), topLevelFunc); }},
-        {ExprKind::TRANSFORM_TO_GENERIC, [this, &expr, &topLevelFunc]() {
-            CheckTransformToGeneric(StaticCast<const TransformToGeneric&>(expr), topLevelFunc); }},
-        {ExprKind::TRANSFORM_TO_CONCRETE, [this, &expr, &topLevelFunc]() {
-            CheckTransformToConcrete(StaticCast<const TransformToConcrete&>(expr), topLevelFunc); }},
+        {ExprKind::UNBOX_TO_VALUE, [this, &expr, &topLevelFunc]() {
+            CheckUnBox(StaticCast<const UnBoxToValue&>(expr), topLevelFunc); }},
+        {ExprKind::CAST_TO_GENERIC, [this, &expr, &topLevelFunc]() {
+            CheckCastToGeneric(StaticCast<const CastToGeneric&>(expr), topLevelFunc); }},
+        {ExprKind::CAST_TO_CONCRETE, [this, &expr, &topLevelFunc]() {
+            CheckCastToConcrete(StaticCast<const CastToConcrete&>(expr), topLevelFunc); }},
         {ExprKind::GET_INSTANTIATE_VALUE, [this, &expr, &topLevelFunc]() {
             CheckGetInstantiateValue(StaticCast<const GetInstantiateValue&>(expr), topLevelFunc); }},
         {ExprKind::UNBOX_TO_REF, [this, &expr, &topLevelFunc]() {
@@ -3518,7 +3529,7 @@ void CHIRChecker::CheckEnumTuple(const Tuple& expr, const Function& topLevelFunc
 
     // 1. operands can't be empty
     auto result = expr.GetResult();
-    const auto& operands = expr.GetOperands();
+    const auto operands = expr.GetElementValues();
     if (operands.empty()) {
         auto errMsg = "must have one operand in `" + result->ToString(0) +
             "` at least, and the 1st operand's type is UInt32 or Bool.";
@@ -3596,7 +3607,7 @@ void CHIRChecker::CheckStructTuple(const Tuple& expr, const Function& topLevelFu
     // 1. tuple's operands must be struct's instance member vars, so their sizes and types must be equal
     auto result = expr.GetResult();
     auto resultTy = StaticCast<StructType*>(result->GetType());
-    const auto& operands = expr.GetOperands();
+    const auto operands = expr.GetElementValues();
     auto structDef = resultTy->GetStructDef();
     auto memberVarTypes = resultTy->GetInstantiatedMemberTys(builder);
     if (operands.size() != memberVarTypes.size()) {
@@ -3624,7 +3635,7 @@ void CHIRChecker::CheckNormalTuple(const Tuple& expr, const Function& topLevelFu
     // 1. operands's size must equal to size of TupleType's element type
     auto result = expr.GetResult();
     auto resultTy = StaticCast<TupleType*>(result->GetType());
-    const auto& operands = expr.GetOperands();
+    const auto operands = expr.GetElementValues();
     auto elementTypes = StaticCast<TupleType*>(resultTy)->GetElementTypes();
     if (operands.size() != elementTypes.size()) {
         auto errMsg = "size mismatched, there are " + std::to_string(elementTypes.size()) +
@@ -3698,7 +3709,7 @@ void CHIRChecker::CheckApply(const Apply& expr, const Function& topLevelFunc)
         return;
     }
     
-    CheckApplyBase(ApplyBase(&expr), topLevelFunc);
+    CheckApplyBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckInvoke(const Invoke& expr, const Function& topLevelFunc)
@@ -3706,7 +3717,7 @@ void CHIRChecker::CheckInvoke(const Invoke& expr, const Function& topLevelFunc)
     if (!OperandNumAtLeast(1, expr, topLevelFunc)) {
         return;
     }
-    CheckInvokeBase(InvokeBase(&expr), topLevelFunc);
+    CheckInvokeBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckInvokeStatic(const InvokeStatic& expr, const Function& topLevelFunc)
@@ -3714,7 +3725,7 @@ void CHIRChecker::CheckInvokeStatic(const InvokeStatic& expr, const Function& to
     if (!OperandNumAtLeast(1, expr, topLevelFunc)) {
         return;
     }
-    CheckInvokeStaticBase(InvokeStaticBase(&expr), topLevelFunc);
+    CheckInvokeStaticBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckInstanceOf(const InstanceOf& expr, const Function& topLevelFunc)
@@ -3761,7 +3772,7 @@ void CHIRChecker::CheckGetException(const GetException& expr, const Function& to
         return;
     }
 
-    if (!CheckCustomTypeDefIsExpected(*StaticCast<ClassType*>(baseType)->GetClassDef(), CORE_PACKAGE_NAME, "Object")) {
+    if (!IsExpectedCustomType(*baseType, CORE_PACKAGE_NAME, "Object")) {
         TypeCheckError(expr, *result, "Object&", topLevelFunc);
     }
 }
@@ -3771,7 +3782,7 @@ void CHIRChecker::CheckSpawn(const Spawn& expr, const Function& topLevelFunc)
     if (!OperandNumAtLeast(1, expr, topLevelFunc)) {
         return;
     }
-    CheckSpawnBase(SpawnBase(&expr), topLevelFunc);
+    CheckSpawnBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckRawArrayAllocate(const RawArrayAllocate& expr, const Function& topLevelFunc)
@@ -3779,7 +3790,7 @@ void CHIRChecker::CheckRawArrayAllocate(const RawArrayAllocate& expr, const Func
     if (!OperandNumIsEqual(1, expr, topLevelFunc)) {
         return;
     }
-    CheckRawArrayAllocateBase(RawArrayAllocateBase(&expr), topLevelFunc);
+    CheckRawArrayAllocateBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckRawArrayLiteralInit(const RawArrayLiteralInit& expr, const Function& topLevelFunc)
@@ -3802,7 +3813,7 @@ void CHIRChecker::CheckRawArrayLiteralInit(const RawArrayLiteralInit& expr, cons
 
     // 3. all elements' type must be equal to RawArray's element type
     auto rawArrayEleTy = StaticCast<RawArrayType*>(rawArray->GetType()->StripAllRefs())->GetElementType();
-    for (auto e : expr.GetElements()) {
+    for (auto e : expr.GetElementValues()) {
         if (!e->GetType()->IsEqualOrSubTypeOf(*rawArrayEleTy, builder)) {
             TypeCheckError(expr, *e, rawArrayEleTy->ToString(), topLevelFunc);
         }
@@ -3852,7 +3863,7 @@ void CHIRChecker::CheckVArray(const VArray& expr, const Function& topLevelFunc)
         ErrorInExpr(topLevelFunc, expr, errMsg + hint);
         return;
     }
-    for (auto arg : expr.GetOperands()) {
+    for (auto arg : expr.GetElementValues()) {
         if (!arg->GetType()->IsEqualOrSubTypeOf(*elemType, builder)) {
             TypeCheckError(expr, *arg, elemType->ToString(), topLevelFunc);
         }
@@ -3888,7 +3899,7 @@ void CHIRChecker::CheckVArrayBuilder(const VArrayBuilder& expr, const Function& 
 
 void CHIRChecker::CheckIntrinsic(const Intrinsic& expr, const Function& topLevelFunc)
 {
-    CheckIntrinsicBase(IntrinsicBase(&expr), topLevelFunc);
+    CheckIntrinsicBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckBox(const Box& expr, const Function& topLevelFunc)
@@ -3896,8 +3907,8 @@ void CHIRChecker::CheckBox(const Box& expr, const Function& topLevelFunc)
     if (!OperandNumIsEqual(1, expr, topLevelFunc)) {
         return;
     }
-    auto targetType = expr.GetTargetTy();
-    auto sourceType = expr.GetSourceTy();
+    auto targetType = expr.GetTargetType();
+    auto sourceType = expr.GetSourceType();
     if (!targetType->IsRef()) {
         TypeCheckError(expr, *expr.GetResult(), "reference", topLevelFunc);
     } else if (targetType->StripAllRefs()->IsBox()) {
@@ -3915,13 +3926,13 @@ void CHIRChecker::CheckBox(const Box& expr, const Function& topLevelFunc)
     }
 }
 
-void CHIRChecker::CheckUnBox(const UnBox& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckUnBox(const UnBoxToValue& expr, const Function& topLevelFunc)
 {
     if (!OperandNumIsEqual(1, expr, topLevelFunc)) {
         return;
     }
-    auto targetType = expr.GetTargetTy();
-    auto sourceType = expr.GetSourceTy();
+    auto targetType = expr.GetTargetType();
+    auto sourceType = expr.GetSourceType();
     if (!sourceType->IsRef()) {
         TypeCheckError(expr, *expr.GetSourceValue(), "reference", topLevelFunc);
     } else if (sourceType->StripAllRefs()->IsBox()) {
@@ -3939,28 +3950,28 @@ void CHIRChecker::CheckUnBox(const UnBox& expr, const Function& topLevelFunc)
     }
 }
 
-void CHIRChecker::CheckTransformToGeneric(const TransformToGeneric& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckCastToGeneric(const CastToGeneric& expr, const Function& topLevelFunc)
 {
     if (!OperandNumIsEqual(1, expr, topLevelFunc)) {
         return;
     }
-    if (!expr.GetTargetTy()->IsGenericRelated()) {
+    if (!expr.GetTargetType()->IsGenericRelated()) {
         TypeCheckError(expr, *expr.GetResult(), "generic related", topLevelFunc);
     }
-    if (expr.GetSourceTy()->IsGeneric()) {
+    if (expr.GetSourceType()->IsGeneric()) {
         TypeCheckError(expr, *expr.GetSourceValue(), "concrete", topLevelFunc);
     }
 }
 
-void CHIRChecker::CheckTransformToConcrete(const TransformToConcrete& expr, const Function& topLevelFunc)
+void CHIRChecker::CheckCastToConcrete(const CastToConcrete& expr, const Function& topLevelFunc)
 {
     if (!OperandNumIsEqual(1, expr, topLevelFunc)) {
         return;
     }
-    if (expr.GetTargetTy()->IsGeneric()) {
+    if (expr.GetTargetType()->IsGeneric()) {
         TypeCheckError(expr, *expr.GetResult(), "concrete", topLevelFunc);
     }
-    if (!expr.GetSourceTy()->IsGenericRelated()) {
+    if (!expr.GetSourceType()->IsGenericRelated()) {
         TypeCheckError(expr, *expr.GetSourceValue(), "generic related", topLevelFunc);
     }
 }
@@ -4028,7 +4039,7 @@ void CHIRChecker::CheckGetInstantiateValue(const GetInstantiateValue& expr, cons
     if (auto parentType = funcBase->GetParentCustomTypeOrExtendedType()) {
         if (auto customType = DynamicCast<CustomType*>(parentType)) {
             for (auto arg : customType->GetGenericArgs()) {
-                if (!instTypeArgs[typeIdx]->IsEqualOrInstantiatedTypeOf(*arg, builder)) {
+                if (!InstTypeCanSetToGenericRelatedType(*instTypeArgs[typeIdx], *arg)) {
                     errMsg += IndexToString(typeIdx + 1) + ", ";
                     hasError = true;
                 }
@@ -4038,7 +4049,7 @@ void CHIRChecker::CheckGetInstantiateValue(const GetInstantiateValue& expr, cons
     }
     for (auto& it : funcAndGenericTypes) {
         for (auto genericType : it.second) {
-            if (!instTypeArgs[typeIdx]->IsEqualOrInstantiatedTypeOf(*genericType, builder)) {
+            if (!InstTypeCanSetToGenericRelatedType(*instTypeArgs[typeIdx], *genericType)) {
                 errMsg += IndexToString(typeIdx + 1) + ", ";
                 hasError = true;
             }
@@ -4060,14 +4071,14 @@ void CHIRChecker::CheckUnBoxToRef(const UnBoxToRef& expr, const Function& topLev
         return;
     }
 
-    auto targetType = expr.GetTargetTy();
+    auto targetType = expr.GetTargetType();
     auto isValueRefType = targetType->IsRef() &&
         StaticCast<RefType*>(targetType)->GetBaseType()->IsValueType();
     if (!isValueRefType) {
         TypeCheckError(expr, *expr.GetResult(), "Value&", topLevelFunc);
     }
     
-    auto sourceType = expr.GetSourceTy();
+    auto sourceType = expr.GetSourceType();
     auto isReferenceRefType = sourceType->IsRef() &&
         StaticCast<RefType*>(sourceType)->GetBaseType()->IsReferenceType();
     if (!isReferenceRefType) {
@@ -4145,7 +4156,7 @@ void CHIRChecker::CheckAllocate(const Allocate& expr, const Function& topLevelFu
     // 1. don't have operands
     OperandNumIsEqual(0, expr, topLevelFunc);
 
-    CheckAllocateBase(AllocateBase(&expr), topLevelFunc);
+    CheckAllocateBase(expr, topLevelFunc);
 }
 
 void CHIRChecker::CheckLoad(const Load& expr, const Function& topLevelFunc)
@@ -4213,8 +4224,8 @@ void CHIRChecker::CheckGetElementRef(const GetElementRef& expr, const Function& 
         return;
     }
 
-    // 2. location type must be ref type
-    auto location = expr.GetLocation();
+    // 2. base type must be ref type
+    auto location = expr.GetBase();
     auto locationType = location->GetType();
     if (!locationType->IsRef()) {
         TypeCheckError(expr, *location, locationType->ToString() + "&", topLevelFunc);
@@ -4271,8 +4282,8 @@ void CHIRChecker::CheckStoreElementRef(const StoreElementRef& expr, const Functi
         return;
     }
 
-    // 2. location type must be ref
-    auto location = expr.GetLocation();
+    // 2. base type must be ref
+    auto location = expr.GetBase();
     auto locationType = location->GetType();
     if (!locationType->IsRef()) {
         TypeCheckError(expr, *location, locationType->ToString() + "&", topLevelFunc);

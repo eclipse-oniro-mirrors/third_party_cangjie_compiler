@@ -14,7 +14,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
 #endif
-#include <flatbuffers/PackageFormat_generated.h>
+#include <flatbuffers/StdxChirFormat_generated.h>
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
@@ -34,10 +34,10 @@ namespace Cangjie::CHIR {
 
 class CHIRDeserializer::CHIRDeserializerImpl {
 public:
-    void ConfigBase(const PackageFormat::Base* buffer, Base& obj);
-    void ConfigValue(const PackageFormat::Value* buffer, Value& obj);
-    void ConfigCustomTypeDef(const PackageFormat::CustomTypeDef* buffer, CustomTypeDef& obj);
-    void ConfigExpression(const PackageFormat::Expression* buffer, Expression& obj);
+    void ConfigBase(const CHIRFormat::Base* buffer, Base& obj);
+    void ConfigValue(const CHIRFormat::Value* buffer, Value& obj);
+    void ConfigCustomTypeDef(const CHIRFormat::CustomTypeDef* buffer, CustomTypeDef& obj);
+    void ConfigExpression(const CHIRFormat::Expression* buffer, Expression& obj);
     template <typename T, typename FBT> T Create(const FBT* obj);
     template <typename T, typename FBT> std::vector<T> Create(const flatbuffers::Vector<FBT>* vec);
     template <typename T, typename FBT> T* Deserialize(const FBT* obj);
@@ -56,7 +56,7 @@ public:
 
     template <typename T, typename FBT> void Config(const FBT* buffer, T& obj);
 
-    void Run(const PackageFormat::CHIRPackage* package);
+    void Run(const CHIRFormat::CHIRPackage* package);
     explicit CHIRDeserializerImpl(CHIRBuilder& chirBuilder, bool compilePlatform = false)
         : builder(chirBuilder), compilePlatform(compilePlatform){};
 
@@ -66,7 +66,7 @@ private:
 private:
     Cangjie::CHIR::CHIRBuilder& builder;
     bool compilePlatform = false;
-    const PackageFormat::CHIRPackage* pool{};
+    const CHIRFormat::CHIRPackage* pool{};
 
     // Package object maps
     std::unordered_map<uint32_t, Type*> id2Type{{0, nullptr}};
@@ -75,7 +75,7 @@ private:
     std::unordered_map<uint32_t, CustomTypeDef*> id2CustomTypeDef{{0, nullptr}};
 
     // lazy GenericType config
-    std::vector<std::pair<GenericType*, const PackageFormat::GenericType*>> genericTypeConfig;
+    std::vector<std::pair<GenericType*, const CHIRFormat::GenericType*>> genericTypeConfig;
 };
 }
 #endif

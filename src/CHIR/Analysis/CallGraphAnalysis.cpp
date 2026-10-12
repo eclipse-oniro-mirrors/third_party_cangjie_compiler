@@ -23,9 +23,13 @@
 
 #include "cangjie/CHIR/Analysis/CallGraphAnalysis.h"
 
-#include "cangjie/CHIR/Optimization/Devirtualization.h"
+#include <iostream>
+#include <set>
+
 #include "cangjie/CHIR/IR/Expression/Terminator.h"
 #include "cangjie/CHIR/Utils/Visitor/Visitor.h"
+#include "cangjie/Utils/Casting.h"
+#include "cangjie/Utils/Utils.h"
 
 namespace Cangjie::CHIR {
 
@@ -92,10 +96,8 @@ bool CallGraph::Edge::operator==(const Edge& other) const
     return this->edgeValue.first == other.edgeValue.first;
 }
 
-CallGraph::CallGraph(const Package* package, DevirtualizationInfo& devirtFuncInfo)
-    : devirtFuncInfo(devirtFuncInfo),
-      entryNode(std::make_unique<Node>(nullptr)),
-      exitNode(std::make_unique<Node>(nullptr))
+CallGraph::CallGraph(const Package* package)
+    : entryNode(std::make_unique<Node>(nullptr)), exitNode(std::make_unique<Node>(nullptr))
 {
     // build the call graph.
     for (auto func : package->GetGlobalFuncsWithBody()) {
@@ -137,12 +139,12 @@ CallGraph::Node* CallGraph::GetOrCreateNode(const Function& func)
 void CallGraph::PopulateCallGraphNode(Node& node, BlockGroup& funcBlockGroup)
 {
     auto preVisit = [&node, this](Expression& expr) {
-        if (expr.GetExprKind() == ExprKind::INVOKE || expr.GetExprKind() == ExprKind::INVOKE_WITH_EXCEPTION) {
+        if (auto invoke = DynamicCast<InvokeBase*>(&expr)) {
             // Get all the possible callee of virtual function from Devirtualization info collection.
             // exclude it from EntryNode and add it here.
-            AddVirtualEdgeToNode(node, expr);
-        } else if (expr.GetExprKind() == ExprKind::APPLY || expr.GetExprKind() == ExprKind::APPLY_WITH_EXCEPTION) {
-            AddDirectEdgeToNode(node, expr);
+            AddVirtualEdgeToNode(node, *invoke);
+        } else if (auto apply = DynamicCast<ApplyBase*>(&expr)) {
+            AddDirectEdgeToNode(node, *apply);
         }
         return VisitResult::CONTINUE;
     };
@@ -150,24 +152,13 @@ void CallGraph::PopulateCallGraphNode(Node& node, BlockGroup& funcBlockGroup)
     Visitor::Visit(funcBlockGroup, preVisit);
 }
 
-void CallGraph::AddVirtualEdgeToNode(Node& node, const Expression& expression)
+void CallGraph::AddVirtualEdgeToNode(Node& node, const InvokeBase& invoke)
 {
     // Get all the possible callee of virtual function from Devirtualization info collection.
     // exclude it from EntryNode and add it here.
-    Type* resTy;
-    std::vector<Type*> types;
-    std::string methodName;
-    if (expression.GetExprKind() == ExprKind::INVOKE) {
-        auto invoke = StaticCast<const Invoke*>(&expression);
-        resTy = invoke->GetObject()->GetType();
-        types = invoke->GetMethodType()->GetParamTypes();
-        methodName = invoke->GetMethodName();
-    } else {
-        auto invoke = StaticCast<const InvokeWithException*>(&expression);
-        resTy = invoke->GetObject()->GetType();
-        types = invoke->GetMethodType()->GetParamTypes();
-        methodName = invoke->GetMethodName();
-    }
+    Type* resTy = invoke.GetObject()->GetType();
+    std::vector<Type*> types = invoke.GetMethodType()->GetParamTypes();
+    std::string methodName = invoke.GetMethodName();
     while (resTy->IsRef()) {
         resTy = StaticCast<RefType*>(resTy)->GetBaseType();
     }
@@ -197,17 +188,11 @@ void CallGraph::AddVirtualEdgeToNode(Node& node, const Expression& expression)
     }
 }
 
-void CallGraph::AddDirectEdgeToNode(Node& node, const Expression& expression)
+void CallGraph::AddDirectEdgeToNode(Node& node, const ApplyBase& apply)
 {
     const Function* calledFunc = nullptr;
-    if (expression.GetExprKind() == ExprKind::APPLY) {
-        if (auto callee = StaticCast<const Apply*>(&expression)->GetCallee(); callee->IsFuncWithBody()) {
-            calledFunc = StaticCast<const Function*>(callee);
-        }
-    } else {
-        if (auto callee = StaticCast<const ApplyWithException*>(&expression)->GetCallee(); callee->IsFuncWithBody()) {
-            calledFunc = StaticCast<const Function*>(callee);
-        }
+    if (auto callee = apply.GetCallee(); callee->IsFuncWithBody()) {
+        calledFunc = StaticCast<const Function*>(callee);
     }
     if (calledFunc) {
         Edge edge(GetOrCreateNode(*calledFunc), Edge::Kind::DIRECT);
@@ -224,13 +209,12 @@ std::unordered_set<Function*> CallGraph::GetAllPossibleCalleeOfInvoke(
     const std::pair<std::string, std::vector<Type*>>& method) const
 {
     (void)method;
-    (void)devirtFuncInfo;
     return std::unordered_set<Function*>();
 }
 
 void CallGraphAnalysis::DoCallGraphAnalysis(bool isDebug)
 {
-    CallGraph callGraph(package, devirtFuncInfo);
+    CallGraph callGraph(package);
     BuildSCC(callGraph);
     if (isDebug) {
         PrintCallGraph(callGraph);
@@ -272,6 +256,16 @@ void CallGraphAnalysis::PrintCallGraph(const CallGraph& callGraph) const
         }
         message += "\n";
         std::cout << message;
+    }
+
+    std::cout << "[CallGraphAnalysis] SCC Post-Order:\n";
+    for (size_t i = 0; i < postOrderSCCFunctionlist.size(); ++i) {
+        auto* func = postOrderSCCFunctionlist[i];
+        if (func == nullptr) {
+            std::cout << "  [" << i << "] <null>\n";
+            continue;
+        }
+        std::cout << "  [" << i << "] " << func->GetIdentifierWithoutPrefix() << "\n";
     }
 }
 

@@ -13,16 +13,8 @@
  */
 
 #include "ObjCParamMapper.h"
-#include "Transpiler.h"
 #include "Emitter.h"
-#include "NativeFFI/ObjC/Utils/ASTFactory.h"
-#include "NativeFFI/ObjC/Utils/Common.h"
-#include "NativeFFI/Utils.h"
-#include "cangjie/Sema/TypeManager.h"
-#include "cangjie/Utils/FileUtil.h"
-#include "Utils.h"
-#include <iostream>
-#include <set>
+#include "NativeFFI/ObjC/Utils/ASTQuery.h"
 
 namespace Cangjie::Interop::ObjC {
 
@@ -31,15 +23,39 @@ using namespace AST;
 using namespace Native::FFI;
 using std::string;
 
-ObjCParamMapper::ObjCParamMapper() {}
+namespace {
+const std::string CAST_TO_VOID_PTR = "(__bridge void*)";
+const std::string CAST_TO_VOID_PTR_RETAINED = "(__bridge_retained void*)";
+const std::string CAST_TO_VOID_PTR_UNSAFE = "(void*)";
 
+const std::string REGISTRY_ID = "$registryId";
+const std::string SELF_NAME = "self";
+
+const std::string UNSUPPORTED_TYPE = "UNSUPPORTED_TYPE";
+const std::string INT64_T = "int64_t";
+const std::string SETTER_PARAM_NAME = "value";
+const std::string VOID_TYPE = "void";
+const std::string VOID_POINTER_TYPE = VOID_TYPE + "*";
+
+std::string SelfInfoArgs()
+{
+    return SELF_NAME + "." + REGISTRY_ID + ", " + CAST_TO_VOID_PTR + SELF_NAME;
+}
+
+std::string SelfInfoParamTypes()
+{
+    return INT64_T + "," + VOID_POINTER_TYPE;
+}
+} // namespace
+
+ObjCParamMapper::ObjCParamMapper() {}
 
 /*
  *  DECLARATION: :(arg1Type)arg1:(arg2Type)arg2:...(argNType)argN
  *  STATIC_REF: (arg1Type, arg2Type, ...argNType)
  */
 std::string ObjCParamMapper::GenerateFuncParamLists(
-    std::unordered_set<std::string>* typedefs,
+    std::vector<std::string>& typedefs,
     const std::vector<OwnedPtr<FuncParamList>>& paramLists,
     const std::vector<std::string>& selectorComponents, FunctionListFormat format, const ObjCFunctionType type,
     bool hasForeignNameAnno)
@@ -56,10 +72,6 @@ std::string ObjCParamMapper::GenerateFuncParamLists(
         switch (format) {
             case FunctionListFormat::DECLARATION:
                 if (i != 0) {
-                    /*
-                     * for CJMapping Objective-C method signature, label shouldn't generate if not use @ForeignName
-                     * as it would be more user-friendly to keep both side method signatures the same
-                     */
                     auto name = hasForeignNameAnno ? *componentIterator++ : "";
                     genParams += name + ":"; // label
                 } else {
@@ -98,7 +110,7 @@ std::string ObjCParamMapper::GenerateFuncParamLists(
 }
 
 ArgsList ObjCParamMapper::ConvertParamsListToArgsList(
-    std::unordered_set<std::string>* typedefs,
+    std::vector<std::string>& typedefs,
     const std::vector<OwnedPtr<FuncParamList>>& paramLists, bool withRegistryId)
 {
     ArgsList result = ArgsList();
@@ -107,6 +119,7 @@ ArgsList ObjCParamMapper::ConvertParamsListToArgsList(
         result.emplace_back(std::pair<std::string, std::string>(
             INT64_T, string(SELF_NAME) + "." + REGISTRY_ID)
         );
+        result.emplace_back(VOID_POINTER_TYPE, CAST_TO_VOID_PTR + SELF_NAME);
     }
 
     if (!paramLists.empty() && paramLists[0]) {
@@ -121,16 +134,16 @@ ArgsList ObjCParamMapper::ConvertParamsListToArgsList(
 }
 
 std::string ObjCParamMapper::ConvertParamsListToArgsListToString(
-    const std::vector<OwnedPtr<AST::FuncParamList>>& paramLists, bool withRegistryId)
+    const std::vector<OwnedPtr<AST::FuncParamList>>& paramLists, bool withSelfInfo)
 {
     std::string result = "";
 
-    if (withRegistryId) {
-        result = SELF_NAME + "." + REGISTRY_ID;
+    if (withSelfInfo) {
+        result = SelfInfoArgs();
     }
 
     if (!paramLists.empty() && paramLists[0]) {
-        if (withRegistryId && paramLists[0]->params.size() != 0) {
+        if (withSelfInfo && paramLists[0]->params.size() != 0) {
             result += ", ";
         }
         for (size_t i = 0; i < paramLists[0]->params.size(); i++) {
@@ -165,16 +178,32 @@ std::vector<std::string> ObjCParamMapper::ConvertParamsListToCallableParamsStrin
     return result;
 }
 
-std::string ObjCParamMapper::MapCJTypeToObjCType(std::unordered_set<std::string>* typedefs, const Ty& ty)
+void ObjCParamMapper::RegisterTypedef(std::vector<std::string>& typedefs, MappedCType cType)
+{
+    if (cType.decl != "") {
+        typedefs.emplace_back(cType.decl);
+    }
+}
+
+void ObjCParamMapper::CollectTypedefs(std::vector<std::string>& typedefs, MappedCType cType)
+{
+    for (auto child : cType.dependencies) {
+        CollectTypedefs(typedefs, child);
+    }
+    RegisterTypedef(typedefs, cType);
+}
+
+std::string ObjCParamMapper::MapCJTypeToObjCType(std::vector<std::string>& typedefs, const Ty& ty)
 {
     auto objctype = TypeMapper::Cj2ObjCForObjC(ty);
-    if (objctype.decl != "") {
-        typedefs->insert(objctype.decl);
+    for (auto child : objctype.dependencies) {
+        CollectTypedefs(typedefs, child);
     }
+    RegisterTypedef(typedefs, objctype);
     return objctype.usage;
 }
 
-std::string ObjCParamMapper::MapCJTypeToObjCType(std::unordered_set<std::string>* typedefs, const Ptr<Type>& type)
+std::string ObjCParamMapper::MapCJTypeToObjCType(std::vector<std::string>& typedefs, const Ptr<Type>& type)
 {
     if (!type) {
         return UNSUPPORTED_TYPE;
@@ -183,7 +212,7 @@ std::string ObjCParamMapper::MapCJTypeToObjCType(std::unordered_set<std::string>
     return MapCJTypeToObjCType(typedefs, *type->GetTy());
 }
 
-std::string ObjCParamMapper::MapCJTypeToObjCType(std::unordered_set<std::string>* typedefs,
+std::string ObjCParamMapper::MapCJTypeToObjCType(std::vector<std::string>& typedefs,
     const Ptr<FuncParam>& param)
 {
     if (!param) {
@@ -193,20 +222,16 @@ std::string ObjCParamMapper::MapCJTypeToObjCType(std::unordered_set<std::string>
     return MapCJTypeToObjCType(typedefs, *param->type->GetTy());
 }
 
-std::string ObjCParamMapper::GenerateArgumentCast(const Ty& retTy, std::string value)
+std::string ObjCParamMapper::GenerateArgumentCast(const Ty& paramTy, std::string value)
 {
-    if (TypeMapper::IsObjCCJMapping(retTy)) {
-        return value + "." + REGISTRY_ID;
-    }
-    const auto& actualTy = retTy.IsCoreOptionType() ? *retTy.typeArgs[0] : retTy;
-    if (TypeMapper::IsObjCImpl(actualTy)) {
-        return CAST_TO_VOID_PTR + std::move(value);
-    }
-    if (TypeMapper::IsObjCMirror(actualTy) || TypeMapper::IsObjCBlock(actualTy) ||
-        TypeMapper::IsObjCCJMappingInterface(actualTy)) {
+    const auto& actualTy = paramTy.IsCoreOptionType() ? *paramTy.typeArgs[0] : paramTy;
+    // An @ObjCImpl hands over its reference exactly like an @ObjCMirror does: the Cangjie wrapper the entry
+    // point builds around the handle owns it from here on, and releases it in its finalizer. Passing an impl
+    // at +0 instead left that wrapper releasing a reference it never took.
+    if (IsObjCMirror(actualTy) || IsObjCImpl(actualTy) || IsObjCBlock(actualTy)) {
         return CAST_TO_VOID_PTR_RETAINED + std::move(value);
     }
-    if (TypeMapper::IsObjCPointer(actualTy)) {
+    if (IsObjCPointer(actualTy)) {
         return CAST_TO_VOID_PTR_UNSAFE + std::move(value);
     }
     return value;
@@ -225,9 +250,9 @@ struct EmittableObjCFuncMetainfo ObjCParamMapper::GetGetterForProp(
     getter.mangledIdentifier    = getterWrapperName;
     getter.retType              = prop.type;
     getter.paramsDecl           = "";
-    getter.paramStaticRef       = prop.isStatic ? "" : INT64_T;
-    getter.callingParams        = prop.isStatic ? "" : SELF_NAME + "." + REGISTRY_ID;
-    getter.convertedParams      = prop.isStatic ? "" : SELF_NAME + "." + REGISTRY_ID;
+    getter.paramStaticRef       = prop.isStatic ? "()" : "(" + SelfInfoParamTypes() + ")";
+    getter.callingParams        = prop.isStatic ? "" : SelfInfoArgs();
+    getter.convertedParams      = prop.isStatic ? "" : SelfInfoArgs();
     getter.bridge               = bridge;
     return getter;
 }
@@ -247,13 +272,13 @@ struct EmittableObjCFuncMetainfo ObjCParamMapper::GetSetterForProp(
     setter.bridge               = false;
     setter.paramsDecl           = "(" + prop.type + ")" + SETTER_PARAM_NAME;
     setter.paramStaticRef       = (!prop.isStatic
-                                    ? "(" + INT64_T + ","
+                                    ? "(" + SelfInfoParamTypes() + ","
                                     : "(") + prop.type + ")";
     setter.callingParams        = !prop.isStatic
-                                    ? SELF_NAME + "." + REGISTRY_ID + ", " + SETTER_PARAM_NAME
+                                    ? SelfInfoArgs() + ", " + SETTER_PARAM_NAME
                                     : SETTER_PARAM_NAME;
     setter.convertedParams      = (!prop.isStatic
-                                    ? SELF_NAME + "." + REGISTRY_ID + ", "
+                                    ? SelfInfoArgs() + ", "
                                     : "") + GenerateArgumentCast(*ty, SETTER_PARAM_NAME);
     return setter;
 }

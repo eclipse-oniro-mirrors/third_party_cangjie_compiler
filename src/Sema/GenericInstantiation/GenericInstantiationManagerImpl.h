@@ -100,8 +100,6 @@ public:
     void ResetGenericInstantiationStage()
     {
         ClearCache();
-        // Build generic instantiateManager to rebuild instantiated cache and genericNodeToInstantiatedNodeMap.
-        RebuildGenericInstantiationManager();
         Utils::ProfileRecorder recorder("ResetGenericInstantiationStage", "BuildAbstractFuncMap");
         // Build abstract function map for all type which inherited interface.
         BuildAbstractFuncMap();
@@ -136,19 +134,7 @@ private:
     Generic2InsMap instantiatedDeclsMap;
     /** Key: generic decl & instantiated types. Value: instantiated decl. */
     std::unordered_multimap<GenericInfo, Ptr<AST::Decl>, GenericInfoHash, GenericInfoEqual> declInstantiationByTypeMap;
-    /**
-     * This map saves the information of the function in which structure declaration implements the abstract function in
-     * interface.
-     * The key is pair of type and the abstract function in interface.
-     * The value is a set that contains pair of:
-     *    1. the structure declaration which contains the function which implements abstract function.
-     *    2. the index of the implementation function in structure declaration.
-     * */
-    std::unordered_map<std::pair<Ptr<AST::Ty>, Ptr<AST::FuncDecl>>,
-        std::unordered_set<std::pair<Ptr<AST::Decl>, size_t>, HashPair>, HashPair>
-        abstractFuncToDeclMap;
     std::unordered_map<Ptr<AST::Decl>, size_t> membersIndexMap;
-    std::unordered_map<Ptr<const AST::Decl>, std::vector<size_t>> skippedMemberOffsets;
     /** Node kinds which should be ignored in walker. */
     inline static const std::unordered_set<AST::ASTKind> ignoreKinds = {
         AST::ASTKind::GENERIC_PARAM_DECL,
@@ -170,11 +156,7 @@ private:
     void InstantiateForIncrementalPackage();
 
     /** Rebuild type stored decl pointer for imported instantiated decls. */
-    void RestoreInstantiatedDeclTy() const;
     void RestoreInstantiatedDeclTy(AST::Decl& decl) const;
-    void RebuildGenericInstantiationManager();
-    void WalkImportedInstantiations(const std::function<void(AST::Decl&)>& processFunc,
-        const std::function<bool(AST::Package&)>& skipChecker) const;
     void UpdateInstantiatedExtendMap();
     void ClearCache();
     void RecordExtend(AST::Node& node);
@@ -207,20 +189,20 @@ private:
      * Instantiate a generic decl @p genericDecl with type arguments @p instTys.
      */
     void InstantiateGenericDeclWithInstTys(AST::Decl& decl, const std::vector<Ptr<AST::Ty>>& instTys);
-    /**
-     * Walk inherited types which are used by non-generic be boxed extend decls.
-     * Used to guarantee all related generic types are instantiated.
-     */
-    void WalkNonGenericExtendedType();
     /** Helper functions during clone instantiated decl. */
     void PerformTyInstantiationDuringClone(
         const AST::Node& genericNode, AST::Node& clonedNode, const GenericInfo& info, const TypeSubst& g2gTyMap);
     void PerformUpdateAttrDuringClone(AST::Node& genericNode, AST::Node& clonedNode) const;
     /** Find implemented version function of abstract function @p interfaceFunc in the decl of Ty @p ty. */
     Ptr<AST::FuncDecl> FindImplFuncForAbstractFunc(AST::Ty& ty, AST::FuncDecl& fd, AST::Ty& targetBaseTy);
-    /** Find matched implementation function of abstract function @p fd from candidates */
-    Ptr<AST::Decl> SelectTypeMatchedImplMember(AST::Ty& ty, const AST::FuncDecl& interfaceFunc,
-        std::vector<std::pair<Ptr<AST::Decl>, size_t>>& candidates, AST::Ty& targetBaseTy);
+    /** Whether the abstract-function resolution can be skipped for @p fd under @p ty. */
+    bool ShouldSkipAbstractFuncResolution(AST::Ty& ty, const AST::FuncDecl& fd) const;
+    /**
+     * Resolve the concrete instantiated FuncDecl among the instantiated decls of @p implFunc's outer decl
+     * (and its generic instantiations) whose type matches @p matchedInstTy, falling back to @p implFunc.
+     */
+    Ptr<AST::FuncDecl> FindFuncInGenericInstantiatedDecl(
+        AST::Ty& ty, const AST::FuncDecl& fd, Ptr<AST::FuncDecl> implFunc, const Ptr<AST::Ty>& matchedInstTy) const;
     /** Walker function for node instantiation. */
     AST::VisitAction CheckNodeInstantiation(AST::Node& node);
     /** Walker function for reference pointer rearrangement. */
@@ -259,19 +241,6 @@ private:
 
     /** Build interface function to implemented function map for all type decls */
     void BuildAbstractFuncMap();
-    void BuildAbstractFuncMapHelper(AST::Ty& ty);
-    bool IsImplementationFunc(AST::Ty& ty, const AST::FuncDecl& interfaceFunc, const AST::FuncDecl& fd);
-    MultiTypeSubst GetTypeMapping(Ptr<AST::Ty>& baseTy, AST::Ty& interfaceTy);
-    void MapFuncWithDecl(AST::Ty& ty, AST::FuncDecl& interfaceFunc, const AST::FuncDecl& target);
-    void CollectDeclMemberFuncs(AST::Decl& decl, std::unordered_set<Ptr<AST::FuncDecl>>& funcs) const;
-    std::unordered_set<Ptr<AST::FuncDecl>> GetInheritedMemberFuncs(AST::Ty& ty);
-    std::unordered_set<Ptr<AST::InheritableDecl>> GetInheritedInterfaces(AST::Ty& ty);
-    /** Collect inherited members for imported decls which is not check during sema stage. */
-    std::unordered_set<Ptr<AST::FuncDecl>> MergeMemberFuncs(
-        AST::Ty& ty, AST::Decl& decl, const std::unordered_set<Ptr<AST::FuncDecl>>& inheritedMembers);
-    std::unordered_set<Ptr<AST::FuncDecl>> CollectInheritedMembers(AST::Ty& ty, AST::Decl& decl);
-    std::unordered_set<Ptr<AST::FuncDecl>> CollectInheritedMembersVisit(
-        AST::Ty& ty, AST::Decl& decl, std::set<std::pair<Ptr<AST::Ty>, Ptr<AST::Decl>>>& visited);
 
     /**
      * Get general version of given @p decl. If getOriginal is on:
@@ -312,21 +281,6 @@ private:
         intersectionTyStatus.emplace(&ty, false);
         return false;
     }
-    void RemoveFromCache(AST::Decl& decl)
-    {
-        auto genericDecl = decl.genericDecl;
-        instantiatedDeclsMap[genericDecl].erase(&decl);
-        GenericInfo genericInfo(genericDecl, BuildTypeMapping(decl));
-        auto decls = declInstantiationByTypeMap.equal_range(genericInfo);
-        for (auto it = decls.first; it != decls.second; ++it) {
-            if (it->second == &decl) {
-                declInstantiationByTypeMap.erase(it);
-                break;
-            }
-        }
-    }
-    size_t CountSkippedMembersBefore(const AST::Decl& decl, size_t offset);
-    Ptr<AST::Decl> GetMemberByOffset(const AST::Decl& decl, size_t offset);
     bool IsDeclCanRestoredForTy(const AST::Decl& decl) const;
     class IncrementalContext {
     public:

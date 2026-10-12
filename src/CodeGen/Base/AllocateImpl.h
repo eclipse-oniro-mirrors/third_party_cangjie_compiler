@@ -6,21 +6,17 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-/**
- * @file
- *
- * This file implements codegen for CHIR Allocate.
- */
 #ifndef CANGJIE_ALLOCATEIMPL_H
 #define CANGJIE_ALLOCATEIMPL_H
-
 #include "llvm/IR/Value.h"
 
 namespace Cangjie {
+namespace CHIR {
+class AllocateBase;
+} // namespace CHIR
 namespace CodeGen {
 class IRBuilder2;
-class CHIRAllocateWrapper;
-llvm::Value* GenerateAllocate(IRBuilder2& irBuilder, const CHIRAllocateWrapper& alloca);
+llvm::Value* GenerateAllocate(IRBuilder2& irBuilder, const CHIR::AllocateBase& alloca);
 } // namespace CodeGen
 } // namespace Cangjie
 #endif // CANGJIE_ALLOCATEIMPL_H

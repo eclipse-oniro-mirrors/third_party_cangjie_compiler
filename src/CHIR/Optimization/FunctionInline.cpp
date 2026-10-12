@@ -137,7 +137,7 @@ static bool OnlyCalledOnce(const Function& func)
 {
     bool alreadyHasUser = false;
     for (auto user : func.GetUsers()) {
-        if (user->GetExprKind() == ExprKind::APPLY || user->GetExprKind() == ExprKind::APPLY_WITH_EXCEPTION) {
+        if (Cangjie::Is<ApplyBase>(user)) {
             if (alreadyHasUser) {
                 return false;
             }
@@ -252,6 +252,12 @@ bool FunctionInline::CheckCanRewrite(const Apply& apply)
     if (func->GetFuncKind() == FuncKind::INSTANCEVAR_INIT) {
         return true;
     }
+    // @ObjCMirror functions are generated and always have the same body
+    // that calls relevant native code
+    // according to benchmarks, they can always be inlined
+    if (func->TestAttr(Attribute::OBJ_C_MIRROR)) {
+        return true;
+    }
     // Determine if we can inline by checking the size of callee exceed the threshold
     if (inlinedCountMap[globalFunc] >= INLINED_COUNT_THRESHOLD) {
         return false;
@@ -339,11 +345,13 @@ void FunctionInline::ReplaceFuncResult(LocalVar* resNew, LocalVar* resOld)
             builder.CreateExpression<Load>(user->GetDebugLocation(), valType, resNew, user->GetParentBlock());
         newLoad->MoveBefore(user);
         user->ReplaceOperand(resOld, newLoad->GetResult());
-        auto cast = TypeCastOrBoxIfNeeded(
+        auto [cast, newExprs] = TypeCastOrBoxIfNeeded(
             *newLoad->GetResult(), *resOld->GetType(), builder, *newLoad->GetParentBlock(), INVALID_LOCATION);
         if (cast != newLoad->GetResult()) {
             CJC_ASSERT(cast->IsLocalVar());
-            StaticCast<LocalVar*>(cast)->GetExpr()->MoveBefore(user);
+            for (auto newExpr : newExprs) {
+                newExpr->MoveBefore(user);
+            }
             user->ReplaceOperand(newLoad->GetResult(), cast);
         }
     }
@@ -488,7 +496,7 @@ void FunctionInline::DoFunctionInline(const Apply& apply, const std::string& nam
     //   Exit()
     // }
     CJC_NULLPTR_CHECK(block1->GetTerminator());
-    block1->GetTerminator()->ReplaceSuccessor(*block2, *funcEntry);
+    block1->GetTerminator()->ReplaceOperand(block2, funcEntry);
     // if callee must throw exception, then we can't get `exitBlock`
     for (auto exitBlock : exitBlocks) {
         if (exitBlock != nullptr) {

@@ -82,12 +82,9 @@ ReachingDefinitionAnalysis::ReachingDefinitionAnalysis(const Function* func) : A
         auto bb = worklist[worklistIdx];
         for (auto expr : bb->GetExpressions()) {
             Type* allocatedTy = nullptr;
-            auto kind = expr->GetExprKind();
-            if (kind == ExprKind::ALLOCATE) {
-                allocatedTy = StaticCast<Allocate*>(expr)->GetType();
-            } else if (kind == ExprKind::ALLOCATE_WITH_EXCEPTION) {
-                allocatedTy = StaticCast<AllocateWithException*>(expr)->GetType();
-            } else if (kind == ExprKind::LAMBDA) {
+            if (Is<AllocateBase>(expr)) {
+                allocatedTy = StaticCast<AllocateBase*>(expr)->GetType();
+            } else if (Is<Lambda>(expr)) {
                 auto blocks = StaticCast<const Lambda*>(expr)->GetBody()->GetBlocks();
                 worklist.insert(worklist.end(), blocks.begin(), blocks.end());
             }
@@ -166,12 +163,12 @@ void ReachingDefinitionAnalysis::PropagateExpressionEffect(
 }
 
 std::optional<Block*> ReachingDefinitionAnalysis::PropagateTerminatorEffect(
-    ReachingDefinitionDomain& state, const Terminator* terminator)
+    ReachingDefinitionDomain& state, const Expression* terminator)
 {
-    if (terminator->GetExprKind() == ExprKind::APPLY_WITH_EXCEPTION) {
-        HandleApplyExpr(state, StaticCast<const ApplyWithException*>(terminator));
-    } else if (terminator->GetExprKind() == ExprKind::INTRINSIC_WITH_EXCEPTION) {
-        HandleIntrinsicExpr(state, StaticCast<const IntrinsicWithException*>(terminator));
+    if (Is<TryApply>(terminator)) {
+        HandleApplyExpr(state, StaticCast<const TryApply*>(terminator));
+    } else if (Is<TryIntrinsic>(terminator)) {
+        HandleIntrinsicExpr(state, StaticCast<const TryIntrinsic*>(terminator));
     }
     return std::nullopt;
 }
@@ -189,7 +186,7 @@ void ReachingDefinitionAnalysis::HandleStoreExpr(ReachingDefinitionDomain& state
 void ReachingDefinitionAnalysis::HandleGetElemRefExpr(ReachingDefinitionDomain& state, const GetElementRef* getElemRef)
 {
     // If it's a non-readonly GetElementRef to a tracked struct.
-    auto target = getElemRef->GetLocation();
+    auto target = getElemRef->GetBase();
     if (auto it = allocateIdxMap.find(target); it != allocateIdxMap.end()) {
         if (StaticCast<RefType*>(target->GetType())->GetBaseType()->IsStruct()) {
             if (!getElemRef->GetResult()->TestAttr(Attribute::READONLY)) {
@@ -203,7 +200,7 @@ void ReachingDefinitionAnalysis::HandleGetElemRefExpr(ReachingDefinitionDomain& 
 void ReachingDefinitionAnalysis::HanldeStoreElemRefExpr(
     ReachingDefinitionDomain& state, const StoreElementRef& storeElemRef)
 {
-    auto target = storeElemRef.GetLocation();
+    auto target = storeElemRef.GetBase();
     if (auto it = allocateIdxMap.find(target); it != allocateIdxMap.end()) {
         if (StaticCast<RefType*>(target->GetType())->GetBaseType()->IsStruct()) {
             state.reachingDefs[it->second].SetToBound(/* isTop = */ true);

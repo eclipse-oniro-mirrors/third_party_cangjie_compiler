@@ -36,7 +36,6 @@
 #include "cangjie/Basic/Linkage.h"
 #include "cangjie/Basic/MacroCallDiagInfo.h"
 #include "cangjie/Basic/Position.h"
-#include "cangjie/Basic/InteropCJPackageConfigReader.h"
 #include "cangjie/Lex/Token.h"
 #include "cangjie/Utils/CheckUtils.h"
 #include "cangjie/Utils/ConstantsUtils.h"
@@ -497,7 +496,7 @@ protected:
 
 private:
     AttributePack attributes;
-    
+
     /**
      * The semantic type of the Node.
      * W: ASTContext, Clone, Create, Expand, CodeGenHLIR (PrepareImportedAST), ASTSerialization (Load),
@@ -1076,6 +1075,22 @@ struct Decl : Node {
      */
     size_t GetGenericsCount() const;
 
+    /**
+     * @return `true` if declaration is a java mirror (foreign java declaration).
+     */
+    bool IsJavaMirror() const
+    {
+        return TestAttr(Attribute::JAVA_MIRROR);
+    }
+
+    /**
+     * @return `true` if declaration is a java impl (cangjie declaration exported to java).
+     */
+    bool IsJavaImpl() const
+    {
+        return TestAttr(Attribute::JAVA_IMPL);
+    }
+
 protected:
     Decl(ASTKind kind) : Node(kind)
     {
@@ -1087,8 +1102,17 @@ struct InheritableDecl : public Decl {
     std::vector<OwnedPtr<Type>> inheritedTypes; /**< Super class or super interfaces. */
     std::set<Ptr<InterfaceTy>> GetSuperInterfaceTys() const;
     std::vector<Ptr<InterfaceTy>> GetStableSuperInterfaceTys() const;
-    // guarantees sub-types always exist before super-types
-    std::vector<Ptr<AST::ClassLikeDecl>> GetAllSuperDecls();
+    /**
+     * Collect this decl and all its super-decls (super classes and super interfaces) via BFS
+     * over inheritedTypes, ordered so sub-types precede super-types, each visited once.
+     * Only collects the super-decls of this declaration; it does NOT include interfaces
+     * introduced by extends of this type.
+     * @param obtainSpecific If true, each super-decl is resolved via Ty::GetDeclPtrOfTy
+     *     (maps common type to its specificImplementation when one exists); if false, taken
+     *     directly from the type. Only super-decls are mapped; the root (this) is inserted
+     *     as-is, so callers of the specific mode MUST ensure `this` is already a specific decl.
+     */
+    std::vector<Ptr<AST::ClassLikeDecl>> GetAllSuperDecls(bool obtainSpecific = false);
 
 protected:
     InheritableDecl(ASTKind kind) : Decl(kind)
@@ -1466,6 +1490,8 @@ struct InterfaceBody : Node {
  */
 struct ClassLikeDecl : InheritableDecl {
     std::set<Ptr<Decl>> subDecls; /**< A <: B ==>  B.subDecls = {A}. */
+    void MarkAsJavaMirror();
+    void MarkAsJavaImpl();
 protected:
     ClassLikeDecl(ASTKind kind) : InheritableDecl(kind)
     {
@@ -3065,19 +3091,6 @@ struct Package : Node {
     bool noSubPkg{false};
     bool needExported{true}; /**< Parent path of package path is "src", there is no need to export this package. */
 
-    // ===--------------------------------------------------------------------===//
-    // Interop CJ Package Level Symbol Config
-    // ===--------------------------------------------------------------------===//
-    InteropCJStrategy interopCJApiStrategy = InteropCJStrategy::NONE;
-    InteropCJGenericStrategyType interopCJGenericTypeStrategy = InteropCJGenericStrategyType::NONE;
-    std::vector<std::string> interopCJIncludedApis;
-    std::vector<std::string> interopCJExcludedApis;
-    std::unordered_map<std::string, std::unordered_map<std::string, GenericTypeArguments>>
-        allowedInteropCJGenericInstantiations;
-    std::vector<std::string> interopTuples; /**< Record interop tuple configuration. Writed in sema. */
-    bool isInteropCJPackageConfig{false};
-    std::vector<LambdaPattern> lambdaPatterns;
-
 private:
     std::vector<std::string> allDependentStdPkgs; /**< Record all dependent standard packages. */
 
@@ -3126,11 +3139,6 @@ public:
     const std::vector<std::string>& GetAllDependentStdPkgs() const
     {
         return allDependentStdPkgs;
-    }
-
-    const std::vector<LambdaPattern>& GetLambdaPatterns() const
-    {
-        return lambdaPatterns;
     }
 };
 

@@ -65,21 +65,31 @@ Ptr<Value> Translator::Visit(const AST::ArrayExpr& array)
 Expression* Translator::CreateAndAppendApplyCallFromCallExpr(
     Value& callee, FuncCallContext& context, const FuncType& instFuncTy, const AST::CallExpr& expr)
 {
-    auto funcCall = TryCreate<Apply>(currentBlock, instFuncTy.GetReturnType(), &callee, context);
     const auto& loc = TranslateLocation(expr);
+    auto firstNothingArgIndex = GetFirstNothingTypeArgIndex(context.args);
+    if (context.args.size() == expr.args.size() && firstNothingArgIndex.has_value()) {
+        // The never-executed call is a separate unreachable source region from its terminating argument.
+        auto argumentRootLocation = currentBlock->GetDebugLocation();
+        CreateAndAppendTerminator<Exit>(currentBlock);
+        currentBlock = CreateBlock();
+        currentBlock->SetDebugLocation(argumentRootLocation);
+    }
+    auto funcCall = TryCreate<Apply>(currentBlock, instFuncTy.GetReturnType(), &callee, context);
     funcCall->SetDebugLocation(loc);
     if (expr.callKind == AST::CallKind::CALL_SUPER_FUNCTION) {
         if (auto apply = DynamicCast<Apply*>(funcCall)) {
             apply->SetSuperCall();
         }
     }
-    if (HasNothingTypeArg(context.args)) {
-        if (expr.baseFunc != nullptr) {
-            const auto& warningLoc = TranslateLocation(*expr.baseFunc);
-            funcCall->Set<DebugLocationInfoForWarning>(warningLoc);
-        } else {
-            funcCall->Set<DebugLocationInfoForWarning>(loc);
-        }
+    const auto& warningLoc = expr.baseFunc != nullptr ? TranslateLocation(*expr.baseFunc) : loc;
+    if (firstNothingArgIndex.has_value()) {
+        FinalizeNothingCallArguments(*funcCall, loc, warningLoc);
+        return funcCall;
+    }
+    if (instFuncTy.GetReturnType()->IsNothing()) {
+        CreateAndAppendTerminator<Exit>(loc, currentBlock);
+        currentBlock = CreateBlock();
+        currentBlock->SetDebugLocation(loc);
     }
     return funcCall;
 }
@@ -234,14 +244,16 @@ Ptr<Value> Translator::InitArrayByCollection(const AST::ArrayExpr& array)
     Type* originalObjType =
         StaticCast<CustomType*>(collection->GetType()->StripAllRefs())->GetCustomTypeDef()->GetType();
     originalObjType = builder.GetType<RefType>(originalObjType);
+    auto funcType = builder.GetType<FuncType>(std::vector<Type*>({originalObjType}), sizeTy);
+    auto collectionType = collection->GetType()->StripAllRefs();
+    std::vector<Type*> emptyInstTypeArgs;
+    auto sizeGetFunc = collectionType->GetExpectedFunc("$sizeget", *funcType, false, emptyInstTypeArgs, builder, true);
+    CJC_NULLPTR_CHECK(sizeGetFunc);
     auto invokeInfo = InvokeCallContext {
+        .method = sizeGetFunc,
         .caller = collection,
         .funcCallCtx = FuncCallContext {
             .thisType = collection->GetType()->StripAllRefs()
-        },
-        .virMethodCtx = FuncSigInfo {
-            .funcName = "$sizeget",
-            .funcType = builder.GetType<FuncType>(std::vector<Type*>({originalObjType}), sizeTy)
         }
     };
     auto loc = TranslateLocation(array);
@@ -281,8 +293,9 @@ Ptr<Value> Translator::InitVArrayByItem(const AST::ArrayExpr& vArray)
     auto vArrayTy = StaticCast<VArrayType*>(chirTy.TranslateType(*vArray.GetTy()));
     auto eleTy = vArrayTy->GetElementType();
 
+    auto size = vArrayTy->GetSize();
     auto sizeVal =
-        CreateAndAppendConstantExpression<IntLiteral>(builder.GetInt64Ty(), *currentBlock, vArrayTy->GetSize())
+        CreateAndAppendConstantExpression<IntLiteral>(builder.GetInt64Ty(), *currentBlock, static_cast<uint64_t>(size))
             ->GetResult();
     auto valArg = vArray.args[0].get();
     auto val = TranslateExprArg(*valArg);
@@ -298,8 +311,9 @@ Ptr<Value> Translator::InitVArrayByLambda(const AST::ArrayExpr& vArray)
     auto loc = TranslateLocation(vArray);
     auto vArrayTy = StaticCast<VArrayType*>(chirTy.TranslateType(*vArray.GetTy()));
     auto eleTy = vArrayTy->GetElementType();
+    auto size = vArrayTy->GetSize();
     auto sizeVal =
-        CreateAndAppendConstantExpression<IntLiteral>(builder.GetInt64Ty(), *currentBlock, vArrayTy->GetSize())
+        CreateAndAppendConstantExpression<IntLiteral>(builder.GetInt64Ty(), *currentBlock, static_cast<uint64_t>(size))
             ->GetResult();
     auto initFn = TranslateExprArg(*vArray.args[0]);
     auto nullItem = CreateAndAppendConstantExpression<NullLiteral>(eleTy, *currentBlock)->GetResult();

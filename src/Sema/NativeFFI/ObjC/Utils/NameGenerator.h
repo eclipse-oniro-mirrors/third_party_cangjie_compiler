@@ -21,15 +21,12 @@
 namespace Cangjie::Interop::ObjC {
 class NameGenerator {
 public:
-    explicit NameGenerator(const BaseMangler& mangler, TypeManager& typeManager);
-    std::string GenerateInitCjObjectName(const AST::VarDecl& target, const std::string* genericActualName = nullptr);
-    std::string GenerateInitCjObjectName(const AST::FuncDecl& target, const std::string* genericActualName = nullptr);
-    std::string GenerateInitCjObjectName(const AST::Decl& target, const std::string* genericActualName = nullptr);
-    std::string GenerateDeleteCjObjectName(const AST::Decl& target, const std::string* genericActualName = nullptr);
-    std::string GenerateLockCjObjectName(const AST::Decl& target);
-    std::string GenerateUnlockCjObjectName(const AST::Decl& target);
-    std::string GenerateMethodWrapperName(const AST::FuncDecl& target, const std::string* genericActualName = nullptr,
-        bool isInnerGeneric = false);
+    explicit NameGenerator(const BaseMangler& mangler);
+    std::string GenerateInitCjObjectName(const AST::VarDecl& target);
+    std::string GenerateInitCjObjectName(const AST::FuncDecl& target);
+    std::string GenerateInitCjObjectName(const AST::Decl& target);
+    std::string GenerateDeleteCjObjectName(const AST::Decl& target);
+    std::string GenerateMethodWrapperName(const AST::FuncDecl& target);
     std::string GeneratePropGetterWrapperName(const AST::PropDecl& target);
     std::string GetPropSetterWrapperName(const AST::PropDecl& target);
     std::string GetFieldGetterWrapperName(const AST::VarDeclAbstract& target,
@@ -40,7 +37,7 @@ public:
      * Returns name declared in @ForeignName or target.identifier if no foreign name specified.
      * The only one exception is function: If it has one param, then target.identifier + ":" will be returned.
      */
-    std::string GetObjCDeclName(const AST::Decl& target, const std::string* genericActualName = nullptr);
+    static std::string GetObjCDeclName(const AST::Decl& target);
 
     std::string GetObjCGetterName(const AST::Decl& arget);
     std::string GetObjCSetterName(const AST::Decl& target);
@@ -63,9 +60,11 @@ public:
      */
     static Ptr<std::string> GetUserDefinedObjCName(const AST::Decl& target);
 
+    static std::string GenerateHandleWrapperName(const AST::ClassLikeDecl& mirror) noexcept;
+    static std::string GenerateRegistryCompanionName(const AST::ClassDecl& impl) noexcept;
+
 private:
     const BaseMangler& mangler;
-    TypeManager& typeManager;
 };
 } // namespace Cangjie::Interop::ObjC
 

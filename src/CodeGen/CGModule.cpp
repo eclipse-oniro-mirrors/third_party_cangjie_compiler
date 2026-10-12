@@ -214,7 +214,6 @@ void CGModule::GenCodeGenAddedMetadata() const
 
 namespace {
 
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
 inline void SetCFFIStub(const CHIR::Value& func, llvm::Function* function)
 {
     CJC_NULLPTR_CHECK(function);
@@ -231,7 +230,6 @@ inline void SetCFFIStub(const CHIR::Value& func, llvm::Function* function)
         }
     }
 }
-#endif
 
 void AddToGenericParamMapUnderExtendScope(const llvm::Function* function, std::unique_ptr<CGFunction>& cgFunc,
     const CHIR::Function& f, std::optional<size_t> outerTIIdx)
@@ -282,9 +280,38 @@ void AddToGenericParamMapWithOuterTI(const llvm::Function* function, std::unique
         ++idx;
     }
 }
+
+void SetupGenericParamsMap(llvm::Function* function, std::unique_ptr<CGFunction>& cgFunc,
+    const CHIR::Value& func, const CGFunctionType& cgFuncType)
+{
+    for (auto& [gt, idx] : cgFuncType.GetGenericParamIndicesMap()) {
+        function->getArg(static_cast<unsigned>(idx))->setName("ti." + gt->GetSrcCodeIdentifier());
+        auto index = idx;
+        (void)cgFunc->genericParamsMap.emplace(
+            gt, [function, index](IRBuilder2&) { return function->getArg(static_cast<unsigned>(index)); });
+    }
+
+    auto outerTIIdx = cgFuncType.GetOuterTypeInfoIndex();
+
+    // If this is a function defined within `Extend<T, ..., K>` scope,  we need to
+    // add the `T`, ..., `K` into the genericParamsMap of this function.
+    if (auto f = DynamicCast<const CHIR::Function*>(&func); f && f->IsInExtend()) {
+        CJC_ASSERT(outerTIIdx.has_value());
+        AddToGenericParamMapUnderExtendScope(function, cgFunc, *f, outerTIIdx);
+    }
+
+    if (outerTIIdx.has_value()) {
+        AddToGenericParamMapWithOuterTI(function, cgFunc, func, outerTIIdx);
+    }
+
+    if (auto thisTIIdx = cgFuncType.GetThisTypeInfoIndex()) {
+        auto thisTiArg = function->getArg(static_cast<unsigned>(thisTIIdx.value()));
+        thisTiArg->setName("thisTI");
+    }
+}
 } // namespace
 
-CGFunction* CGModule::GetOrInsertCGFunction(const CHIR::Value* func, bool forWrapper)
+CGFunction* CGModule::GetOrInsertCGFunction(const CHIR::Value* func)
 {
     CJC_NULLPTR_CHECK(func);
     if (auto it = valueMapping.find(func); it != valueMapping.end()) {
@@ -292,92 +319,71 @@ CGFunction* CGModule::GetOrInsertCGFunction(const CHIR::Value* func, bool forWra
         CJC_NULLPTR_CHECK(cgFunction);
         return cgFunction;
     }
-    auto cgFuncType = StaticCast<CGFunctionType*>(CGType::GetOrCreateWithNode(*this, func, true, forWrapper));
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-    auto chirFuncTy = StaticCast<CHIR::FuncType*>(func->GetType());
+    auto cgFuncType = StaticCast<CGFunctionType*>(CGType::GetOrCreateWithNode(*this, func, true));
+    auto function = DeclareLLVMFunction(*func, *cgFuncType);
+    auto cgFunc = std::make_unique<CGFunction>(function, cgFuncType, func, *this);
+    SetupGenericParamsMap(function, cgFunc, *func, *cgFuncType);
+    SetCJNativeFunctionAttrs(*func, *function, *cgFunc);
+    auto ret = cgFunc.get();
+    (void)functions.emplace(function, ret);
+    SetOrUpdateMappedCGValue(func, std::move(cgFunc));
+    return ret;
+}
+
+llvm::Function* CGModule::DeclareLLVMFunction(const CHIR::Value& func, const CGFunctionType& cgFuncType)
+{
+    auto chirFuncTy = StaticCast<CHIR::FuncType*>(func.GetType());
     CJC_NULLPTR_CHECK(chirFuncTy);
     llvm::FunctionType* functionType =
-        chirFuncTy->IsCFunc() ? cffi->GetCFuncType(*chirFuncTy) : cgFuncType->GetLLVMFunctionType();
-#endif
+        chirFuncTy->IsCFunc() ? cffi->GetCFuncType(*chirFuncTy) : cgFuncType.GetLLVMFunctionType();
     auto function = llvm::cast<llvm::Function>(
-        module->getOrInsertFunction(func->GetIdentifierWithoutPrefix(), functionType).getCallee());
-    if (forWrapper) {
-        function->addFnAttr("wrapper");
-    }
-    if (func->TestAttr(CHIR::Attribute::NO_INLINE)) {
+        module->getOrInsertFunction(func.GetIdentifierWithoutPrefix(), functionType).getCallee());
+    if (func.TestAttr(CHIR::Attribute::NO_INLINE)) {
         function->addFnAttr(llvm::Attribute::NoInline);
     }
-    if (cgFuncType->HasBasePtr()) {
+    if (cgFuncType.HasBasePtr()) {
         AddFnAttr(function, llvm::Attribute::get(module->getContext(), STRUCT_MUT_FUNC_ATTR)); // Deprecated
         AddFnAttr(function, llvm::Attribute::get(module->getContext(), THIS_PARAM_HAS_BP));
     }
 
-    auto chirFunc = StaticCast<const CHIR::Function*>(func);
+    auto chirFunc = StaticCast<const CHIR::Function*>(&func);
     auto chirLinkage = chirFunc->Get<CHIR::LinkTypeInfo>();
-    if (func->IsFuncWithBody()) {
-        bool markByMD = cgCtx->IsCGParallelEnabled() && !IsCHIRWrapper(func->GetIdentifierWithoutPrefix());
+    if (func.IsFuncWithBody()) {
+        bool markByMD = cgCtx->IsCGParallelEnabled() && !IsCHIRWrapper(func.GetIdentifierWithoutPrefix());
         AddLinkageTypeMetadata(*function, CHIRLinkage2LLVMLinkage(chirLinkage), markByMD);
     } else if (chirLinkage == Linkage::EXTERNAL_WEAK) {
         // Import function in if branch of @IfAvailable need to mark as EXTERNAL_WEAK.
         function->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
     }
+    return function;
+}
 
-    auto cgFunc = std::make_unique<CGFunction>(function, cgFuncType, func, *this);
-
-    for (auto& [gt, idx] : cgFuncType->GetGenericParamIndicesMap()) {
-        function->getArg(static_cast<unsigned>(idx))->setName("ti." + gt->GetSrcCodeIdentifier());
-        auto index = idx;
-        (void)cgFunc->genericParamsMap.emplace(
-            gt, [function, index](IRBuilder2&) { return function->getArg(static_cast<unsigned>(index)); });
-    }
-
-    auto outerTIIdx = cgFuncType->GetOuterTypeInfoIndex();
-
-    // If this is a function defined within `Extend<T, ..., K>` scope,  we need to
-    // add the `T`, ..., `K` into the genericParamsMap of this function.
-    if (auto f = DynamicCast<const CHIR::Function*>(func); f && f->IsInExtend()) {
-        CJC_ASSERT(outerTIIdx.has_value());
-        AddToGenericParamMapUnderExtendScope(function, cgFunc, *f, outerTIIdx);
-    }
-
-    if (outerTIIdx.has_value()) {
-        AddToGenericParamMapWithOuterTI(function, cgFunc, *func, outerTIIdx);
-    }
-
-    if (auto thisTIIdx = cgFuncType->GetThisTypeInfoIndex()) {
-        auto thisTiArg = function->getArg(static_cast<unsigned>(thisTIIdx.value()));
-        thisTiArg->setName("thisTI");
-    }
-
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
-    SetCFFIStub(*func, function);
+void CGModule::SetCJNativeFunctionAttrs(const CHIR::Value& func, llvm::Function& function, CGFunction& cgFunc)
+{
+    auto chirFuncTy = StaticCast<CHIR::FuncType*>(func.GetType());
+    SetCFFIStub(func, &function);
     if (chirFuncTy->IsCFunc()) {
-        cffi->AddFunctionAttr(*chirFuncTy, *function);
+        cffi->AddFunctionAttr(*chirFuncTy, function);
     } else {
-        SetGCCangjie(function);
-        auto chirParamTypes = dynamic_cast<CHIR::FuncType*>(func->GetType())->GetParamTypes();
+        SetGCCangjie(&function);
+        auto chirParamTypes = dynamic_cast<CHIR::FuncType*>(func.GetType())->GetParamTypes();
         for (size_t idx = 0; idx < chirParamTypes.size(); ++idx) {
             if (chirParamTypes[idx]->IsStruct()) {
-                cgFunc->GetArgByIndexFromCHIR(idx)->addAttr(llvm::Attribute::ReadOnly);
-                cgFunc->GetArgByIndexFromCHIR(idx)->addAttr(llvm::Attribute::NoCapture);
+                cgFunc.GetArgByIndexFromCHIR(idx)->addAttr(llvm::Attribute::ReadOnly);
+                cgFunc.GetArgByIndexFromCHIR(idx)->addAttr(llvm::Attribute::NoCapture);
             }
         }
     }
-    if (func->IsFuncWithBody()) {
-        if (!StaticCast<const CHIR::Function*>(func)->IsCFFIWrapper()) {
-            SetGCCangjie(function);
+    if (func.IsFuncWithBody()) {
+        if (!StaticCast<const CHIR::Function*>(&func)->IsCFFIWrapper()) {
+            SetGCCangjie(&function);
         }
     }
-    if (func->TestAttr(CHIR::Attribute::NO_SIDE_EFFECT)) {
-        function->addFnAttr(llvm::Attribute::NoUnwind);
-        function->addFnAttr(llvm::Attribute::ReadOnly);
-        function->addFnAttr(llvm::Attribute::WillReturn);
+    if (func.TestAttr(CHIR::Attribute::NO_SIDE_EFFECT)) {
+        function.addFnAttr(llvm::Attribute::NoUnwind);
+        function.addFnAttr(llvm::Attribute::ReadOnly);
+        function.addFnAttr(llvm::Attribute::WillReturn);
     }
-#endif
-    auto ret = cgFunc.get();
-    (void)functions.emplace(function, ret);
-    SetOrUpdateMappedCGValue(func, std::move(cgFunc));
-    return ret;
 }
 
 CGValue* CGModule::GetOrInsertGlobalVariable(const CHIR::GlobalVar* chirGV)
@@ -443,7 +449,6 @@ llvm::Value* CGModule::GenerateUnitTypeValue()
     return unitVal;
 }
 
-#ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
 llvm::Constant* CGModule::GetExceptionIntrinsicPersonality()
 {
     auto funcName = "__cj_personality_v0$";
@@ -466,7 +471,6 @@ llvm::Constant* CGModule::GetExceptionIntrinsicPersonality()
     }
     return func;
 }
-#endif
 
 void CGModule::Opt()
 {
@@ -532,11 +536,19 @@ llvm::GlobalVariable* CGModule::GeneratePrivateUnnamedAddrConstant(
 llvm::GlobalVariable* CGModule::GetOrCreateGlobalVariable(
     llvm::Constant* constVal, const std::string& gvContent, bool isTuple)
 {
-    std::string name = isTuple ? GetConstantTupleName(gvContent) : GetConstantArrayName(gvContent);
-    if (auto gv = module->getGlobalVariable(name, true); gv) {
-        return gv;
-    } else {
-        return GeneratePrivateUnnamedAddrConstant(name, constVal);
+    const std::string baseName = isTuple ? GetConstantTupleName(gvContent) : GetConstantArrayName(gvContent);
+    std::string name = baseName;
+    for (size_t collisionId = 1;; ++collisionId) {
+        auto namedValue = module->getNamedValue(name);
+        if (!namedValue) {
+            return GeneratePrivateUnnamedAddrConstant(name, constVal);
+        }
+        // Constants are uniqued within an LLVMContext, so pointer equality also verifies their contents.
+        if (auto gv = llvm::dyn_cast<llvm::GlobalVariable>(namedValue);
+            gv && gv->hasInitializer() && gv->getInitializer() == constVal) {
+            return gv;
+        }
+        name = baseName + "." + std::to_string(collisionId);
     }
 }
 

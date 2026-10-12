@@ -17,6 +17,8 @@
 
 #include <deque>
 #include <map>
+#include <utility>
+#include <vector>
 
 #include "cangjie/AST/ASTCasting.h"
 #include "cangjie/AST/Node.h"
@@ -26,6 +28,7 @@
 #include "cangjie/CHIR/IR/CHIRBuilder.h"
 #include "cangjie/CHIR/IR/CHIRContext.h"
 #include "cangjie/Basic/DiagnosticEngine.h"
+#include "cangjie/CHIR/IR/Expression/Expression.h"
 #include "cangjie/CHIR/IR/Type/CHIRType.h"
 #include "cangjie/CHIR/IR/Value/Value.h"
 #include "cangjie/Utils/CastingTemplate.h"
@@ -405,10 +408,11 @@ FuncType* ConvertRealFuncTypeToVirtualFuncType(const FuncType& type, CHIRBuilder
  * @param parentBlock The parent block.
  * @param loc The debug location.
  * @param needCheck A flag indicating if a check is needed.
- * @return The value after type casting or boxing if needed.
+ * @return A pair of the value after type casting or boxing if needed, and the newly created expressions
+ *         (not inserted into the block; the caller must append or move them).
  */
-Ptr<Value> TypeCastOrBoxIfNeeded(Value& val, Type& expectedTy, CHIRBuilder& builder, Block& parentBlock,
-    const DebugLocation& loc = INVALID_LOCATION, bool needCheck = true);
+std::pair<Value*, std::vector<Expression*>> TypeCastOrBoxIfNeeded(Value& val, Type& expectedTy, CHIRBuilder& builder,
+    Block& parentBlock, const DebugLocation& loc = INVALID_LOCATION, bool needCheck = true);
 
 /**
  * @brief Creates and appends an expression to the builder.
@@ -468,6 +472,19 @@ bool IsSuperOrThisCall(const AST::CallExpr& expr);
 std::unordered_map<const GenericType*, Type*> GetInstMapFromCurDefToCurType(const CustomType& curType);
 
 std::unordered_map<const GenericType*, Type*> GetInstMapFromCurDefAndExDefToCurType(const CustomType& curType);
+
+/**
+ * @brief Build generic instantiation map from an ApplyBase call site.
+ *
+ * Maps callee function/lambda generic parameters and parent custom-type generics
+ * to the instantiated types provided by the apply. Does not decide ThisType
+ * rewriting (left to callers such as BlockGroupCopyHelper).
+ *
+ * @param apply The apply / try-apply expression.
+ * @param builder The CHIR builder.
+ * @return Instantiation map from generic types to concrete types.
+ */
+std::unordered_map<const GenericType*, Type*> GetInstMapFromApply(const ApplyBase& apply, CHIRBuilder& builder);
 
 /**
  * @brief Retrieves the instance map from a custom type definition and its parent.
@@ -601,15 +618,17 @@ bool IsEnumSelectorType(const Type& type);
 std::vector<ClassDef*> GetExtendedInterfaceDefs(const CustomTypeDef& def);
 
 /**
- * @brief Checks if a custom type definition matches the expected package and source code name.
+ * @brief Checks if a type is a custom type matching the expected package and source code name.
  *
- * @param def The custom type definition to check.
+ * Does not strip references; callers that may hold RefType must StripAllRefs() first.
+ *
+ * @param ty The type to check.
  * @param packageName The expected package name.
  * @param defSrcCodeName The expected source code name.
- * @return True if the custom type definition matches the expected package and source code name, false otherwise.
+ * @return True if the type is the expected custom type, false otherwise.
  */
-bool CheckCustomTypeDefIsExpected(
-    const CustomTypeDef& def, const std::string& packageName, const std::string& defSrcCodeName);
+bool IsExpectedCustomType(
+    const Type& ty, const std::string& packageName, const std::string& defSrcCodeName);
 
 /**
  * @brief Checks if a custom type definition is the core 'Any' type.
@@ -731,12 +750,10 @@ bool IsConstructor(const Value& value);
  */
 Value* GetCastOriginalTarget(const Expression& expr);
 
-bool IsInstanceVarInit(const Value& value);
-
 std::vector<ClassType*> GetSuperTypesRecusively(Type& subType, CHIRBuilder& builder);
 
-Type* GetInstParentCustomTypeForApplyCallee(const Apply& expr, CHIRBuilder& builder);
-Type* GetInstParentCustomTypeForAweCallee(const ApplyWithException& expr, CHIRBuilder& builder);
+Type* GetInstParentCustomTyOfCallee(
+    const Value& value, const std::vector<Value*>& args, const Type* thisType, CHIRBuilder& builder);
 
 std::vector<VTableSearchRes> GetFuncIndexInVTable(
     Type& root, const FuncCallType& funcCallType, CHIRBuilder& builder);
@@ -810,11 +827,34 @@ uint64_t GetRefDims(const Type& type);
 bool IsSTDFunction(const Function& func);
 
 /**
+ * @brief Operator literal for diagnostic / printing, e.g. "-" / "!" / "~".
+ */
+std::string GetUnaryExprKindLiteral(UnaryExprKind kind);
+
+/**
+ * @brief Operator literal for diagnostic / printing, e.g. "+" / "<<" / "&&".
+ */
+std::string GetBinaryExprKindLiteral(BinaryExprKind kind);
+
+/**
  * @brief Retrieves the non-debug users of a value.
  *
  * @param val The value to retrieve the non-debug users from.
  * @return The non-debug users of the value.
  */
 std::vector<Expression*> GetNonDebugUsers(const Value& val);
+
+/**
+ * @brief Retrieves the callee in src parent type.
+ *
+ * @param callee The callee to retrieve in src parent type.
+ * @param methodName The method name to retrieve in src parent type.
+ * @param expectedOffset The expected offset of the callee in src parent type.
+ * @return The callee in src parent type.
+ */
+Function* GetCalleeInSrcParentType(
+    Function& callee, const std::string& methodName, std::optional<size_t> expectedOffset = std::nullopt);
+
+void AddTypeCastForReturnVal(Expression& expr, Type& expectedTy, CHIRBuilder& builder);
 } // namespace Cangjie::CHIR
 #endif

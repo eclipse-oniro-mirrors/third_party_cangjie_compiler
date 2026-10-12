@@ -22,6 +22,7 @@
 #include "cangjie/AST/Match.h"
 #include "cangjie/AST/Walker.h"
 #include "cangjie/Basic/Utils.h"
+#include "cangjie/Utils/CastingTemplate.h"
 #include "cangjie/Utils/ConstantsUtils.h"
 #include "cangjie/Utils/FloatFormat.h"
 #include "cangjie/Utils/StdUtils.h"
@@ -769,21 +770,13 @@ void InsertMirrorVarProp(ClassDecl& decl, Attribute attrToBeSet)
 
 } // namespace Cangjie::AST
 
-namespace {
-using namespace Cangjie::AST;
-
-void SetPositionAndCurFileByProvidedNode(Node& consumer, Node& provider)
-{
-    consumer.curFile = provider.curFile;
-    consumer.begin = provider.begin;
-    consumer.end = provider.end;
-}
-}
-
 namespace Cangjie::Interop::Java {
 bool IsImpl(const Node& node)
 {
-    return !node.TestAttr(Attribute::JAVA_MIRROR) && node.TestAttr(Attribute::JAVA_MIRROR_SUBTYPE);
+    if (!Is<ClassLikeDecl>(node)) {
+        return false;
+    }
+    return StaticAs<ASTKind::CLASS_LIKE_DECL>(&node)->IsJavaImpl();
 }
 
 bool IsImplRegistryCompanion(const Node& node)
@@ -810,12 +803,15 @@ bool IsJObject(const Decl& decl, const std::string& packageName)
 
 bool IsMirror(const Node& node)
 {
-    return node.TestAttr(Attribute::JAVA_MIRROR);
+    if (!Is<ClassLikeDecl>(node)) {
+        return false;
+    }
+    return StaticAs<ASTKind::CLASS_LIKE_DECL>(&node)->IsJavaMirror();
 }
 
-bool IsCJMapping(const Node& node)
+bool IsSyntheticMirrorWrapper(const Node& node)
 {
-    return node.TestAttr(Attribute::JAVA_CJ_MAPPING);
+    return node.astKind == ASTKind::CLASS_DECL && node.TestAttr(Attribute::JAVA_MIRROR_SYNTHETIC_WRAPPER);
 }
 
 bool IsObject(const Node& node)
@@ -823,46 +819,4 @@ bool IsObject(const Node& node)
     return node.GetTy()->IsObject();
 }
 
-bool IsFwdClass(const Node& node)
-{
-    return node.TestAttr(Attribute::CJ_MIRROR_JAVA_INTERFACE_FWD);
-}
-
 } // namespace Cangjie::Interop::Java
-
-namespace Cangjie::Interop::ObjC {
-
-std::string GetSyntheticNameFromClassLike(const ClassLikeDecl& classLikeDecl)
-{
-    return classLikeDecl.identifier.Val() + SYNTHETIC_CLASS_SUFFIX;
-}
-
-bool IsDeclAppropriateForSyntheticClassGeneration(const Decl& decl)
-{
-    return decl.TestAttr(Attribute::OBJ_C_MIRROR) && decl.astKind == ASTKind::INTERFACE_DECL;
-}
-
-// abstract on parser stage, on sema stage abstractness will be removed
-void InsertSyntheticClassDecl(ClassLikeDecl& decl, File& file)
-{
-    auto synthetic = MakeOwned<ClassDecl>();
-    synthetic->CloneAttrs(decl);
-    synthetic->EnableAttr(Attribute::OBJ_C_MIRROR_SYNTHETIC_WRAPPER, Attribute::COMPILER_ADD, Attribute::ABSTRACT);
-    synthetic->DisableAttr(Attribute::OBJ_C_MIRROR);
-    synthetic->identifier = GetSyntheticNameFromClassLike(decl);
-    synthetic->identifier.SetPos(decl.identifier.Begin(), decl.identifier.End());
-
-    synthetic->inheritedTypes.emplace_back(CreateRefType(decl));
-
-    synthetic->fullPackageName = decl.fullPackageName;
-    SetPositionAndCurFileByProvidedNode(*synthetic, decl);
-
-    synthetic->body = MakeOwned<ClassBody>();
-    SetPositionAndCurFileByProvidedNode(*synthetic->body, *synthetic);
-
-    synthetic->moduleName = ::Cangjie::Utils::GetRootPackageName(decl.fullPackageName);
-
-    file.decls.emplace_back(std::move(synthetic));
-}
-
-} // namespace Cangjie::Interop::ObjC

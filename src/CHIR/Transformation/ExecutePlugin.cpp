@@ -51,11 +51,10 @@ bool ExecutePlugin::Execute(const std::string& pluginPath)
 Package* ExecutePlugin::DeserializePluginResult(
     std::unordered_set<Function*>& srcCodeImportedFuncs,
     std::unordered_set<GlobalVar*>& srcCodeImportedVars,
-    std::vector<Function*>& initFuncsForConstVar,
-    std::unordered_map<Block*, Terminator*>& maybeUnreachable)
+    std::vector<Function*>& initFuncsForConstVar)
 {
     // 1. convert CHIR pointers to strings
-    CHIRPtrToString(srcCodeImportedFuncs, srcCodeImportedVars, initFuncsForConstVar, maybeUnreachable);
+    CHIRPtrToString(srcCodeImportedFuncs, srcCodeImportedVars, initFuncsForConstVar);
 
     // 2. reset CHIR context
     builder.MergeAllocatedInstance();
@@ -76,15 +75,14 @@ Package* ExecutePlugin::DeserializePluginResult(
 #endif
 
     // 4. convert strings to CHIR pointers
-    StringToCHIRPtr(srcCodeImportedFuncs, srcCodeImportedVars, initFuncsForConstVar, maybeUnreachable);
+    StringToCHIRPtr(srcCodeImportedFuncs, srcCodeImportedVars, initFuncsForConstVar);
     return builder.GetCurPackage();
 }
 
 void ExecutePlugin::CHIRPtrToString(
     std::unordered_set<Function*>& srcCodeImportedFuncs,
     std::unordered_set<GlobalVar*>& srcCodeImportedVars,
-    std::vector<Function*>& initFuncsForConstVar,
-    std::unordered_map<Block*, Terminator*>& maybeUnreachable)
+    std::vector<Function*>& initFuncsForConstVar)
 {
     for (auto f : srcCodeImportedFuncs) {
         srcCodeImportedFuncNames.emplace(f->GetIdentifierWithoutPrefix());
@@ -98,23 +96,12 @@ void ExecutePlugin::CHIRPtrToString(
         initFuncsForConstVarNames.emplace_back(f->GetIdentifierWithoutPrefix());
     }
     initFuncsForConstVar.clear();
-    for (auto& it : maybeUnreachable) {
-        auto funcName = it.first->GetTopLevelFunc()->GetIdentifierWithoutPrefix();
-        auto blockName = it.first->GetIdentifierWithoutPrefix();
-        // maybe a terminator is created and removed in AST2CHIR, so it doesn't have a parent block
-        if (it.second->GetParentBlock()) {
-            auto terminatorName = it.second->GetParentBlock()->GetIdentifierWithoutPrefix();
-            unreachableBlockNames[funcName] = {blockName, terminatorName};
-        }
-    }
-    maybeUnreachable.clear();
 }
 
 void ExecutePlugin::StringToCHIRPtr(
     std::unordered_set<Function*>& srcCodeImportedFuncs,
     std::unordered_set<GlobalVar*>& srcCodeImportedVars,
-    std::vector<Function*>& initFuncsForConstVar,
-    std::unordered_map<Block*, Terminator*>& maybeUnreachable)
+    std::vector<Function*>& initFuncsForConstVar)
 {
     auto chirPkg = builder.GetCurPackage();
     for (auto def : chirPkg->GetAllExtendDef()) {
@@ -153,31 +140,6 @@ void ExecutePlugin::StringToCHIRPtr(
             if (f->GetIdentifierWithoutPrefix() == it) {
                 initFuncsForConstVar.emplace_back(f);
                 break;
-            }
-        }
-    }
-
-    for (auto& it : unreachableBlockNames) {
-        for (auto f : chirPkg->GetGlobalFuncsWithBody()) {
-            if (f->GetIdentifierWithoutPrefix() != it.first) {
-                continue;
-            }
-            auto allBlocks = f->GetBody()->GetAllBlocks();
-            Block* bb = nullptr;
-            Terminator* tt = nullptr;
-            for (auto block : allBlocks) {
-                if (bb != nullptr && tt != nullptr) {
-                    break;
-                }
-                if (block->GetIdentifierWithoutPrefix() == it.second.first) {
-                    bb = block;
-                }
-                if (block->GetIdentifierWithoutPrefix() == it.second.second) {
-                    tt = block->GetTerminator();
-                }
-            }
-            if (bb != nullptr && tt != nullptr) {
-                maybeUnreachable.emplace(bb, tt);
             }
         }
     }

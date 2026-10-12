@@ -33,7 +33,7 @@ int64_t Translator::CalculateDelayExitLevelForReturn()
     }
     return level;
 }
- 
+
 int64_t Translator::CalculateDelayExitLevelForThrow()
 {
     return CalculateDelayExitLevelForReturn() + 1;
@@ -78,9 +78,8 @@ Ptr<Value> Translator::Visit(const AST::ReturnExpr& expr)
     if (level > 0 && delayExitSignal) {
         UpdateDelayExitSignal(level);
     }
-    Ptr<Terminator> terminator = nullptr;
     if (finallyContext.empty()) {
-        terminator = CreateAndAppendTerminator<Exit>(loc, currentBlock);
+        auto terminator = CreateAndAppendTerminator<Exit>(loc, currentBlock);
         /* compile add return expr should not print warning.
             public open func foo(): Int64 {
                 unsafe{        ---------------> will have a compiler add return expr.
@@ -98,12 +97,11 @@ Ptr<Value> Translator::Visit(const AST::ReturnExpr& expr)
         auto prevBlock = currentBlock;
         // Create return in separate block, and control flow will be redirected to this block at the end of finally.
         currentBlock = CreateBlock();
-        terminator = CreateAndAppendTerminator<Exit>(loc, currentBlock);
+        CreateAndAppendTerminator<Exit>(loc, currentBlock);
         // the pair of blocks is {the block before control flow, control flow's target block}.
         controlBlocks[index].emplace_back(prevBlock, currentBlock);
     }
-    // For following unreachable expressions, and return also has value of type 'Nothing'.
     currentBlock = CreateBlock();
-    maybeUnreachable.emplace(currentBlock, terminator);
+    currentBlock->SetDebugLocation(loc);
     return nullptr;
 }

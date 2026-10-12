@@ -19,7 +19,8 @@ namespace {
 bool HasFuncCallWithNothingRetVal(const Block& block)
 {
     for (auto expr : block.GetNonTerminatorExpressions()) {
-        if (!Cangjie::Is<FuncCall>(expr)) {
+        // Only Apply/Invoke/InvokeStatic (+ Try*) — not Intrinsic, even though IntrinsicBase : FuncCall.
+        if (!Cangjie::Is<ApplyBase>(expr) && !Cangjie::Is<DynamicDispatch>(expr)) {
             continue;
         }
         auto type = expr->GetResultType()->StripAllRefs();
@@ -180,7 +181,7 @@ void VarInitCheck::UseBeforeInitCheck(
         }
     };
 
-    const auto actionOnTerminator = [this, func, &members](const MaybeUninitDomain& state, const Terminator* terminator,
+    const auto actionOnTerminator = [this, func, &members](const MaybeUninitDomain& state, const Expression* terminator,
                                         std::optional<Block*>) {
         if (!func->IsConstructor()) {
             return;
@@ -218,8 +219,8 @@ void VarInitCheck::UseBeforeInitCheck(
             if (auto uninitedMembers = state.GetMaybeUninitedLocalMembers(); !uninitedMembers.empty()) {
                 RaiseUninitedDefMemberError(state, func, members, uninitedMembers);
             }
-        } else if (terminator->GetExprKind() == ExprKind::APPLY_WITH_EXCEPTION) {
-            CheckMemberFuncCall(state, *func, *StaticCast<ApplyWithException*>(terminator));
+        } else if (auto tryApply = DynamicCast<const TryApply*>(terminator)) {
+            CheckMemberFuncCall(state, *func, *tryApply);
         }
     };
 
@@ -242,7 +243,7 @@ bool VarInitCheck::CheckLoadToUninitedAllocation(const MaybeUninitDomain& state,
 bool VarInitCheck::CheckGetElementRefToUninitedAllocation(
     const MaybeUninitDomain& state, const GetElementRef& getElementRef) const
 {
-    auto targetVal = getElementRef.GetLocation();
+    auto targetVal = getElementRef.GetBase();
     auto oriType = targetVal->GetType()->StripAllRefs();
     if (!oriType->IsStruct() && !oriType->IsEnum()) {
         // class need load before use, do not check it, only check struct and enum
@@ -266,7 +267,7 @@ std::optional<size_t> IsGetElemRefViaDefMember(const Expression& expr, const Par
         return std::nullopt;
     }
     auto getElemRef = Cangjie::StaticCast<const GetElementRef*>(&expr);
-    auto location = getElemRef->GetLocation();
+    auto location = getElemRef->GetBase();
     if (location == &thisArg) {
         return getElemRef->GetPath()[0];
     } else if (location->IsLocalVar()) {
@@ -302,7 +303,7 @@ namespace {
 std::optional<size_t> IsStoreViaDefMember(
     const StoreElementRef& store, const Parameter& thisArg, bool shouldBeNested = false)
 {
-    auto location = store.GetLocation();
+    auto location = store.GetBase();
     // The parameter `shouldBeNested` means if the target of the xxxGetElementRef must be
     // a nested class/struct member.
     if (location == &thisArg && (!shouldBeNested || store.GetPath().size() > 1)) {
@@ -445,7 +446,7 @@ void VarInitCheck::ReassignInitedLetVarCheck(const Function* func, const Constru
         }
     };
     const auto actionAfterVisitExpr = [](const MaybeInitDomain&, Expression*, size_t) {};
-    const auto actionOnTerminator = [](const MaybeInitDomain&, Terminator*, std::optional<Block*>) {};
+    const auto actionOnTerminator = [](const MaybeInitDomain&, Expression*, std::optional<Block*>) {};
 
     result->VisitWith(actionBeforeVisitExpr, actionAfterVisitExpr, actionOnTerminator);
 }
@@ -459,7 +460,7 @@ void VarInitCheck::CheckStoreToInitedCustomDefMember(const MaybeInitDomain& stat
         return;
     }
     auto& paths = store->GetPath();
-    if (store->GetLocation() == func->GetParam(0) && paths.size() == 1) {
+    if (store->GetBase() == func->GetParam(0) && paths.size() == 1) {
         if (members[paths[0]].TestAttr(Attribute::READONLY) &&
             state.IsMaybeInitedMember(paths[0]) != MaybeInitDomain::InitedMemberKind::NA) {
             // this `let-defined` member variable has already been initialised

@@ -9,7 +9,9 @@
 #include "GenerateJavaMirrorReferenceWrapperClass.h"
 #include "JavaInteropManager.h"
 #include "NativeFFI/Java/BeforeTypeCheck/Utils.h"
+#include "cangjie/AST/AttributePack.h"
 #include "cangjie/AST/Node.h"
+#include "cangjie/Modules/ImportManager.h"
 #include "cangjie/Utils/SafePointer.h"
 #include "cangjie/AST/Utils.h"
 #include "cangjie/AST/Create.h"
@@ -35,6 +37,17 @@ void InsertSuperTypes(ClassDecl& wrapper, ClassLikeDecl& mirror)
     }
     wrapper.inheritedTypes.emplace_back(CreateRefType(mirror));
 }
+
+void InsertJavaMirrorAnnotation(ClassDecl& wrapper, const std::string& javaName, const ImportManager& importManager)
+{
+    auto anno = MakeOwned<Annotation>();
+    anno->EnableAttr(Attribute::COMPILER_ADD);
+    anno->kind = AnnotationKind::JAVA_MIRROR;
+    anno->args.push_back(CreateFuncArg(
+        CreateLitConstExpr(LitConstKind::STRING, javaName, GetStringDecl(importManager).GetTy())));
+
+    wrapper.annotations.emplace_back(std::move(anno));
+}
 } // namespace
 
 bool GenerateJavaMirrorReferenceWrapperClass::ShouldHaveMirrorReferenceWrapper(const Node& node) const
@@ -42,16 +55,18 @@ bool GenerateJavaMirrorReferenceWrapperClass::ShouldHaveMirrorReferenceWrapper(c
     return IsMirror(node) && (node.IsInterfaceDecl() || node.IsAbstractClass());
 }
 
-OwnedPtr<ClassDecl> GenerateJavaMirrorReferenceWrapperClass::GenerateWrapperClass(ClassLikeDecl& mirror) const
+OwnedPtr<ClassDecl> GenerateJavaMirrorReferenceWrapperClass::GenerateWrapperClass(
+    const ImportManager& importManager, ClassLikeDecl& mirror) const
 {
     CJC_ASSERT(ShouldHaveMirrorReferenceWrapper(mirror));
     auto wrapper = CloneClassSkeleton(mirror, GetMirrorReferenceWrapperNameFromClassLike(mirror));
+    wrapper->MarkAsJavaMirror();
     wrapper->EnableAttr(
-        Attribute::JAVA_MIRROR,
-        Attribute::JAVA_MIRROR_SUBTYPE,
-        Attribute::JAVA_MIRROR_SYNTHETIC_WRAPPER);
+        Attribute::JAVA_MIRROR_SYNTHETIC_WRAPPER,
+        Attribute::NO_REFLECT_INFO);
 
     InsertSuperTypes(*wrapper, mirror);
+    InsertJavaMirrorAnnotation(*wrapper, GetJavaFQName(mirror), importManager);
     return wrapper;
 }
 
@@ -61,7 +76,7 @@ void GenerateJavaMirrorReferenceWrapperClass::Process(PreTypeCheckContext& ctx)
         if (!ShouldHaveMirrorReferenceWrapper(*mirror)) {
             continue;
         }
-        ctx.AddGeneratedDecl(GenerateWrapperClass(*mirror));
+        ctx.AddGeneratedDecl(GenerateWrapperClass(ctx.importManager, *mirror));
     }
 }
 

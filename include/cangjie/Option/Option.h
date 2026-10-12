@@ -133,8 +133,7 @@ enum class Environment : uint8_t {
     NOT_AVAILABLE,
 };
 
-inline static const std::string DEFALUT_ANDROID_API {"31"};
-inline static const std::string MIN_ANDROID_API {"26"};
+inline static const std::string MIN_ANDROID_API {"23"};
 
 struct Info {
     ArchType arch;
@@ -603,15 +602,9 @@ public:
 
     bool implicitPrelude = true; /**< Whether import prelude libraries by default. */
 
-    bool enableInteropCJMapping = false; /**< Whether enable cj data structure mapping for interop */
-
     bool enableTimer = false; /**< Whether enable timer report. */
 
     bool enableMemoryCollect = false; /**< Whether enable memory usage report. */
-
-    enum class InteropLanguage : uint8_t { NA, Java, ObjC };
-
-    InteropLanguage targetInteropLanguage{InteropLanguage::NA};
 
     std::optional<unsigned int> errorCountLimit = 8; /**< limits the amount of errors compiler prints */
 
@@ -683,7 +676,7 @@ public:
      *
      * @return bool Returns true if LTO is enabled, otherwise returns false.
      */
-    bool IsCompileAsExeEnabled() const 
+    bool IsCompileAsExeEnabled() const
     {
         return enableCompileAsExe;
     }
@@ -851,7 +844,7 @@ public:
     enum class CHIRMode : uint8_t { NA, STANDARD, WITH_ID, ALL };
 
     bool codegenDebugMode = false;
-    bool dumpAST = false; 
+    bool dumpAST = false;
     bool dumpCHIR = false;
     bool dumpIR = false;
     bool dumpAll = false; // dump all of AST, CHIR, IR
@@ -881,8 +874,6 @@ public:
     bool compileCjd{false};
 
     bool cjdbMode = false; /** whether the option used in cjdb */
-
-    std::string interopCJPackageConfigPath = "./"; /**< cjinterop .toml package config file paths */
 
     enum class SanitizerType : uint8_t {
         NONE,

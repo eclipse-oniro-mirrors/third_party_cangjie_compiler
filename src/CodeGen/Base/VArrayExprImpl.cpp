@@ -37,8 +37,8 @@ llvm::Value* GenerateConstantVArray(
     auto varrayCGType = CGType::GetOrCreate(irBuilder.GetCGModule(), varrayChirType);
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     std::vector<llvm::Constant*> params;
-    for (size_t i = 0; i < varray.GetOperands().size(); ++i) {
-        auto value = (irBuilder.GetCGModule() | varray.GetOperand(i))->GetRawValue();
+    for (auto element : varray.GetElementValues()) {
+        auto value = (irBuilder.GetCGModule() | element)->GetRawValue();
         auto tmp = llvm::dyn_cast<llvm::GlobalVariable>(value);
         params.emplace_back(tmp ? tmp->getInitializer() : llvm::cast<llvm::Constant>(value));
     }
@@ -64,7 +64,7 @@ llvm::Value* CodeGen::GenerateVArray(IRBuilder2& irBuilder, const CHIR::VArray& 
     auto varrayType = varrayCGType->GetLLVMType();
     auto varrayPtr = irBuilder.CreateEntryAlloca(varrayType, nullptr, "varray");
 
-    for (size_t i = 0; i < varrayChirType->GetSize(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(varrayChirType->GetSize()); ++i) {
         auto indexName = "varray.idx" + std::to_string(i) + "E";
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
         auto elementPtr =

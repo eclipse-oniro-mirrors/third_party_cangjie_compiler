@@ -14,6 +14,7 @@
 #include "IRBuilder.h"
 #include "IRGenerator.h"
 #include "cangjie/CHIR/IR/Value/Value.h"
+#include "cangjie/CHIR/Utils/CHIRCasting.h"
 
 using namespace Cangjie::CHIR;
 
@@ -72,23 +73,23 @@ void ExpressionGeneratorImpl::EmitIR()
                 rawRet = HandleTerminatorExpression(irBuilder, *chirExpr);
                 break;
             case ExprMajorKind::UNARY_EXPR: {
-                auto unaryExpr = StaticCast<const CHIR::UnaryExpression*>(chirExpr);
+                auto unaryExpr = StaticCast<const CHIR::UnaryExpressionBase*>(chirExpr);
                 irBuilder.EmitLocation(CHIRExprWrapper(*chirExpr));
-                rawRet = HandleUnaryExpression(irBuilder, CHIRUnaryExprWrapper(*unaryExpr));
+                rawRet = HandleUnaryExpression(irBuilder, *unaryExpr);
                 break;
             }
             case ExprMajorKind::BINARY_EXPR: {
-                auto binaryExpr = StaticCast<const CHIR::BinaryExpression*>(chirExpr);
+                auto binaryExpr = StaticCast<const CHIR::BinaryExpressionBase*>(chirExpr);
                 irBuilder.EmitLocation(CHIRExprWrapper(*chirExpr));
-                rawRet = HandleBinaryExpression(irBuilder, CHIRBinaryExprWrapper(*binaryExpr));
+                rawRet = HandleBinaryExpression(irBuilder, *binaryExpr);
                 break;
             }
             case ExprMajorKind::MEMORY_EXPR:
                 rawRet = HandleMemoryExpression(irBuilder, *chirExpr);
                 break;
             case ExprMajorKind::OTHERS:
-                if (chirExpr->IsConstant()) {
-                    rawRet = HandleConstantExpression(irBuilder, *StaticCast<const CHIR::Constant*>(chirExpr));
+                if (auto constant = DynamicCast<const CHIR::Constant*>(chirExpr)) {
+                    rawRet = HandleConstantExpression(irBuilder, *constant);
                 } else {
                     rawRet = HandleOthersExpression(irBuilder, *chirExpr);
                 }

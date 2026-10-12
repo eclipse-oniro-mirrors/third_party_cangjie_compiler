@@ -6,7 +6,13 @@
 
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-add_executable(ConditionalCompilationTest ConditionalCompilationTest.cpp ${CANGJIE_SRC_OBJECTS})
+include_directories(${CMAKE_SOURCE_DIR}/src/ConditionalCompilation)
+
+add_executable(
+    ConditionalCompilationTest
+    ConditionalCompilationTest.cpp
+    ConditionalCompilationImplTest.cpp
+    ${CANGJIE_SRC_OBJECTS})
 
 target_link_libraries(
     ConditionalCompilationTest

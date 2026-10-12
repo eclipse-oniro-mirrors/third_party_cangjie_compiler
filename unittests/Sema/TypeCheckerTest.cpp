@@ -19,8 +19,13 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#define CJ_ENVIRON _environ
+#elif defined(__APPLE__)
+#include <crt_externs.h>
+#define CJ_ENVIRON (*_NSGetEnviron())
 #else
 #include <unistd.h>
+#define CJ_ENVIRON environ
 #endif
 
 using namespace Cangjie;
@@ -30,11 +35,7 @@ namespace {
 std::unordered_map<std::string, std::string> GetEnvironmentVars()
 {
     std::unordered_map<std::string, std::string> envVars;
-#ifdef _WIN32
-    char **env = _environ;
-#else
-    char **env = environ;
-#endif
+    char **env = CJ_ENVIRON;
     while (env && *env) {
         std::string entry(*env);
         size_t pos = entry.find('=');
@@ -78,18 +79,12 @@ protected:
         invocation.globalOptions.executablePath = projectPath + "/output/bin/";
 #endif
         std::string cangjieHome = projectPath + "/output";
-#if defined(_WIN32)
-        std::string platform = "windows_x86_64";
-#elif defined(__APPLE__) && defined(__x86_64__)
-        std::string platform = "darwin_x86_64";
-#elif defined(__APPLE__)
-        std::string platform = "darwin_arm64";
-#elif defined(__x86_64__)
-        std::string platform = "linux_x86_64";
-#else
-        std::string platform = "linux_aarch64";
-#endif
-        std::string cangjiePath = cangjieHome + "/modules/" + platform + "_cjnative";
+        // Derive the platform-specific module directory from the target triple
+        // (GetCangjieLibTargetPathName returns "<os>_<arch>_cjnative") instead
+        // of hard-coding "darwin_arm64"/"darwin_aarch64", which must otherwise
+        // be kept in sync with the actual output directory name.
+        std::string cangjiePath =
+            cangjieHome + "/modules/" + invocation.globalOptions.GetCangjieLibTargetPathName();
 #ifdef _WIN32
         char* oldHome = getenv("CANGJIE_HOME");
         char* oldPath = getenv("CANGJIE_PATH");
@@ -143,6 +138,62 @@ protected:
     DiagnosticEngine diag;
     CompilerInvocation invocation;
     std::unique_ptr<TestCompilerInstance> instance;
+
+    void CheckInvalidVariadicOverload(const std::string& code, bool expectResolvedFunction)
+    {
+        instance->code = code;
+        instance->invocation.globalOptions.implicitPrelude = true;
+        instance->Compile(CompileStage::SEMA);
+
+        Ptr<CallExpr> memberCall{nullptr};
+        Walker walker(instance->GetSourcePackages()[0]->files[0].get(), [&memberCall](Ptr<Node> node) {
+            auto call = DynamicCast<CallExpr*>(node);
+            auto memberAccess = call ? DynamicCast<MemberAccess*>(call->baseFunc.get()) : nullptr;
+            if (memberAccess && memberAccess->field == "f") {
+                memberCall = call;
+            }
+            return VisitAction::WALK_CHILDREN;
+        });
+        walker.Walk();
+
+        ASSERT_TRUE(memberCall);
+        EXPECT_EQ(diag.GetErrorCount(), 2);
+        if (!expectResolvedFunction) {
+            EXPECT_FALSE(memberCall->resolvedFunction);
+            return;
+        }
+        ASSERT_TRUE(memberCall->resolvedFunction);
+        EXPECT_FALSE(memberCall->resolvedFunction->TestAttr(Attribute::IS_BROKEN));
+        EXPECT_FALSE(memberCall->resolvedFunction->hasVariableLenArg);
+        auto memberAccess = StaticAs<ASTKind::MEMBER_ACCESS>(memberCall->baseFunc.get());
+        EXPECT_EQ(memberAccess->target, memberCall->resolvedFunction);
+    }
+
+    void CheckInvalidVariadicFunctionReference(const std::string& code)
+    {
+        instance->code = code;
+        instance->invocation.globalOptions.implicitPrelude = true;
+        instance->Compile(CompileStage::SEMA);
+
+        Ptr<MemberAccess> functionReference{nullptr};
+        Walker walker(instance->GetSourcePackages()[0]->files[0].get(), [&functionReference](Ptr<Node> node) {
+            auto memberAccess = DynamicCast<MemberAccess*>(node);
+            if (memberAccess && memberAccess->field == "f") {
+                functionReference = memberAccess;
+            }
+            return VisitAction::WALK_CHILDREN;
+        });
+        walker.Walk();
+
+        ASSERT_TRUE(functionReference);
+        EXPECT_EQ(diag.GetErrorCount(), 2);
+        auto target = DynamicCast<FuncDecl*>(functionReference->target);
+        ASSERT_TRUE(target);
+        EXPECT_FALSE(target->TestAttr(Attribute::IS_BROKEN));
+        EXPECT_FALSE(target->hasVariableLenArg);
+        ASSERT_EQ(functionReference->targets.size(), 1);
+        EXPECT_EQ(functionReference->targets[0], target);
+    }
 };
 
 TEST_F(TypeCheckerTest, TypecheckTest)
@@ -169,6 +220,88 @@ main() {
     });
     walker.Walk();
     EXPECT_EQ(diag.GetErrorCount(), 0);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicFunctionIsNotCallTarget)
+{
+    CheckInvalidVariadicOverload(R"(
+class H {
+    func f(...x: Int64): Unit
+}
+main() { H().f(1) }
+    )", false);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicAfterValidOverloadDoesNotAffectCallTarget)
+{
+    CheckInvalidVariadicOverload(R"(
+class H {
+    func f(x: Int64): Unit
+    func f(...x: Int64): Unit
+}
+main() { H().f(1) }
+    )", true);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicBeforeValidOverloadDoesNotAffectCallTarget)
+{
+    CheckInvalidVariadicOverload(R"(
+class H {
+    func f(...x: Int64): Unit
+    func f(x: Int64): Unit
+}
+main() { H().f(1) }
+    )", true);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicAfterValidOverloadDoesNotAffectFunctionReference)
+{
+    CheckInvalidVariadicFunctionReference(R"(
+class H {
+    func f(x: Int64): Unit
+    func f(...x: Int64): Unit
+}
+main() { let functionReference = H().f }
+    )");
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicBeforeValidOverloadDoesNotAffectFunctionReference)
+{
+    CheckInvalidVariadicFunctionReference(R"(
+class H {
+    func f(...x: Int64): Unit
+    func f(x: Int64): Unit
+}
+main() { let functionReference = H().f }
+    )");
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicAfterValidImplementationDoesNotAffectInterfaceConformance)
+{
+    CheckInvalidVariadicOverload(R"(
+interface I {
+    func f(x: Int64): Unit
+}
+class H <: I {
+    func f(x: Int64): Unit {}
+    func f(...x: Int64): Unit
+}
+main() { H().f(1) }
+    )", true);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicBeforeValidImplementationDoesNotAffectInterfaceConformance)
+{
+    CheckInvalidVariadicOverload(R"(
+interface I {
+    func f(x: Int64): Unit
+}
+class H <: I {
+    func f(...x: Int64): Unit
+    func f(x: Int64): Unit {}
+}
+main() { H().f(1) }
+    )", true);
 }
 
 TEST_F(TypeCheckerTest, MacroDeclTest)
@@ -278,7 +411,7 @@ TEST_F(TypeCheckerTest, MacroDiagInLSPTest)
     Cangjie::MacroProcMsger::GetInstance().CloseMacroSrv();
 }
 
-TEST_F(TypeCheckerTest, DISABLED_NoDiagInLSPMacroCallTest)
+TEST_F(TypeCheckerTest, NoDiagInLSPMacroCallTest)
 {
     srcPath = projectPath + "/unittests/Sema/SemaCangjieFiles/";
     std::string command = "cjc " + srcPath + "AddClassTyInfoMacro.cj --compile-macro -Woff all";
@@ -362,7 +495,7 @@ TEST_F(TypeCheckerTest, AssumptionTest)
 {
 #ifdef _WIN32
     srcPath = projectPath + "\\unittests\\Sema\\SemaCangjieFiles\\AssumptionTest";
-#elif defined(__unix__)
+#elif defined(__APPLE__) || defined(__unix__)
     srcPath = projectPath + "/unittests/Sema/SemaCangjieFiles/AssumptionTest";
 #endif
 
@@ -406,11 +539,11 @@ TEST_F(TypeCheckerTest, AssumptionTest)
     }
 }
 
-TEST_F(TypeCheckerTest, DISABLED_SpawnTest)
+TEST_F(TypeCheckerTest, SpawnTest)
 {
 #ifdef _WIN32
     srcPath = projectPath + "\\unittests\\Sema\\SemaCangjieFiles\\";
-#elif defined(__unix__)
+#elif defined(__APPLE__) || defined(__unix__)
     srcPath = projectPath + "/unittests/Sema/SemaCangjieFiles/";
 #endif
     auto srcFile = srcPath + "spawn.cj";
@@ -431,11 +564,13 @@ TEST_F(TypeCheckerTest, DISABLED_SpawnTest)
     Ptr<Node> targetFutureObj1{nullptr};
     Ptr<Node> targetFutureObj2{nullptr};
     for (auto& decl : instance->GetSourcePackages()[0]->files[0]->decls) {
-        auto main = As<ASTKind::FUNC_DECL>(decl.get());
-        EXPECT_TRUE(main);
-        EXPECT_TRUE(main->funcBody->body->body.size() == 4);
-        targetFutureObj1 = main->funcBody->body->body[1].get();
-        targetFutureObj2 = main->funcBody->body->body[2].get();
+        if (auto md = DynamicCast<MainDecl>(decl.get())) {
+            auto main = As<ASTKind::FUNC_DECL>(md->desugarDecl.get());
+            EXPECT_TRUE(main);
+            EXPECT_TRUE(main->funcBody->body->body.size() == 4);
+            targetFutureObj1 = main->funcBody->body->body[1].get();
+            targetFutureObj2 = main->funcBody->body->body[2].get();
+        }
     }
 
     auto var1 = As<ASTKind::VAR_DECL>(targetFutureObj1);
@@ -580,4 +715,101 @@ main() {
         return VisitAction::WALK_CHILDREN;
     });
     walker.Walk();
+}
+
+TEST_F(TypeCheckerTest, VarWithPatternInConstFunctionProducesDiagnostic)
+{
+    std::string code = R"(
+struct S {
+    const S() {}
+    const func f(): Int64 {
+        var (a, b) = (1, 2)
+        return 0
+    }
+}
+
+main(): Int64 {
+    return 0
+}
+)";
+
+    instance->code = code;
+    instance->invocation.globalOptions.implicitPrelude = false;
+    instance->Compile(CompileStage::SEMA);
+
+    auto diagnostics = diag.GetCategoryDiagnostic(DiagCategory::SEMA);
+    bool foundDiagnostic = false;
+    for (auto& diagnostic : diagnostics) {
+        if (diagnostic.rKind == DiagKindRefactor::sema_cannot_define_var_in_const_funciton) {
+            foundDiagnostic = true;
+            EXPECT_FALSE(diagnostic.mainHint.range.HasZero());
+        }
+    }
+    EXPECT_TRUE(foundDiagnostic);
+    EXPECT_EQ(diag.GetErrorCount(), 1);
+}
+
+// The string interpolation literal is desugared into a StringBuilder-based block in
+// `DesugarStrInterpolationExpr`. Every synthesized node (the StringBuilder ctor call, the
+// `$tmp` var decl, the `append` calls and the final `toString` call) must carry a valid
+// source position copied from the original interpolation expression. Nodes with a zero
+// position used to trigger an ICE in `DiagnosticEngine::CheckRange` when a later phase
+// (e.g. recursive-constructor detection) emitted a diagnostic anchored on them.
+TEST_F(TypeCheckerTest, StrInterpolationDesugarNodesHaveValidPosition)
+{
+    // Cover both branches of `DesugarStrPartExpr` inside the InterpolationExpr arm:
+    //  - `count` (Int64) has a matching `append(Int64)` overload -> matchedAppend branch.
+    //  - `p` (user type P <: ToString) has no direct append overload -> toString() fallback
+    //    branch, which routes a Block through `CreateMemberAccess`/`CreateFuncArg` and is the
+    //    path that previously left a zero-position '$dummy' wrapper.
+    std::string code = R"(
+class P <: ToString {
+    public func toString(): String {
+        return "P"
+    }
+}
+main(): Int64 {
+    let count = 42
+    let p = P()
+    let s = "count is ${count}, p is ${p}."
+    return 0
+}
+)";
+
+    instance->code = code;
+    instance->invocation.globalOptions.implicitPrelude = true;
+    auto ret = instance->Compile(CompileStage::DESUGAR_AFTER_SEMA);
+    ASSERT_TRUE(ret);
+    // The desugared interpolation must type-check without errors.
+    ASSERT_EQ(diag.GetErrorCount(), 0) << "interpolation desugar should not produce errors";
+
+    // Locate the desugared interpolation literal and walk its synthesized sub-tree.
+    Ptr<Expr> desugarRoot {nullptr};
+    Walker finder(instance->GetSourcePackages()[0]->files[0].get(), [&desugarRoot](Ptr<Node> node) -> VisitAction {
+        if (auto lce = DynamicCast<LitConstExpr>(node); lce && lce->siExpr && lce->desugarExpr) {
+            desugarRoot = lce->desugarExpr.get();
+            return VisitAction::SKIP_CHILDREN;
+        }
+        return VisitAction::WALK_CHILDREN;
+    });
+    finder.Walk();
+    ASSERT_NE(desugarRoot, nullptr) << "no desugared string interpolation found";
+
+    // `DesugarStrInterpolationExpr` synthesizes the StringBuilder ctor call, the `$tmp` var
+    // decl, the `append`/`toString` calls and their args, copying the source position of the
+    // original interpolation expression onto each. These synthesized nodes (Expr/Decl/Type)
+    // carry the COMPILER_ADD attribute. A zero position on one of them used to trigger an ICE
+    // in `DiagnosticEngine::CheckRange` when a later phase (e.g. recursive-constructor
+    // detection) emitted a diagnostic anchored on it, so every synthesized node is guarded.
+    Walker checker(desugarRoot.get(), [](Ptr<Node> node) -> VisitAction {
+        if (!node->TestAttr(Attribute::COMPILER_ADD)) {
+            return VisitAction::WALK_CHILDREN;
+        }
+        EXPECT_FALSE(node->begin.IsZero())
+            << "synthesized interpolation desugar node has zero begin position";
+        EXPECT_FALSE(node->end.IsZero())
+            << "synthesized interpolation desugar node has zero end position";
+        return VisitAction::WALK_CHILDREN;
+    });
+    checker.Walk();
 }

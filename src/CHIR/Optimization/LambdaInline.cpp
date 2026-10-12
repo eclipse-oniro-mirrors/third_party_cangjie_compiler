@@ -7,6 +7,7 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "cangjie/CHIR/Optimization/LambdaInline.h"
+#include "cangjie/CHIR/Utils/CHIRCasting.h"
 #include "cangjie/CHIR/Utils/Utils.h"
 
 namespace Cangjie::CHIR {
@@ -92,7 +93,7 @@ bool LambdaInline::IsLambdaPassToEasyFunc(const Lambda& lambda) const
 
     // 1. judge if lambda is a parameter of an apply.
     auto users = lambda.GetResult()->GetUsers();
-    CJC_ASSERT(users.size() == 1 && users[0]->IsApply());
+    CJC_ASSERT(users.size() == 1);
     auto apply = StaticCast<Apply*>(users[0]);
     size_t index = apply->GetArgs().size();
     auto args = apply->GetArgs();

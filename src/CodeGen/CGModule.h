@@ -139,7 +139,7 @@ public:
     void GenIncremental();
     void GenCodeGenAddedMetadata() const;
 #endif
-    CGFunction* GetOrInsertCGFunction(const CHIR::Value* func, bool forWrapper = false);
+    CGFunction* GetOrInsertCGFunction(const CHIR::Value* func);
     CGValue* GetOrInsertGlobalVariable(const CHIR::GlobalVar* chirGV);
     llvm::GlobalVariable* GetOrCreateGlobalVariable(
         llvm::Constant* constVal, const std::string& gvContent, bool isTuple);
@@ -322,6 +322,9 @@ private:
     void EraseUnusedFuncs(const std::function<bool(const llvm::GlobalObject&)> extraCond);
     void EraseUnusedGVs(const std::function<bool(const llvm::GlobalObject&)> extraCond);
     bool CheckUnusedGV(const llvm::GlobalVariable* var, const std::set<std::string>& llvmUsed);
+
+    llvm::Function* DeclareLLVMFunction(const CHIR::Value& func, const CGFunctionType& cgFuncType);
+    void SetCJNativeFunctionAttrs(const CHIR::Value& func, llvm::Function& function, CGFunction& cgFunc);
 };
 
 class CGFunction : public CGValue {

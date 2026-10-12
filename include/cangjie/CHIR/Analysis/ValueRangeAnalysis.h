@@ -175,15 +175,15 @@ private:
 
     void HandleNormalExpressionEffect(RangeDomain& state, const Expression* expression) override;
 
-    void HandleUnaryExpr(RangeDomain& state, const UnaryExpression* unaryExpr) const;
+    void HandleUnaryExpr(RangeDomain& state, const UnaryExpressionBase* unaryExpr) const;
 
-    void HandleBinaryExpr(RangeDomain& state, const BinaryExpression* binaryExpr);
+    void HandleBinaryExpr(RangeDomain& state, const BinaryExpressionBase* binaryExpr);
 
     void HandleOthersExpr(RangeDomain& state, const Expression* expression);
 
     // ======================= Transfer functions for terminators ======================= //
 
-    std::optional<Block*> HandleTerminatorEffect(RangeDomain& state, const Terminator* terminator) override;
+    std::optional<Block*> HandleTerminatorEffect(RangeDomain& state, const Expression* terminator) override;
 
     std::optional<Block*> HandleBranchTerminator(const RangeDomain& state, const Branch* branch) const;
 
@@ -197,21 +197,26 @@ private:
 
     template <typename TTypeCast> ExceptionKind HandleTypeCast(RangeDomain& state, const TTypeCast* cast)
     {
-        auto from = cast->GetSourceTy();
-        auto to = cast->GetTargetTy();
+        auto from = cast->GetSourceType();
+        auto to = cast->GetTargetType();
         if (!from->IsInteger() || !to->IsInteger()) {
             state.SetToTopOrTopRef(cast->GetResult(), cast->GetResult()->GetType()->IsRef());
             return ExceptionKind::NA;
         }
         auto value = cast->GetSourceValue();
         const auto& sourceDomain = GetSIntDomainFromState(state, value);
+        OverflowStrategy ov = OverflowStrategy::NA;
+        if constexpr (std::is_base_of_v<NumericCastBase, TTypeCast>) {
+            ov = cast->GetOverflowStrategy();
+        }
         auto res = ComputeTypeCast(
-            state, value, sourceDomain, ToWidth(*to), to->IsUnsignedInteger(), cast->GetOverflowStrategy());
+            state, value, sourceDomain, ToWidth(*to), to->IsUnsignedInteger(), ov);
         state.Update(cast->GetResult(), std::make_unique<SIntRange>(res));
         return ExceptionKind::NA;
     }
 
-    BoolDomain GenerateBoolRangeFromBinaryOp(RangeDomain& state, const Ptr<const BinaryExpression>& binaryExpr) const;
+    BoolDomain GenerateBoolRangeFromBinaryOp(
+        RangeDomain& state, const Ptr<const BinaryExpressionBase>& binaryExpr) const;
 
     DiagnosticEngine& diag;
 

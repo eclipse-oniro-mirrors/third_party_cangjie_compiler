@@ -197,7 +197,7 @@ public:
             if (exprs.empty()) {
                 continue;
             }
-            auto terminator = StaticCast<Terminator*>(exprs.back());
+            auto terminator = exprs.back();
             exprs.pop_back();
 
             for (auto exp : exprs) {

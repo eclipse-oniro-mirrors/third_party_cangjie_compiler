@@ -13,6 +13,8 @@
  */
 
 #include "Base/TypeCastImpl.h"
+#include "cangjie/CHIR/IR/Expression/Expression.h"
+#include "cangjie/CHIR/Utils/CHIRCasting.h"
 
 #include "Base/CGTypes/CGEnumType.h"
 #include "CGModule.h"
@@ -258,7 +260,8 @@ llvm::Value* GenerateCondCheckUpperBound(
         auto targetTyKind = irBuilder.GetTypeKindFromType(targetTy);
         auto srcTyKind = irBuilder.GetTypeKindFromType(srcTy);
         if (IsUInt2Int(srcTy, targetTy)) {
-            auto maxType = NeedsUIntToIntConversion(irBuilder, srcTy, targetTyKind) ? targetType.GetLLVMType() : srcValue.getType();
+            auto maxType = NeedsUIntToIntConversion(
+                irBuilder, srcTy, targetTyKind) ? targetType.GetLLVMType() : srcValue.getType();
             auto maxVal = llvm::ConstantInt::getSigned(maxType, GetIntMaxOrMin(irBuilder, targetTy, true));
             auto tempSrcValue = NeedsUIntToIntConversion(irBuilder, srcTy, targetTyKind)
                 ? irBuilder.CreateZExtOrTrunc(&srcValue, targetType.GetLLVMType())
@@ -585,10 +588,10 @@ llvm::Value* GenerateGenericTypeCast(IRBuilder2& irBuilder, const CGValue& cgSrc
     }
 }
 
-llvm::Value* GenerateTypeCast(IRBuilder2& irBuilder, const CHIRTypeCastWrapper& typeCast)
+llvm::Value* GenerateTypeCast(IRBuilder2& irBuilder, const CHIR::TypeCast& typeCast)
 {
-    auto targetTy = typeCast.GetTargetTy();
-    auto srcTy = typeCast.GetSourceTy();
+    auto targetTy = typeCast.GetTargetType();
+    auto srcTy = typeCast.GetSourceType();
     CJC_ASSERT(srcTy && targetTy);
 
     auto& cgMod = irBuilder.GetCGModule();
@@ -625,6 +628,10 @@ llvm::Value* GenerateTypeCast(IRBuilder2& irBuilder, const CHIRTypeCastWrapper& 
     }
 #endif
 
+    OverflowStrategy overflowStrategy = OverflowStrategy::NA;
+    if (auto numericCast = DynamicCast<const CHIR::NumericCastBase*>(&typeCast)) {
+        overflowStrategy = numericCast->GetOverflowStrategy();
+    }
     if (targetTy->IsFloat() && srcTy->IsFloat()) {
         return GenerateFloatConvExpr(irBuilder, srcValue, targetType->GetLLVMType(),
             *StaticCast<CHIR::NumericType*>(srcTy), *StaticCast<CHIR::NumericType*>(targetTy));
@@ -633,7 +640,7 @@ llvm::Value* GenerateTypeCast(IRBuilder2& irBuilder, const CHIRTypeCastWrapper& 
             irBuilder, srcValue, targetType->GetLLVMType(), *StaticCast<CHIR::IntType*>(srcTy));
     } else if (targetTy->IsInteger() && srcTy->IsFloat()) {
         return GenerateFloatToIntegerConvExpr(
-            irBuilder, typeCast.GetOverflowStrategy(), *srcValue, *targetType, *StaticCast<CHIR::FloatType*>(srcTy));
+            irBuilder, overflowStrategy, *srcValue, *targetType, *StaticCast<CHIR::FloatType*>(srcTy));
     } else if (irBuilder.GetTypeKindFromType(*targetTy) == CHIR::Type::TypeKind::TYPE_UINT32 && srcTy->IsRune()) {
         return srcValue;
     } else if (targetTy->IsRune() && srcTy->IsInteger()) {
@@ -650,7 +657,7 @@ llvm::Value* GenerateTypeCast(IRBuilder2& irBuilder, const CHIRTypeCastWrapper& 
         return irBuilder.CreateBitOrPointerCast(srcValue, castedTo);
     } else if (targetTy->IsInteger() && srcTy->IsInteger()) {
         return GenerateIntegerConversionExpr(
-            irBuilder, typeCast.GetOverflowStrategy(), *srcValue, *targetType, *StaticCast<CHIR::IntType*>(srcTy));
+            irBuilder, overflowStrategy, *srcValue, *targetType, *StaticCast<CHIR::IntType*>(srcTy));
     } else if (targetType->GetLLVMType() == srcType->GetLLVMType()) {
         return srcValue;
     } else if (IsCFunc(*targetTy) && srcTy->IsCPointer()) {

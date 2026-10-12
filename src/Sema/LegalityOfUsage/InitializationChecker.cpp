@@ -272,17 +272,20 @@ void CollectDeclsFromPropDecl(const OwnedPtr<Decl>& decl, const PropDecl& pd, st
     }
 }
 
-void UpdateContextVariables(std::unordered_set<Ptr<const AST::VarDecl>>& contextVariables, const Decl& d)
+void UpdateContextVariables(
+    std::unordered_map<std::string, std::unordered_set<Ptr<const AST::VarDecl>>>& contextVariables, const Decl& d)
 {
     if (d.TestAnyAttr(Attribute::GLOBAL, Attribute::STATIC)) {
         return;
     }
     if (auto vd = DynamicCast<VarDecl>(&d)) {
-        contextVariables.emplace(vd);
+        auto& variables = contextVariables[ScopeManagerApi::GetScopeGateName(d.scopeName)];
+        variables.emplace(vd);
     } else if (auto vpd = DynamicCast<VarWithPatternDecl>(&d)) {
+        auto& variables = contextVariables[ScopeManagerApi::GetScopeGateName(d.scopeName)];
         for (auto it : FlattenVarWithPatternDecl(*vpd)) {
             if (auto vp = DynamicCast<VarPattern>(it)) {
-                contextVariables.emplace(vp->varDecl.get());
+                variables.emplace(vp->varDecl.get());
             }
         }
     }
@@ -329,9 +332,15 @@ void InitializationChecker::UpdateScopeStatus(const Node& node)
     if (auto [it, success] =
             variablesBeforeTeminatedScope.try_emplace(scopeGate, std::unordered_set<Ptr<const AST::Decl>>{});
         success) {
-        it->second.reserve(contextVariables.size());
-        for (auto& [_, vars] : contextVariables) {
-            it->second.insert(vars.cbegin(), vars.cend());
+        // Only declarations in the current scope and its ancestors are visible here. contextVariables may retain
+        // entries for previously checked top-level declarations, so scanning the whole map at every terminator is
+        // not needed here
+        auto visibleScope = scopeGate;
+        while (!visibleScope.empty()) {
+            if (auto found = contextVariables.find(visibleScope); found != contextVariables.end()) {
+                it->second.insert(found->second.cbegin(), found->second.cend());
+            }
+            visibleScope = ScopeManagerApi::GetScopeGateName(visibleScope);
         }
         scopeTerminationKinds[scopeGate] = node.astKind;
     }
@@ -406,7 +415,7 @@ void InitializationChecker::CheckInitialization(Ptr<AST::Node> n)
         }
         n->EnableAttr(Attribute::INITIALIZATION_CHECKED);
         if (auto decl = DynamicCast<Decl>(n)) {
-            UpdateContextVariables(contextVariables[ScopeManagerApi::GetScopeGateName(decl->scopeName)], *decl);
+            UpdateContextVariables(contextVariables, *decl);
             if (FromCommonPart(*decl)) {
                 // When a declaration is deserialized from CJO, it means that it has been
                 // already analyzed during common compilation.
@@ -1621,25 +1630,6 @@ void InitializationChecker::CheckInitInConstructors(FuncDecl& fd, const std::vec
             decl->EnableAttr(Attribute::INITIALIZED);
         }
         return;
-    }
-
-    if (auto classDecl = As<ASTKind::CLASS_DECL>(fd.funcBody->parentClassLike)) {
-        if (auto superClass = classDecl->GetSuperClassDecl();
-            superClass && superClass->TestAnyAttr(Attribute::JAVA_MIRROR, Attribute::JAVA_MIRROR_SUBTYPE)) {
-            for (auto decl : unInitNonFuncDecls) {
-                if (decl->astKind != ASTKind::VAR_DECL || !decl->TestAttr(Attribute::COMPILER_ADD)) {
-                    continue;
-                }
-                if (decl->identifier != Interop::Java::JAVA_REF_FIELD_NAME) {
-                    continue;
-                }
-                /*
-                    Only `javaref` field in mirrors and impls initialization has to be skipped.
-                    This field is initialized in JavaInterop desugar stage
-                */
-                decl->EnableAttr(Attribute::INITIALIZED);
-            }
-        }
     }
 
     // If the constructor is terminated by 'ThrowExpr' directly,

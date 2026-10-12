@@ -17,7 +17,16 @@ set(BASE_UTIL_SRC
     $<TARGET_OBJECTS:CangjieLex>
 )
 
-add_executable(UtilsTests UtilsTests.cpp)
+add_executable(UtilsTests
+    UtilsTests.cpp
+    FileUtilTests.cpp
+    ProfileRecorderTests.cpp
+    SafePointerTests.cpp
+    SemaphoreTests.cpp
+    StdUtilsTests.cpp
+    TaskQueueTests.cpp)
+# ProfileRecorderTests drives the recorders through their own headers, which are private to src/Utils.
+target_include_directories(UtilsTests PRIVATE ${CMAKE_SOURCE_DIR}/src/Utils)
 if(CANGJIE_CODEGEN_CJNATIVE_BACKEND)
 target_link_libraries(
     UtilsTests
@@ -29,6 +38,16 @@ target_link_libraries(
     GTest::gtest_main)
 endif()
 add_test(NAME UtilsTests COMMAND UtilsTests)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_program(CANGJIE_BASH_EXECUTABLE bash)
+    if(CANGJIE_BASH_EXECUTABLE)
+        add_test(
+            NAME RuntimeEnvSetupTest
+            COMMAND ${CANGJIE_BASH_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/RuntimeEnvSetupTest.sh
+                ${CMAKE_SOURCE_DIR}/utils/envsetup/runtime)
+    endif()
+endif()
 
 set(CAST_TEST_SRC CastASTTests.cpp CastTyTests.cpp)
 set(CAST_TEST_LIB cangjie-lsp ${CMAKE_DL_LIBS})

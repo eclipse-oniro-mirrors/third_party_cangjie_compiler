@@ -92,12 +92,9 @@ void SaveAllocateMap(
 {
     for (auto bb : body.GetBlocks()) {
         for (auto expr : bb->GetExpressions()) {
-            auto kind = expr->GetExprKind();
-            if ((kind == ExprKind::ALLOCATE || kind == ExprKind::ALLOCATE_WITH_EXCEPTION) &&
-                expr->GetResult()->GetDebugExpr()) {
+            if (Is<AllocateBase>(expr) && expr->GetResult()->GetDebugExpr()) {
                 allocateIdxMap.emplace(expr->GetResult(), allocateIdx++);
-            }
-            if (kind == ExprKind::LAMBDA) {
+            } else if (Is<Lambda>(expr)) {
                 SaveAllocateMap(*StaticCast<Lambda*>(expr)->GetBody(), allocateIdx, allocateIdxMap);
             }
         }
@@ -142,7 +139,7 @@ void MaybeUninitAnalysis::PropagateExpressionEffect(MaybeUninitDomain& state, co
 }
 
 std::optional<Block*> MaybeUninitAnalysis::PropagateTerminatorEffect(
-    MaybeUninitDomain& state, const Terminator* expression)
+    MaybeUninitDomain& state, const Expression* expression)
 {
     (void)state;
     (void)expression;

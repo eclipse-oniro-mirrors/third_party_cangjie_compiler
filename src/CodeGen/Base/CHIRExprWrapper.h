@@ -48,7 +48,7 @@ public:
 
     bool IsConstant() const
     {
-        return chirExpr.IsConstant();
+        return Is<CHIR::Constant>(chirExpr);
     }
 
     bool IsConstantNull() const
@@ -81,14 +81,9 @@ public:
         return chirExpr.GetTopLevelFunc();
     }
 
-    unsigned GetNumOfOperands() const
+    unsigned GetNumOfNonSuccessorOperands() const
     {
-        return chirExpr.GetNumOfOperands();
-    }
-
-    std::vector<CHIR::Value*> GetOperands() const
-    {
-        return chirExpr.GetOperands();
+        return chirExpr.GetNumOfNonSuccessorOperands();
     }
 
     CHIR::Value* GetOperand(unsigned idx) const
@@ -148,7 +143,7 @@ public:
 
 class CHIRApplyWrapper : public CHIRCallExpr {
 public:
-    explicit CHIRApplyWrapper(const CHIR::Apply& apply) : CHIRCallExpr(apply)
+    explicit CHIRApplyWrapper(const CHIR::ApplyBase& apply) : CHIRCallExpr(apply)
     {
         if (GetInstantiatedTypeArgs().size() != GetCalleeTypeArgsNum()) {
 #ifndef NDEBUG
@@ -158,53 +153,27 @@ public:
         }
     }
 
-    explicit CHIRApplyWrapper(const CHIR::ApplyWithException& applyWithException) : CHIRCallExpr(applyWithException)
-    {
-        if (GetInstantiatedTypeArgs().size() != GetCalleeTypeArgsNum()) {
-#ifndef NDEBUG
-            Errorln(chirExpr.ToString(0));
-#endif
-            CJC_ASSERT_WITH_MSG(false, "Incorrect ApplyExpr from CHIR, type arguments are missing.");
-        }
-    }
-
     ~CHIRApplyWrapper() override = default;
 
     CHIR::Value* GetCallee() const
     {
-        if (GetExprKind() == CHIR::ExprKind::APPLY) {
-            return StaticCast<const CHIR::Apply&>(chirExpr).GetCallee();
-        } else {
-            return StaticCast<const CHIR::ApplyWithException&>(chirExpr).GetCallee();
-        }
+        return GetApply().GetCallee();
     }
 
     std::vector<CHIR::Value*> GetArgs() const override
     {
-        if (GetExprKind() == CHIR::ExprKind::APPLY) {
-            return StaticCast<const CHIR::Apply&>(chirExpr).GetArgs();
-        } else {
-            return StaticCast<const CHIR::ApplyWithException&>(chirExpr).GetArgs();
-        }
+        return GetApply().GetArgs();
     }
 
     std::vector<CHIR::Type*> GetInstantiatedTypeArgs() const override
     {
-        if (GetExprKind() == CHIR::ExprKind::APPLY) {
-            return StaticCast<const CHIR::Apply&>(chirExpr).GetInstantiatedTypeArgs();
-        } else {
-            return StaticCast<const CHIR::ApplyWithException&>(chirExpr).GetInstantiatedTypeArgs();
-        }
+        return GetApply().GetInstantiatedTypeArgs();
     }
 
     CHIR::Type* GetThisType(bool fromObj = true) const override
     {
         (void)fromObj;
-        if (GetExprKind() == CHIR::ExprKind::APPLY) {
-            return StaticCast<const CHIR::Apply&>(chirExpr).GetThisType();
-        } else {
-            return StaticCast<const CHIR::ApplyWithException&>(chirExpr).GetThisType();
-        }
+        return GetApply().GetThisType();
     }
 
     bool IsCalleeMethod() const override
@@ -239,12 +208,7 @@ public:
 
     const CHIR::Type* GetOuterType(CHIR::CHIRBuilder& builder) const override
     {
-        CHIR::Type* res = nullptr;
-        if (GetExprKind() == CHIR::ExprKind::APPLY) {
-            res = StaticCast<const CHIR::Apply&>(chirExpr).GetInstParentCustomTyOfCallee(builder);
-        } else {
-            res = StaticCast<const CHIR::ApplyWithException&>(chirExpr).GetInstParentCustomTyOfCallee(builder);
-        }
+        CHIR::Type* res = GetApply().GetInstParentCustomTyOfCallee(builder);
         if (!res) {
 #ifndef NDEBUG
             Errorln("Should not get a nullptr:\n", chirExpr.ToString(0));
@@ -260,6 +224,11 @@ public:
     }
 
 private:
+    const CHIR::ApplyBase& GetApply() const
+    {
+        return StaticCast<const CHIR::ApplyBase&>(chirExpr);
+    }
+
     size_t GetCalleeTypeArgsNum() const
     {
         if (GetCallee()->IsFunc()) {
@@ -293,12 +262,7 @@ private:
 
 class CHIRInvokeWrapper : public CHIRInvokeExpr {
 public:
-    explicit CHIRInvokeWrapper(const CHIR::Invoke& invoke) : CHIRInvokeExpr(invoke)
-    {
-    }
-
-    explicit CHIRInvokeWrapper(const CHIR::InvokeWithException& invokeWithException)
-        : CHIRInvokeExpr(invokeWithException)
+    explicit CHIRInvokeWrapper(const CHIR::InvokeBase& invoke) : CHIRInvokeExpr(invoke)
     {
     }
 
@@ -306,58 +270,32 @@ public:
 
     CHIR::Value* GetObject() const
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKE) {
-            return StaticCast<const CHIR::Invoke&>(chirExpr).GetObject();
-        } else {
-            return StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetObject();
-        }
+        return GetInvoke().GetObject();
     }
 
     std::string GetMethodName() const
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKE) {
-            return StaticCast<const CHIR::Invoke&>(chirExpr).GetMethodName();
-        } else {
-            return StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetMethodName();
-        }
+        return GetInvoke().GetMethodName();
     }
 
     CHIR::FuncType* GetMethodType() const
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKE) {
-            return StaticCast<const CHIR::Invoke&>(chirExpr).GetMethodType();
-        } else {
-            return StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetMethodType();
-        }
+        return GetInvoke().GetMethodType();
     }
 
     std::vector<CHIR::Value*> GetArgs() const override
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKE) {
-            return StaticCast<const CHIR::Invoke&>(chirExpr).GetArgs();
-        } else {
-            return StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetArgs();
-        }
+        return GetInvoke().GetArgs();
     }
 
     std::vector<CHIR::Type*> GetInstantiatedTypeArgs() const override
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKE) {
-            return StaticCast<const CHIR::Invoke&>(chirExpr).GetInstantiatedTypeArgs();
-        } else {
-            return StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetInstantiatedTypeArgs();
-        }
+        return GetInvoke().GetInstantiatedTypeArgs();
     }
 
     CHIR::Type* GetThisType(bool fromObj = true) const override
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKE) {
-            return fromObj ? StaticCast<const CHIR::Invoke&>(chirExpr).GetObject()->GetType()
-                           : StaticCast<const CHIR::Invoke&>(chirExpr).GetThisType();
-        } else {
-            return fromObj ? StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetObject()->GetType()
-                           : StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetThisType();
-        }
+        return fromObj ? GetInvoke().GetObject()->GetType() : GetInvoke().GetThisType();
     }
 
     bool IsCalleeMethod() const override
@@ -378,12 +316,7 @@ public:
     const CHIR::Type* GetOuterType(CHIR::CHIRBuilder& builder) const override
     {
         CJC_ASSERT(!IsCalleeStatic());
-        CHIR::Type* res = nullptr;
-        if (GetExprKind() == CHIR::ExprKind::INVOKE) {
-            res = StaticCast<const CHIR::Invoke&>(chirExpr).GetInstSrcParentCustomTypeOfMethod(builder);
-        } else {
-            res = StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetInstSrcParentCustomTypeOfMethod(builder);
-        }
+        CHIR::Type* res = GetInvoke().GetInstSrcParentCustomTypeOfMethod(builder);
         if (!res) {
 #ifndef NDEBUG
             Errorln("Should not get a nullptr:\n", chirExpr.ToString(0));
@@ -401,31 +334,24 @@ public:
 
     std::size_t GetVirtualMethodOffset() const override
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKE) {
-            return StaticCast<const CHIR::Invoke&>(chirExpr).GetVirtualMethodOffset();
-        } else {
-            return StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetVirtualMethodOffset();
-        }
+        return GetInvoke().GetVirtualMethodOffset();
     }
 
-    bool TestVritualMethodAttr(CHIR::CHIRBuilder& builder, CHIR::Attribute attr) const
+    bool TestVritualMethodAttr(CHIR::Attribute attr) const
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKE) {
-            return StaticCast<const CHIR::Invoke&>(chirExpr).GetVirtualMethodAttr(builder).TestAttr(attr);
-        } else {
-            return StaticCast<const CHIR::InvokeWithException&>(chirExpr).GetVirtualMethodAttr(builder).TestAttr(attr);
-        }
+        return GetInvoke().GetVirtualMethodAttr().TestAttr(attr);
+    }
+
+private:
+    const CHIR::InvokeBase& GetInvoke() const
+    {
+        return StaticCast<const CHIR::InvokeBase&>(chirExpr);
     }
 };
 
 class CHIRInvokeStaticWrapper : public CHIRInvokeExpr {
 public:
-    explicit CHIRInvokeStaticWrapper(const CHIR::InvokeStatic& invokeStatic) : CHIRInvokeExpr(invokeStatic)
-    {
-    }
-
-    explicit CHIRInvokeStaticWrapper(const CHIR::InvokeStaticWithException& invokeStaticWithException)
-        : CHIRInvokeExpr(invokeStaticWithException)
+    explicit CHIRInvokeStaticWrapper(const CHIR::InvokeStaticBase& invokeStatic) : CHIRInvokeExpr(invokeStatic)
     {
     }
 
@@ -433,57 +359,33 @@ public:
 
     std::string GetMethodName() const
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
-            return StaticCast<const CHIR::InvokeStatic&>(chirExpr).GetMethodName();
-        } else {
-            return StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetMethodName();
-        }
+        return GetInvokeStatic().GetMethodName();
     }
 
     CHIR::FuncType* GetMethodType() const
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
-            return StaticCast<const CHIR::InvokeStatic&>(chirExpr).GetMethodType();
-        } else {
-            return StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetMethodType();
-        }
+        return GetInvokeStatic().GetMethodType();
     }
 
     CHIR::Value* GetRTTIValue() const
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
-            return StaticCast<const CHIR::InvokeStatic&>(chirExpr).GetRTTIValue();
-        } else {
-            return StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetRTTIValue();
-        }
+        return GetInvokeStatic().GetRTTIValue();
     }
 
     std::vector<CHIR::Value*> GetArgs() const override
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
-            return StaticCast<const CHIR::InvokeStatic&>(chirExpr).GetArgs();
-        } else {
-            return StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetArgs();
-        }
+        return GetInvokeStatic().GetArgs();
     }
 
     CHIR::Type* GetThisType(bool fromObj = true) const override
     {
         (void)fromObj;
-        if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
-            return StaticCast<const CHIR::InvokeStatic&>(chirExpr).GetThisType();
-        } else {
-            return StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetThisType();
-        }
+        return GetInvokeStatic().GetThisType();
     }
 
     std::vector<CHIR::Type*> GetInstantiatedTypeArgs() const override
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
-            return StaticCast<const CHIR::InvokeStatic&>(chirExpr).GetInstantiatedTypeArgs();
-        } else {
-            return StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetInstantiatedTypeArgs();
-        }
+        return GetInvokeStatic().GetInstantiatedTypeArgs();
     }
 
     bool IsCalleeMethod() const override
@@ -504,13 +406,7 @@ public:
     const CHIR::Type* GetOuterType(CHIR::CHIRBuilder& builder) const override
     {
         CJC_ASSERT(IsCalleeStatic());
-        CHIR::Type* res = nullptr;
-        if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
-            res = StaticCast<const CHIR::InvokeStatic&>(chirExpr).GetInstSrcParentCustomTypeOfMethod(builder);
-        } else {
-            res = StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetInstSrcParentCustomTypeOfMethod(
-                builder);
-        }
+        CHIR::Type* res = GetInvokeStatic().GetInstSrcParentCustomTypeOfMethod(builder);
         if (!res) {
 #ifndef NDEBUG
             Errorln("Should not get a nullptr:\n", chirExpr.ToString(0));
@@ -528,306 +424,16 @@ public:
 
     std::size_t GetVirtualMethodOffset() const override
     {
-        if (GetExprKind() == CHIR::ExprKind::INVOKESTATIC) {
-            return StaticCast<const CHIR::InvokeStatic&>(chirExpr).GetVirtualMethodOffset();
-        } else {
-            return StaticCast<const CHIR::InvokeStaticWithException&>(chirExpr).GetVirtualMethodOffset();
-        }
-    }
-};
-
-class CHIRUnaryExprWrapper : public CHIRExprWrapper {
-public:
-    explicit CHIRUnaryExprWrapper(const CHIR::UnaryExpression& unaryExpr) : CHIRExprWrapper(unaryExpr)
-    {
-    }
-
-    explicit CHIRUnaryExprWrapper(const CHIR::IntOpWithException& unaryExprWithException)
-        : CHIRExprWrapper(unaryExprWithException)
-    {
-    }
-
-    ~CHIRUnaryExprWrapper() override = default;
-
-    CHIR::Value* GetOperand() const
-    {
-        if (GetExprMajorKind() == CHIR::ExprMajorKind::UNARY_EXPR) {
-            return StaticCast<const CHIR::UnaryExpression&>(chirExpr).GetOperand();
-        } else {
-            return StaticCast<const CHIR::IntOpWithException&>(chirExpr).GetOperands()[0];
-        }
-    }
-
-    OverflowStrategy GetOverflowStrategy() const
-    {
-        if (GetExprMajorKind() == CHIR::ExprMajorKind::UNARY_EXPR) {
-            return StaticCast<const CHIR::UnaryExpression&>(chirExpr).GetOverflowStrategy();
-        } else {
-            return OverflowStrategy::THROWING;
-        }
-    }
-
-    CHIR::ExprKind GetUnaryExprKind() const
-    {
-        if (GetExprMajorKind() == CHIR::ExprMajorKind::UNARY_EXPR) {
-            return StaticCast<const CHIR::UnaryExpression&>(chirExpr).GetExprKind();
-        } else {
-            return StaticCast<const CHIR::IntOpWithException&>(chirExpr).GetOpKind();
-        }
+        return GetInvokeStatic().GetVirtualMethodOffset();
     }
 
 private:
-    CHIR::ExprKind GetExprKind() const = delete;
-};
-
-class CHIRBinaryExprWrapper : public CHIRExprWrapper {
-public:
-    explicit CHIRBinaryExprWrapper(const CHIR::BinaryExpression& binaryExpr) : CHIRExprWrapper(binaryExpr)
+    const CHIR::InvokeStaticBase& GetInvokeStatic() const
     {
-    }
-
-    explicit CHIRBinaryExprWrapper(const CHIR::IntOpWithException& binaryExprWithException)
-        : CHIRExprWrapper(binaryExprWithException)
-    {
-    }
-
-    ~CHIRBinaryExprWrapper() override = default;
-
-    CHIR::Value* GetLHSOperand() const
-    {
-        if (GetExprMajorKind() == CHIR::ExprMajorKind::BINARY_EXPR) {
-            return StaticCast<const CHIR::BinaryExpression&>(chirExpr).GetLHSOperand();
-        } else {
-            return StaticCast<const CHIR::IntOpWithException&>(chirExpr).GetOperands()[0];
-        }
-    }
-
-    CHIR::Value* GetRHSOperand() const
-    {
-        if (GetExprMajorKind() == CHIR::ExprMajorKind::BINARY_EXPR) {
-            return StaticCast<const CHIR::BinaryExpression&>(chirExpr).GetRHSOperand();
-        } else {
-            return StaticCast<const CHIR::IntOpWithException&>(chirExpr).GetOperands()[1];
-        }
-    }
-
-    OverflowStrategy GetOverflowStrategy() const
-    {
-        if (GetExprMajorKind() == CHIR::ExprMajorKind::BINARY_EXPR) {
-            return StaticCast<const CHIR::BinaryExpression&>(chirExpr).GetOverflowStrategy();
-        } else {
-            return StaticCast<const CHIR::IntOpWithException&>(chirExpr).GetOverflowStrategy();
-        }
-    }
-
-    CHIR::ExprKind GetBinaryExprKind() const
-    {
-        if (GetExprMajorKind() == CHIR::ExprMajorKind::BINARY_EXPR) {
-            return StaticCast<const CHIR::BinaryExpression&>(chirExpr).GetExprKind();
-        } else {
-            return StaticCast<const CHIR::IntOpWithException&>(chirExpr).GetOpKind();
-        }
-    }
-
-private:
-    CHIR::ExprKind GetExprKind() const = delete;
-};
-
-class CHIRSpawnWrapper : public CHIRExprWrapper {
-public:
-    explicit CHIRSpawnWrapper(const CHIR::Spawn& spawn) : CHIRExprWrapper(spawn)
-    {
-    }
-
-    explicit CHIRSpawnWrapper(const CHIR::SpawnWithException& spawnWithException) : CHIRExprWrapper(spawnWithException)
-    {
-    }
-
-    ~CHIRSpawnWrapper() override = default;
-
-    CHIR::Value* GetFuture() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::SPAWN) {
-            return StaticCast<const CHIR::Spawn&>(chirExpr).GetFuture();
-        } else {
-            return StaticCast<const CHIR::SpawnWithException&>(chirExpr).GetFuture();
-        }
-    }
-
-    CHIR::Value* GetSpawnArg() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::SPAWN) {
-            return StaticCast<const CHIR::Spawn&>(chirExpr).GetSpawnArg();
-        } else {
-            return StaticCast<const CHIR::SpawnWithException&>(chirExpr).GetSpawnArg();
-        }
-    }
-
-    CHIR::Value* GetClosure() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::SPAWN) {
-            return StaticCast<const CHIR::Spawn&>(chirExpr).GetClosure();
-        } else {
-            return StaticCast<const CHIR::SpawnWithException&>(chirExpr).GetClosure();
-        }
-    }
-
-    CHIR::Function* GetExecuteClosure() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::SPAWN) {
-            return StaticCast<const CHIR::Spawn&>(chirExpr).GetExecuteClosure();
-        } else {
-            return StaticCast<const CHIR::SpawnWithException&>(chirExpr).GetExecuteClosure();
-        }
-    }
-
-    bool IsExecuteClosure() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::SPAWN) {
-            return StaticCast<const CHIR::Spawn&>(chirExpr).IsExecuteClosure();
-        } else {
-            return StaticCast<const CHIR::SpawnWithException&>(chirExpr).IsExecuteClosure();
-        }
+        return StaticCast<const CHIR::InvokeStaticBase&>(chirExpr);
     }
 };
 
-class CHIRTypeCastWrapper : public CHIRExprWrapper {
-public:
-    explicit CHIRTypeCastWrapper(const CHIR::TypeCast& typeCast) : CHIRExprWrapper(typeCast)
-    {
-    }
-
-    explicit CHIRTypeCastWrapper(const CHIR::TypeCastWithException& typeCastWithException)
-        : CHIRExprWrapper(typeCastWithException)
-    {
-    }
-
-    ~CHIRTypeCastWrapper() override = default;
-
-    CHIR::Value* GetSourceValue() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::TYPECAST) {
-            return StaticCast<const CHIR::TypeCast&>(chirExpr).GetSourceValue();
-        } else {
-            return StaticCast<const CHIR::TypeCastWithException&>(chirExpr).GetSourceValue();
-        }
-    }
-
-    CHIR::Type* GetSourceTy() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::TYPECAST) {
-            return StaticCast<const CHIR::TypeCast&>(chirExpr).GetSourceTy();
-        } else {
-            return StaticCast<const CHIR::TypeCastWithException&>(chirExpr).GetSourceTy();
-        }
-    }
-
-    CHIR::Type* GetTargetTy() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::TYPECAST) {
-            return StaticCast<const CHIR::TypeCast&>(chirExpr).GetTargetTy();
-        } else {
-            return StaticCast<const CHIR::TypeCastWithException&>(chirExpr).GetTargetTy();
-        }
-    }
-
-    OverflowStrategy GetOverflowStrategy() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::TYPECAST) {
-            return StaticCast<const CHIR::TypeCast&>(chirExpr).GetOverflowStrategy();
-        } else {
-            return OverflowStrategy::THROWING;
-        }
-    }
-};
-
-class CHIRIntrinsicWrapper : public CHIRExprWrapper {
-public:
-    explicit CHIRIntrinsicWrapper(const CHIR::Intrinsic& intrinsic) : CHIRExprWrapper(intrinsic)
-    {
-    }
-
-    explicit CHIRIntrinsicWrapper(const CHIR::IntrinsicWithException& intrinsicWithException)
-        : CHIRExprWrapper(intrinsicWithException)
-    {
-    }
-
-    ~CHIRIntrinsicWrapper() override = default;
-
-    CHIR::IntrinsicKind GetIntrinsicKind() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::INTRINSIC) {
-            return StaticCast<const CHIR::Intrinsic&>(chirExpr).GetIntrinsicKind();
-        } else {
-            return StaticCast<const CHIR::IntrinsicWithException&>(chirExpr).GetIntrinsicKind();
-        }
-    }
-
-    std::vector<CHIR::Type*> GetInstantiatedTypeArgs() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::INTRINSIC) {
-            return StaticCast<const CHIR::Intrinsic&>(chirExpr).GetInstantiatedTypeArgs();
-        } else {
-            return StaticCast<const CHIR::IntrinsicWithException&>(chirExpr).GetInstantiatedTypeArgs();
-        }
-    }
-};
-
-class CHIRAllocateWrapper : public CHIRExprWrapper {
-public:
-    explicit CHIRAllocateWrapper(const CHIR::Allocate& allocate) : CHIRExprWrapper(allocate)
-    {
-    }
-
-    explicit CHIRAllocateWrapper(const CHIR::AllocateWithException& allocateWithException)
-        : CHIRExprWrapper(allocateWithException)
-    {
-    }
-
-    ~CHIRAllocateWrapper() override = default;
-
-    CHIR::Type* GetType() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::ALLOCATE) {
-            return StaticCast<const CHIR::Allocate&>(chirExpr).GetType();
-        } else {
-            return StaticCast<const CHIR::AllocateWithException&>(chirExpr).GetType();
-        }
-    }
-};
-
-class CHIRRawArrayAllocateWrapper : public CHIRExprWrapper {
-public:
-    explicit CHIRRawArrayAllocateWrapper(const CHIR::RawArrayAllocate& rawArrayAllocate)
-        : CHIRExprWrapper(rawArrayAllocate)
-    {
-    }
-
-    explicit CHIRRawArrayAllocateWrapper(const CHIR::RawArrayAllocateWithException& rawArrayAllocateWithException)
-        : CHIRExprWrapper(rawArrayAllocateWithException)
-    {
-    }
-
-    ~CHIRRawArrayAllocateWrapper() override = default;
-
-    CHIR::Value* GetSize() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::RAW_ARRAY_ALLOCATE) {
-            return StaticCast<const CHIR::RawArrayAllocate&>(chirExpr).GetSize();
-        } else {
-            return StaticCast<const CHIR::RawArrayAllocateWithException&>(chirExpr).GetSize();
-        }
-    }
-
-    CHIR::Type* GetElementType() const
-    {
-        if (GetExprKind() == CHIR::ExprKind::RAW_ARRAY_ALLOCATE) {
-            return StaticCast<const CHIR::RawArrayAllocate&>(chirExpr).GetElementType();
-        } else {
-            return StaticCast<const CHIR::RawArrayAllocateWithException&>(chirExpr).GetElementType();
-        }
-    }
-};
 } // namespace CodeGen
 } // namespace Cangjie
 #endif // CANGJIE_CHIREXPRWRAPPER_H

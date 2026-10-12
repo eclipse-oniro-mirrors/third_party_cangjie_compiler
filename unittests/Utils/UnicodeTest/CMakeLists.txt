@@ -6,7 +6,7 @@
 
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-add_executable(UnicodeTest UnicodeTest.cpp)
+add_executable(UnicodeTest UnicodeTest.cpp UnicodeConversionTest.cpp)
 target_link_libraries(
     UnicodeTest
     ${CMAKE_DL_LIBS}

@@ -26,9 +26,19 @@ bool IsJavaMirror(const ClassDef& classDef)
     return classDef.TestAttr(Attribute::JAVA_MIRROR);
 }
 
+bool IsObjCImpl(const ClassDef& classDef)
+{
+    return classDef.TestAttr(Attribute::OBJ_C_IMPL);
+}
+
 bool IsMirror(const ClassDef& classDef)
 {
     return IsObjCMirror(classDef) || IsJavaMirror(classDef);
+}
+
+bool HasInitedGeneratedFromAST(const ClassDef& classDef)
+{
+    return IsMirror(classDef) || IsObjCImpl(classDef);
 }
 } // namespace
 
@@ -39,8 +49,8 @@ MarkClassHasInited::MarkClassHasInited(CHIRBuilder& builder)
 
 void MarkClassHasInited::AddHasInitedFlagToClassDef(ClassDef& classDef)
 {
-    // Java and Objective-C mirrors have this field generated from AST.
-    if (IsMirror(classDef)) {
+    // Java and Objective-C mirrors, as well as @ObjCImpl classes, have this field generated from AST.
+    if (HasInitedGeneratedFromAST(classDef)) {
         return;
     }
 

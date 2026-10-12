@@ -29,7 +29,10 @@ bool ShouldDesugarTypecheck(Ptr<Type> type, Ptr<Expr> expr)
     // then will be desugared as regular as
     auto castDecl = DynamicCast<ClassLikeDecl>(Ty::GetDeclOfTy(type->GetTy()));
     auto objDecl = DynamicCast<ClassLikeDecl>(Ty::GetDeclOfTy(expr->GetTy()));
-    if (!objDecl || !castDecl || !castDecl->TestAnyAttr(Attribute::JAVA_MIRROR_SUBTYPE, Attribute::JAVA_MIRROR)) {
+    if (!objDecl || !castDecl) {
+        return false;
+    }
+    if (!castDecl->IsJavaMirror() && !castDecl->IsJavaImpl()) {
         return false;
     }
 
@@ -46,9 +49,8 @@ std::vector<Ptr<TypePattern>> CollectTypePatternsWithJavaClass(Ptr<Pattern> pat)
         if (auto tpat = As<ASTKind::TYPE_PATTERN>(node.get())) {
             auto decl = Ty::GetDeclOfTy(tpat->type->GetTy());
             // Saving for all Java classes, except JObject
-            if (decl && (IsMirror(*decl) || IsImpl(*decl) || decl->TestAttr(Attribute::JAVA_MIRROR_SUBTYPE))
-                && !IsJObject(*decl)) {
-                    res.push_back(tpat);
+            if (decl && (decl->IsJavaMirror() || decl->IsJavaImpl()) && !IsJObject(*decl)) {
+                res.push_back(tpat);
             }
         }
 
@@ -91,7 +93,7 @@ OwnedPtr<Expr> DesugarTypeCheckingAndCasting::CreateIsInstanceCall(Ptr<VarDecl> 
 
     auto javaRefExpr = CreateJavaRefCall(WithinFile(CreateRefExpr(*jObjectVar), curFile));
 
-    auto nameLit = CreateLitConstExpr(LitConstKind::STRING, utils.GetJavaClassNormalizeSignature(*classTy),
+    auto nameLit = CreateLitConstExpr(LitConstKind::STRING, GetJavaJniClassName(*classTy),
         isInstanceOfDecl->funcBody->paramLists[0]->params[2]->GetTy());
 
     return CreateCall(isInstanceOfDecl, curFile, std::move(jniEnvCall), std::move(javaRefExpr), std::move(nameLit));
@@ -100,7 +102,7 @@ OwnedPtr<Expr> DesugarTypeCheckingAndCasting::CreateIsInstanceCall(Ptr<VarDecl> 
 OwnedPtr<Expr> DesugarTypeCheckingAndCasting::CreateJObjectCast(Ptr<VarDecl> jObjectVar,
     Ptr<ClassLikeDecl> castDecl, Ptr<File> curFile) const
 {
-    CJC_ASSERT(IsMirror(*castDecl) || IsImpl(*castDecl));
+    CJC_ASSERT(castDecl->IsJavaMirror() || castDecl->IsJavaImpl());
     auto castTy = castDecl->GetTy();
 
     // match (IsInstance(obj.javaref, ...))
@@ -111,7 +113,7 @@ OwnedPtr<Expr> DesugarTypeCheckingAndCasting::CreateJObjectCast(Ptr<VarDecl> jOb
     // cast true => ...
     // wrap into mirror constructor or into wrapping constructor of java impl on the reference from registry
     OwnedPtr<Expr> trueBranch = utils.CreateOptionSomeCall(
-        ilib.UnwrapJavaEntity(std::move(javarefExpr), castTy, *castDecl),
+        ilib.UnwrapJavaEntity(std::move(javarefExpr), castTy, castDecl),
         castTy);
 
     // case false => None
@@ -131,7 +133,7 @@ OwnedPtr<Block> DesugarTypeCheckingAndCasting::CastAndSubstituteVars(
         auto castDecl = StaticAs<ASTKind::CLASS_LIKE_DECL>(Ty::GetDeclOfTy(castTy));
 
         auto javarefExpr = CreateJavaRefCall(WithinFile(CreateRefExpr(*varDecl), curFile));
-        OwnedPtr<Expr> initializer = ilib.UnwrapJavaEntity(std::move(javarefExpr), castDecl->GetTy(), *castDecl);
+        OwnedPtr<Expr> initializer = ilib.UnwrapJavaEntity(std::move(javarefExpr), castDecl->GetTy(), castDecl);
         auto castedVar = WithinFile(CreateTmpVarDecl(CreateType(castDecl->GetTy()), std::move(initializer)), curFile);
         varsMapping[varDecl] = castedVar;
         varsBlock->body.emplace_back(std::move(castedVar));

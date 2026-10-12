@@ -12,14 +12,13 @@
  * This file implements desugaring of ObjCPointer struct accessors
  */
 
-
-#include "NativeFFI/Utils.h"
-#include "NativeFFI/ObjC/Utils/Common.h"
-#include "cangjie/AST/Create.h"
-#include "cangjie/AST/Walker.h"
-#include "cangjie/AST/Match.h"
-#include "cangjie/AST/Clone.h"
 #include "Handlers.h"
+#include "NativeFFI/ObjC/Utils/ASTQuery.h"
+#include "NativeFFI/Utils.h"
+#include "cangjie/AST/Clone.h"
+#include "cangjie/AST/Create.h"
+#include "cangjie/AST/Match.h"
+#include "cangjie/AST/Walker.h"
 
 using namespace Cangjie::AST;
 using namespace Cangjie::Interop::ObjC;
@@ -55,7 +54,7 @@ enum class ObjCFTypeKind {
     BLOCK, FUNCPTR, NONE
 };
 
-ObjCFTypeKind FTypeKindByCallPropertyDecl(TypeMapper& tm, Ptr<Decl> decl)
+ObjCFTypeKind FTypeKindByCallPropertyDecl(Ptr<Decl> decl)
 {
     if (decl == nullptr
      || decl->astKind != ASTKind::PROP_DECL
@@ -64,10 +63,10 @@ ObjCFTypeKind FTypeKindByCallPropertyDecl(TypeMapper& tm, Ptr<Decl> decl)
         return ObjCFTypeKind::NONE;
     }
     auto typeDecl = decl->outerDecl;
-    if (tm.IsObjCFunc(*typeDecl)) {
+    if (IsObjCFunc(*typeDecl)) {
         return ObjCFTypeKind::FUNCPTR;
     }
-    if (tm.IsObjCBlock(*typeDecl)) {
+    if (IsObjCBlock(*typeDecl)) {
         return ObjCFTypeKind::BLOCK;
     }
 
@@ -94,7 +93,7 @@ void RewriteObjCFuncCall::HandleImpl(InteropContext& ctx)
             }
             auto decl = GetDirectlyReferencedMemberDecl(StaticCast<Expr>(node));
 
-            if (FTypeKindByCallPropertyDecl(ctx.typeMapper, decl) != ObjCFTypeKind::NONE) {
+            if (FTypeKindByCallPropertyDecl(decl) != ObjCFTypeKind::NONE) {
                 ctx.diag.DiagnoseRefactor(
                     DiagKindRefactor::sema_objc_func_call_property_can_only_be_called,
                     *node,
@@ -110,7 +109,7 @@ void RewriteObjCFuncCall::HandleImpl(InteropContext& ctx)
 
             auto& ma = callExpr->baseFunc;
             Ptr<Decl> referencedDecl = GetDirectlyReferencedMemberDecl(ma);
-            auto fTypeKind = FTypeKindByCallPropertyDecl(ctx.typeMapper, referencedDecl);
+            auto fTypeKind = FTypeKindByCallPropertyDecl(referencedDecl);
             if (fTypeKind == ObjCFTypeKind::NONE) {
                 return VisitAction::WALK_CHILDREN;
             }
@@ -125,8 +124,7 @@ void RewriteObjCFuncCall::HandleImpl(InteropContext& ctx)
             }
             for (auto& originalArg : callExpr->args) {
                 OwnedPtr<Expr> cloned = ASTCloner::Clone(originalArg->expr.get());
-                unwrappedArguments.push_back(
-                    ctx.factory.UnwrapEntity(std::move(cloned)));
+                unwrappedArguments.push_back(ctx.factory.UnwrapEntity(std::move(cloned)));
             }
             auto fptrAccessor = fTypeKind == ObjCFTypeKind::BLOCK ?
                 ctx.bridge.GetObjCBlockFPointerAccessor() : ctx.bridge.GetObjCFuncFPointerAccessor();
@@ -140,12 +138,7 @@ void RewriteObjCFuncCall::HandleImpl(InteropContext& ctx)
             // We use objc_retain here, because we don't know in advance if
             // ARC applied objc_autoreleaseReturnValue to the result of the ObjCFunc
             block.push_back(ctx.factory.WrapEntity(std::move(call), *callExpr->GetTy(), Retain::RETAINED));
-            ctx.factory.SetDesugarExpr(
-                callExpr,
-                WrapReturningLambdaCall(
-                    ctx.typeManager,
-                    std::move(block))
-            );
+            ctx.factory.SetDesugarExpr(callExpr, WrapReturningLambdaCall(ctx.typeManager, std::move(block)));
             return VisitAction::WALK_CHILDREN;
         }).Walk();
     }

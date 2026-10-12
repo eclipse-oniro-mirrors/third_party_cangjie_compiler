@@ -685,7 +685,7 @@ void AST2CHIR::CreatePseudoImportedFuncSignatureAndSetGlobalCache(const AST::Fun
     CJC_ASSERT(funcDecl.funcBody->paramLists.size() == 1);
     // NOTE: 'AnnoInfo' will be added during translating customDef.
     if (IsInstanceMember(funcDecl)) {
-        auto pType = funcTy->GetParamTypes()[0];
+        auto pType = funcTy->GetParamType(0);
         auto chirParam = builder.CreateParameter(pType, INVALID_LOCATION, *fn);
         chirParam->SetSrcCodeIdentifier("this");
         fn->AddParam(*chirParam);
@@ -744,7 +744,7 @@ void AST2CHIR::CreateImportedFuncSignatureAndSetGlobalCache(const AST::FuncDecl&
     SetFuncAttributeAndLinkageType(funcDecl, *fn);
     // set param infos of imported func
     if (IsInstanceMember(funcDecl)) {
-        auto pType = StaticCast<FuncType*>(fnTy)->GetParamTypes()[0];
+        auto pType = StaticCast<FuncType*>(fnTy)->GetParamType(0);
         auto chirParam = builder.CreateParameter(pType, INVALID_LOCATION, *fn);
         chirParam->SetSrcCodeIdentifier("this");
     }

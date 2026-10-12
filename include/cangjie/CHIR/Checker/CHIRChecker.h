@@ -13,7 +13,7 @@
 
 #include "cangjie/CHIR/CHIR.h"
 #include "cangjie/CHIR/IR/CHIRBuilder.h"
-#include "cangjie/CHIR/IR/Expression/ExpressionWrapper.h"
+#include "cangjie/CHIR/IR/Expression/Terminator.h"
 #include "cangjie/CHIR/IR/Package.h"
 #include "cangjie/Option/Option.h"
 
@@ -152,23 +152,24 @@ private:
     void CheckRaiseException(const RaiseException& expr, const Function& topLevelFunc);
     void CheckBranch(const Branch& expr, const Function& topLevelFunc);
     void CheckMultiBranch(const MultiBranch& expr, const Function& topLevelFunc);
-    void CheckApplyWithException(const ApplyWithException& expr, const Function& topLevelFunc);
+    void CheckTryApply(const TryApply& expr, const Function& topLevelFunc);
     void CheckApplyBase(const ApplyBase& expr, const Function& topLevelFunc);
-    void CheckInvokeWithException(const InvokeWithException& expr, const Function& topLevelFunc);
+    void CheckTryInvoke(const TryInvoke& expr, const Function& topLevelFunc);
     void CheckInvokeBase(const InvokeBase& expr, const Function& topLevelFunc);
-    void CheckInvokeStaticWithException(const InvokeStaticWithException& expr, const Function& topLevelFunc);
+    void CheckTryInvokeStatic(const TryInvokeStatic& expr, const Function& topLevelFunc);
     void CheckInvokeStaticBase(const InvokeStaticBase& expr, const Function& topLevelFunc);
-    void CheckIntOpWithException(const IntOpWithException& expr, const Function& topLevelFunc);
-    void CheckUnaryExprBase(const UnaryExprBase& expr, const Function& topLevelFunc);
-    void CheckBinaryExprBase(const BinaryExprBase& expr, const Function& topLevelFunc);
-    void CheckSpawnWithException(const SpawnWithException& expr, const Function& topLevelFunc);
+    void CheckTryUnaryExpression(const TryUnaryExpression& expr, const Function& topLevelFunc);
+    void CheckTryBinaryExpression(const TryBinaryExpression& expr, const Function& topLevelFunc);
+    void CheckUnaryExprBase(const UnaryExpressionBase& expr, const Function& topLevelFunc);
+    void CheckBinaryExprBase(const BinaryExpressionBase& expr, const Function& topLevelFunc);
+    void CheckTrySpawn(const TrySpawn& expr, const Function& topLevelFunc);
     void CheckSpawnBase(const SpawnBase& expr, const Function& topLevelFunc);
-    void CheckTypeCastWithException(const TypeCastWithException& expr, const Function& topLevelFunc);
-    void CheckIntrinsicWithException(const IntrinsicWithException& expr, const Function& topLevelFunc);
+    void CheckTryNumericCast(const TryNumericCast& expr, const Function& topLevelFunc);
+    void CheckTryIntrinsic(const TryIntrinsic& expr, const Function& topLevelFunc);
     void CheckIntrinsicBase(const IntrinsicBase& expr, const Function& topLevelFunc);
-    void CheckAllocateWithException(const AllocateWithException& expr, const Function& topLevelFunc);
+    void CheckTryAllocate(const TryAllocate& expr, const Function& topLevelFunc);
     void CheckAllocateBase(const AllocateBase& expr, const Function& topLevelFunc);
-    void CheckRawArrayAllocateWithException(const RawArrayAllocateWithException& expr, const Function& topLevelFunc);
+    void CheckTryRawArrayAllocate(const TryRawArrayAllocate& expr, const Function& topLevelFunc);
     void CheckRawArrayAllocateBase(const RawArrayAllocateBase& expr, const Function& topLevelFunc);
     // ===--------------------------------------------------------------------===//
     // Check Unary Expression
@@ -179,11 +180,11 @@ private:
     // Check Binary Expression
     // ===--------------------------------------------------------------------===//
     void CheckBinaryExpression(const BinaryExpression& expr, const Function& topLevelFunc);
-    void CheckCalculExpression(const BinaryExprBase& expr, const Function& topLevelFunc);
-    void CheckExponentiationExpression(const BinaryExprBase& expr, const Function& topLevelFunc);
-    void CheckBitExpression(const BinaryExprBase& expr, const Function& topLevelFunc);
-    void CheckCompareExpression(const BinaryExprBase& expr, const Function& topLevelFunc);
-    void CheckLogicExpression(const BinaryExprBase& expr, const Function& topLevelFunc);
+    void CheckCalculExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc);
+    void CheckExponentiationExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc);
+    void CheckBitExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc);
+    void CheckCompareExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc);
+    void CheckLogicExpression(const BinaryExpressionBase& expr, const Function& topLevelFunc);
 
     // ===--------------------------------------------------------------------===//
     // Check Memory Expression
@@ -257,9 +258,9 @@ private:
     void CheckVArrayBuilder(const VArrayBuilder& expr, const Function& topLevelFunc);
     void CheckIntrinsic(const Intrinsic& expr, const Function& topLevelFunc);
     void CheckBox(const Box& expr, const Function& topLevelFunc);
-    void CheckUnBox(const UnBox& expr, const Function& topLevelFunc);
-    void CheckTransformToGeneric(const TransformToGeneric& expr, const Function& topLevelFunc);
-    void CheckTransformToConcrete(const TransformToConcrete& expr, const Function& topLevelFunc);
+    void CheckUnBox(const UnBoxToValue& expr, const Function& topLevelFunc);
+    void CheckCastToGeneric(const CastToGeneric& expr, const Function& topLevelFunc);
+    void CheckCastToConcrete(const CastToConcrete& expr, const Function& topLevelFunc);
     void CheckGetInstantiateValue(const GetInstantiateValue& expr, const Function& topLevelFunc);
     void CheckUnBoxToRef(const UnBoxToRef& expr, const Function& topLevelFunc);
     void CheckGetRTTI(const GetRTTI& expr, const Function& topLevelFunc);
@@ -276,7 +277,7 @@ private:
     /**
      * @brief terminator can't jump to another block group
      */
-    void CheckTerminatorJump(const Terminator& terminator, const Function& topLevelFunc);
+    void CheckTerminatorJump(const Expression& terminator, const Function& topLevelFunc);
 
     // ===--------------------------------------------------------------------===//
     // Utils
@@ -288,10 +289,10 @@ private:
     bool OperandNumIsEqual(size_t expectedNum, const Expression& expr, const Function& topLevelFunc);
     bool OperandNumIsEqual(
         const std::vector<size_t>& expectedNum, const Expression& expr, const Function& topLevelFunc);
-    bool SuccessorNumIsEqual(size_t expectedNum, const Terminator& expr, const Function& topLevelFunc);
+    bool SuccessorNumIsEqual(size_t expectedNum, const Expression& expr, const Function& topLevelFunc);
     bool OperandNumAtLeast(size_t expectedNum, const Expression& expr, const Function& topLevelFunc);
-    bool SuccessorNumAtLeast(size_t expectedNum, const Terminator& expr, const Function& topLevelFunc);
-    void ShouldNotHaveResult(const Terminator& expr, const Function& topLevelFunc);
+    bool SuccessorNumAtLeast(size_t expectedNum, const Expression& expr, const Function& topLevelFunc);
+    void ShouldNotHaveResult(const Expression& expr, const Function& topLevelFunc);
     bool CheckHaveResult(const Expression& expr, const Function& topLevelFunc);
 
 private:

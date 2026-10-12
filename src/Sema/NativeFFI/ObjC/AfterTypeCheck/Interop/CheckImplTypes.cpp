@@ -20,10 +20,10 @@ using namespace Cangjie::Interop::ObjC;
 
 void CheckImplTypes::HandleImpl(InteropContext& ctx)
 {
-    auto checker = HandlerFactory<TypeCheckContext>::Start<CheckMirrorSubtypeAttr>()
+    auto checker = HandlerFactory<TypeCheckContext>::Start<CheckImplAttr>()
                        .Use<CheckImplInheritMirror>()
                        .Use<CheckForeignName>()
-                       .Use<CheckMemberTypes>(InteropType::ObjC_Mirror);
+                       .Use<CheckMemberTypes>();
 
     for (auto impl : ctx.impls) {
         auto typeCheckCtx = TypeCheckContext(*impl, ctx.diag, ctx.typeMapper, ctx.typeManager);

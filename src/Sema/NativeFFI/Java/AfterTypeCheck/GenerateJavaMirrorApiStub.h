@@ -18,7 +18,6 @@
 
 #include "AfterTypeCheckStage.h"
 #include "InteropLibBridge.h"
-#include "InheritanceChecker/MemberSignature.h"
 #include "cangjie/AST/Node.h"
 
 namespace Cangjie::Native::FFI::Java {
@@ -33,8 +32,7 @@ public:
     explicit GenerateJavaMirrorApiStub(
         TypeManager& typeManager,
         InteropLibBridge& ilib,
-        Interop::Java::Utils& utils,
-        const std::unordered_map<Ptr<const AST::InheritableDecl>, MemberMap>&);
+        Interop::Java::Utils& utils);
 protected:
     void Process(AfterTypeCheckContext& ctx) override;
 private:
@@ -47,8 +45,6 @@ private:
     AST::FuncDecl& InsertWrappingConstructor(AST::ClassDecl& mirror) const;
 
     AST::FuncDecl& InsertJStringOfStringConstructor(AST::ClassDecl& jstring) const;
-
-    void InsertSyntheticAbstractWrapperMethodStubs(AST::ClassDecl& mirror) const;
 
     AST::FuncDecl& InsertAbstractJavaReferenceGetterStub(AST::InterfaceDecl& mirror) const;
 
@@ -78,9 +74,6 @@ private:
     TypeManager& typeManager;
     InteropLibBridge& ilib;
     Interop::Java::Utils& utils;
-
-    // Type-check stage member map
-    const std::unordered_map<Ptr<const AST::InheritableDecl>, MemberMap>& memberMap;
 };
 
 } // namespace Cangjie::Native::FFI::Java

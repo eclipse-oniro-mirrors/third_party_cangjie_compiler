@@ -50,7 +50,7 @@ public:
     void DiagObjCInitFuncMustBeInMirrorClass(const AST::FuncDecl& node) const;
     void DiagObjCOptionalFuncMustBeInMirrorClass(const AST::FuncDecl& fd) const;
 
-    void DiagObjCMirrorFuncCannotBeForeign(const AST::FuncDecl& node) const;
+    void DiagObjCFuncMustBeForeign(const AST::FuncDecl& node) const;
     void DiagObjCMirrorFuncCannotBeC(const AST::FuncDecl& node) const;
     void DiagObjCMirrorFuncCannotBeGeneric(const AST::FuncDecl& node) const;
     void DiagObjCMirrorFuncCannotHaveBody(const AST::FuncDecl& node) const;
@@ -61,19 +61,23 @@ public:
 private:
     void CheckMirrorAnnoArgs(AST::Annotation& anno) const;
     void CheckImplAnnoArgs(AST::Annotation& anno) const;
+    void CheckObjCAnnoArgs(AST::Annotation& anno) const;
     void CheckInitAnnoArgs(AST::Annotation& anno) const;
     void CheckOptionalAnnoArgs(AST::Annotation& anno) const;
 
     void CheckMirrorAnnoTarget(const AST::Annotation& anno, ScopeKind scopeKind) const;
     void CheckImplAnnoTarget(const AST::Annotation& anno) const;
+    void CheckObjCAnnoTarget(const AST::Annotation& anno, ScopeKind scopeKind) const;
     void CheckInitAnnoTarget(const AST::Annotation& anno) const;
     void CheckOptionalAnnoTarget(const AST::Annotation& anno) const;
 
     void DiagObjCMirrorCannotBeSealed(const AST::Node& node) const;
+    void DiagObjCMirrorCannotBeCommonOrSpecific(const AST::Node& node) const;
 
     void DiagObjCImplCannotBeInterface(const AST::Node& node) const;
     void DiagObjCImplCannotBeAbstract(const AST::Node& node) const;
     void DiagObjCImplCannotBeSealed(const AST::Node& node) const;
+    void DiagObjCImplCannotBeCommonOrSpecific(const AST::Node& node) const;
 
     ParserImpl& p;
 };

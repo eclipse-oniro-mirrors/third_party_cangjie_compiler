@@ -101,8 +101,8 @@ OwnedPtr<ParenExpr> ASTFactory::CreateParenExpr(OwnedPtr<Expr> expr)
 
 OwnedPtr<Expr> ASTFactory::CreateNativeHandleExpr(OwnedPtr<Expr> entity)
 {
-    CJC_ASSERT(IsObjCMirror(*entity->GetTy()) || IsObjCImpl(*entity->GetTy()) ||
-        IsObjCMirrorInterfaceHandleWrapper(*entity->GetTy()));
+    CJC_ASSERT(IsObjCForeign(*entity->GetTy()) || IsObjCExport(*entity->GetTy()) ||
+        IsObjCForeignInterfaceHandleWrapper(*entity->GetTy()));
     auto entityTy = StaticCast<ClassLikeTy>(entity->GetTy());
     auto curFile = entity->curFile;
     auto getter = GetNativeHandleGetter(*entityTy->commonDecl);
@@ -115,7 +115,7 @@ OwnedPtr<Expr> ASTFactory::CreateNativeHandleExpr(OwnedPtr<Expr> entity)
 
 OwnedPtr<Expr> ASTFactory::CreateNativeHandleExpr(ClassLikeTy& ty, Ptr<File> curFile)
 {
-    CJC_ASSERT(IsObjCMirror(ty) || IsObjCImpl(ty) || IsObjCMirrorInterfaceHandleWrapper(ty));
+    CJC_ASSERT(IsObjCForeign(ty) || IsObjCExport(ty) || IsObjCForeignInterfaceHandleWrapper(ty));
     auto thisRef = CreateThisRef(ty.commonDecl, &ty, curFile);
 
     return CreateNativeHandleExpr(std::move(thisRef));
@@ -134,13 +134,13 @@ OwnedPtr<Expr> ASTFactory::CreateNativeHandleExpr(ClassLikeDecl& decl, bool isSt
 
 OwnedPtr<Expr> ASTFactory::UnwrapEntity(OwnedPtr<Expr> expr)
 {
-    if (IsObjCMirror(*expr->GetTy()) || IsObjCImpl(*expr->GetTy())) {
+    if (IsObjCForeign(*expr->GetTy()) || IsObjCExport(*expr->GetTy())) {
         return CreateNativeHandleExpr(std::move(expr));
     }
 
     if (expr->GetTy()->IsCoreOptionType()) {
         auto innerTy = expr->GetTy()->typeArgs[0];
-        if (IsObjCMirror(*innerTy) || IsObjCImpl(*innerTy)) {
+        if (IsObjCForeign(*innerTy) || IsObjCExport(*innerTy)) {
             return UnwrapObjCMirrorOption(std::move(expr), innerTy);
         }
     }
@@ -173,7 +173,7 @@ OwnedPtr<Expr> ASTFactory::UnwrapEntity(OwnedPtr<Expr> expr)
 
 OwnedPtr<Expr> ASTFactory::WrapEntity(OwnedPtr<Expr> expr, Ty& wrapTy, Retain withRetain)
 {
-    if (IsObjCMirror(wrapTy)) {
+    if (IsObjCForeign(wrapTy)) {
         CJC_ASSERT(expr->GetTy()->IsPointer());
         auto curFile = expr->curFile;
         auto classLikeTy = StaticCast<ClassLikeTy>(&wrapTy);
@@ -192,7 +192,7 @@ OwnedPtr<Expr> ASTFactory::WrapEntity(OwnedPtr<Expr> expr, Ty& wrapTy, Retain wi
         return ctorCall;
     }
 
-    if (IsObjCImpl(wrapTy)) {
+    if (IsObjCExport(wrapTy)) {
         CJC_ASSERT(expr->GetTy()->IsPointer());
         // The handle is bound to a temporary first, so that the registry lookup and the ctor call share a
         // single retain - hence Retain::UNRETAINED below.
@@ -253,7 +253,7 @@ OwnedPtr<Expr> ASTFactory::WrapEntity(OwnedPtr<Expr> expr, Ty& wrapTy, Retain wi
     if (wrapTy.IsCoreOptionType()) {
         if (auto classALTy = DynamicCast<ClassLikeTy>(wrapTy.typeArgs[0])) {
             if (auto decl = classALTy->commonDecl;
-                decl && decl->TestAnyAttr(Attribute::OBJ_C_MIRROR, Attribute::OBJ_C_IMPL)) {
+                decl && decl->TestAnyAttr(Attribute::OBJ_C_FOREIGN, Attribute::OBJ_C_EXPORT)) {
                 return WrapObjCMirrorOption(expr, decl, expr->curFile, withRetain);
             }
         }
@@ -1266,7 +1266,7 @@ OwnedPtr<CallExpr> ASTFactory::CreateGetFromRegistryByIdCall(
     auto getFromRegistryByIdExpr = CreateRefExpr(*getFromRegistryByIdDecl);
 
     auto ty = typeArg->GetTy();
-    CJC_ASSERT(IsObjCImpl(*ty));
+    CJC_ASSERT(IsObjCExport(*ty));
 
     std::vector<OwnedPtr<FuncArg>> args;
     args.emplace_back(CreateFuncArg(std::move(registryId)));
@@ -1363,7 +1363,7 @@ OwnedPtr<Expr> ASTFactory::CreateGetSuperClassExpr(OwnedPtr<Expr> objCSuper, Ptr
 OwnedPtr<Expr> ASTFactory::CreateWithObjCSuperScope(OwnedPtr<Expr> nativeHandle, ClassDecl& outerDecl,
     Ptr<Ty> retTy, std::function<std::vector<OwnedPtr<Node>>(OwnedPtr<Expr>, OwnedPtr<Expr>)> bodyFactory)
 {
-    CJC_ASSERT(IsObjCCompatible(*retTy));
+    CJC_ASSERT(IsObjCCompatible(*retTy, TypePosition::OUT));
 
     auto withObjCSuperDecl = bridge.GetWithObjCSuperDecl();
     auto unwrappedTy = typeMapper.Cj2CType(retTy);
@@ -1714,18 +1714,6 @@ OwnedPtr<FuncDecl> ASTFactory::CreateFinalizer(ClassDecl& target)
     return fd;
 }
 
-OwnedPtr<VarDecl> ASTFactory::CreateHasInitedField(ClassDecl& target)
-{
-    static auto boolTy = typeManager.GetPrimitiveTy(TypeKind::TYPE_BOOLEAN);
-    auto initializer = CreateLitConstExpr(LitConstKind::BOOL, "false", boolTy);
-    auto ret = CreateVarDecl(HAS_INITED_IDENT, std::move(initializer));
-    ret->isVar = true;
-    PutDeclToClassLikeBody(*ret, target);
-    ret->EnableAttr(Attribute::PRIVATE, Attribute::NO_REFLECT_INFO, Attribute::HAS_INITED_FIELD);
-
-    return ret;
-}
-
 OwnedPtr<FuncDecl> ASTFactory::CreateNativeHandleGetterDecl(ClassLikeDecl& target)
 {
     static auto nativeObjCIdTy = bridge.GetNativeObjCIdTy();
@@ -1866,7 +1854,8 @@ OwnedPtr<Expr> ASTFactory::CreateConvertToNSStringCall(
 OwnedPtr<Expr> ASTFactory::CreateDescriptionAsStringCall(OwnedPtr<Expr> id)
 {
     auto convertDecl = bridge.GetDescriptionAsStringDecl();
-    return CreateCall(std::move(convertDecl), convertDecl->curFile, std::move(id));
+    auto curFile = convertDecl->curFile;
+    return CreateCall(std::move(convertDecl), curFile, std::move(id));
 }
 
 OwnedPtr<Expr> ASTFactory::CreateObjCRetainCall(OwnedPtr<Expr> id)

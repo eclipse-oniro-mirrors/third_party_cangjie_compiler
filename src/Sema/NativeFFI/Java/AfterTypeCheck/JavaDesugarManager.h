@@ -28,9 +28,7 @@
 #include "cangjie/Mangle/BaseMangler.h"
 #include "cangjie/Modules/ImportManager.h"
 #include "cangjie/Sema/TypeManager.h"
-#include "InheritanceChecker/MemberSignature.h"
 #include "cangjie/Utils/SafePointer.h"
-#include <unordered_map>
 
 namespace Cangjie::Interop::Java {
 using namespace AST;
@@ -42,8 +40,7 @@ const std::string JAVA_IMPL_ENTITY_ARG_NAME_IN_GENERATED_CTOR = "$obj";
 class JavaDesugarManager {
 public:
     JavaDesugarManager(ImportManager& importManager, TypeManager& typeManager, DiagnosticEngine& diag,
-        const BaseMangler& mangler, const std::optional<std::string>& javaCodeGenPath, const std::string& outputLibPath,
-        const std::unordered_map<Ptr<const InheritableDecl>, MemberMap>& memberMap)
+        const BaseMangler& mangler, const std::optional<std::string>& javaCodeGenPath, const std::string& outputLibPath)
         : importManager(importManager),
           typeManager(typeManager),
           utils(importManager, typeManager),
@@ -59,8 +56,7 @@ public:
           jfieldIdCache(importManager, typeManager, lib),
           factory(typeManager, lib, jniBridge, jclassCache, jmethodIdCache, jfieldIdCache),
           javaCodeGenPath(javaCodeGenPath),
-          outputLibPath(outputLibPath),
-          memberMap(memberMap)
+          outputLibPath(outputLibPath)
     {
         lib.CheckInteropLibVersion();
     }
@@ -68,13 +64,14 @@ public:
     /**
      * Fills bodies for previously generated stubs.
      */
-    void GenerateInMirrors(File& file);
+    void GenerateInMirrors(AfterTypeCheckContext& ctx, File& file);
 
-    void GenerateInMirror(ClassDecl& classDecl);
+    void GenerateInMirror(AfterTypeCheckContext& ctx, ClassDecl& classDecl);
 
     void GenerateJavaSourceCode(AfterTypeCheckContext& ctx);
 
     void ProcessJavaMirrorImplStages(AfterTypeCheckContext& ctx, std::function<void(AST::Node&)> desugarPropRef);
+    void ProcessCallSiteDesugarStages(AfterTypeCheckContext& ctx);
 private:
     /**
      * Processes logically isolated interop stage.
@@ -107,11 +104,6 @@ private:
     void InsertJavaMirrorWrappingConstructorBody(ClassDecl& decl);
 
     /**
-     * var $hasInited: Bool = false
-     */
-    void InsertJavaMirrorHasInited(ClassDecl& mirror);
-
-    /**
      * ~init() {
      *     Java_CFFI_deleteGlobalReference($jnienv, this.javaref)
      * }
@@ -134,7 +126,7 @@ private:
      *   super(Java_CFFI_CangjieStringToJava(env, s))
      * }
      */
-    void InsertJStringOfStringCtorBody(ClassDecl& decl);
+    void InsertJStringOfStringCtorBody(AfterTypeCheckContext& ctx, ClassDecl& decl);
 
     void GenerateNativeItemFunc(AfterTypeCheckContext& ctx, const Ptr<TupleTy>& tupleTy);
 
@@ -152,9 +144,6 @@ private:
 
     const std::optional<std::string>& javaCodeGenPath;
     const std::string& outputLibPath;
-
-    // contains the member signatures of structs.
-    const std::unordered_map<Ptr<const AST::InheritableDecl>, MemberMap>& memberMap;
 };
 
 } // namespace Cangjie::Interop::Java

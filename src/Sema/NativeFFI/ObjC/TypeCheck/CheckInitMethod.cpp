@@ -21,7 +21,7 @@ using namespace Cangjie::Interop::ObjC;
 
 void CheckInitMethod::HandleImpl(TypeCheckContext& ctx)
 {
-    if (!IsObjCMirror(ctx.target)) {
+    if (!ctx.target.IsObjCForeign()) {
         return;
     }
 

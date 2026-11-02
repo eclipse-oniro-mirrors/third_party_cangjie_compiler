@@ -41,7 +41,7 @@ void BeforeTypeCheckASTTransformer::TransformToRegistryCompanion(
     if (impl.IsOpen()) {
         regComp.EnableAttr(Attribute::OPEN);
     }
-    regComp.EnableAttr(Attribute::OBJ_C_IMPL_REGISTRY_COMPANION);
+    regComp.EnableAttr(Attribute::OBJ_C_EXPORT_REGISTRY_COMPANION);
     regComp.identifier = NameGenerator::GenerateRegistryCompanionName(impl);
 }
 
@@ -49,7 +49,7 @@ void BeforeTypeCheckASTTransformer::TransformToHandleWrapper(
     ClassDecl& handleWrapper, ClassLikeDecl& mirror) const noexcept
 {
     CloneVisibilityAttribute(mirror, handleWrapper);
-    handleWrapper.EnableAttr(Attribute::OBJ_C_MIRROR_INTERFACE_HANDLE_WRAPPER);
+    handleWrapper.EnableAttr(Attribute::OBJ_C_FOREIGN_INTERFACE_HANDLE_WRAPPER);
     handleWrapper.identifier = NameGenerator::GenerateHandleWrapperName(mirror);
     handleWrapper.inheritedTypes.push_back(CreateRefType(mirror));
 }

@@ -311,7 +311,7 @@ void SetupGenericParamsMap(llvm::Function* function, std::unique_ptr<CGFunction>
 }
 } // namespace
 
-CGFunction* CGModule::GetOrInsertCGFunction(const CHIR::Value* func)
+CGFunction* CGModule::GetOrInsertCGFunction(const CHIR::Value* func, bool forWithTIWrapper)
 {
     CJC_NULLPTR_CHECK(func);
     if (auto it = valueMapping.find(func); it != valueMapping.end()) {
@@ -319,8 +319,11 @@ CGFunction* CGModule::GetOrInsertCGFunction(const CHIR::Value* func)
         CJC_NULLPTR_CHECK(cgFunction);
         return cgFunction;
     }
-    auto cgFuncType = StaticCast<CGFunctionType*>(CGType::GetOrCreateWithNode(*this, func, true));
+    auto cgFuncType = StaticCast<CGFunctionType*>(CGType::GetOrCreateWithNode(*this, func, true, forWithTIWrapper));
     auto function = DeclareLLVMFunction(*func, *cgFuncType);
+    if (forWithTIWrapper) {
+        function->addFnAttr(THIS_PARAM_HAS_TI_ATTR);
+    }
     auto cgFunc = std::make_unique<CGFunction>(function, cgFuncType, func, *this);
     SetupGenericParamsMap(function, cgFunc, *func, *cgFuncType);
     SetCJNativeFunctionAttrs(*func, *function, *cgFunc);
@@ -441,10 +444,16 @@ llvm::Value* CGModule::GenerateUnitTypeValue()
         CJC_NULLPTR_CHECK(unitVal);
         unitVal->addAttribute(CJGLOBAL_VALUE_ATTR);
         unitVal->setInitializer(llvm::UndefValue::get(unitType));
-        AddLinkageTypeMetadata(*unitVal,
-            cgCtx->GetCompileOptions().target.IsMinGW() ? llvm::GlobalValue::PrivateLinkage
-                                                        : llvm::GlobalValue::WeakODRLinkage,
-            false);
+        if (cgCtx->GetCompileOptions().target.IsMinGW()) {
+            AddLinkageTypeMetadata(*unitVal, llvm::GlobalValue::PrivateLinkage, false);
+        } else {
+            AddLinkageTypeMetadata(*unitVal, llvm::GlobalValue::WeakODRLinkage, false);
+            // Every module using the unit value emits its own copy and never references it across
+            // DSOs, so keep it out of .dynsym, same as hidden TypeInfo metadata. Visibility must
+            // stay in this branch: local linkage (the MinGW branch above) requires default
+            // visibility, and GlobalValue::setVisibility asserts on the combination.
+            unitVal->setVisibility(llvm::GlobalValue::HiddenVisibility);
+        }
     }
     return unitVal;
 }

@@ -23,7 +23,6 @@
 #include "cangjie/CHIR/Optimization/ConstPropagation.h"
 #include "cangjie/CHIR/Optimization/DeadCodeElimination.h"
 #include "cangjie/CHIR/Optimization/Devirtualization.h"
-#include "cangjie/CHIR/Optimization/DevirtualizeTrivialStatics.h"
 #include "cangjie/CHIR/Optimization/FunctionInline.h"
 #include "cangjie/CHIR/Optimization/GetRefToArrayElem.h"
 #include "cangjie/CHIR/Optimization/MergeBlocks.h"
@@ -339,7 +338,7 @@ void ToCHIR::RedundantLoadElimination()
     }
     Utils::ProfileRecorder recorder("CHIR Opt", "RedundantLoadElimination");
     auto rle = CHIR::RedundantLoadElimination();
-    rle.RunOnPackage(chirPkg, opts.chirDebugOptimizer);
+    rle.RunOnPackage(*chirPkg);
     DumpCHIRToFile("RedundantLoadElimination");
 }
 
@@ -382,8 +381,6 @@ void ToCHIR::Devirtualization()
     typeAnalysisWrapper.RunOnPackage(chirPkg, opts.chirDebugOptimizer, threadNum, devirtInfo);
     auto devirt = CHIR::Devirtualization(&typeAnalysisWrapper, devirtInfo, builder, *chirPkg, opts);
     devirt.RunOnFuncs(chirPkg->GetGlobalFuncsWithBody());
-    auto devirtStatics = CHIR::DevirtualizeTrivialStatics();
-    devirtStatics.RunOnPackage(*chirPkg, builder, opts.chirDebugOptimizer);
 
     // if get frozen inst funcs after first devirtualization, opt them in the second round
     if (!devirt.GetFrozenInstFuns().empty()) {
@@ -598,7 +595,7 @@ void ToCHIR::RunRedundantFutureOpt()
         return;
     }
     Utils::ProfileRecorder recorder("CHIR Opt", "RedundantFutureOpt");
-    RedundantFutureRemoval(*chirPkg, opts.chirDebugOptimizer).RunOnPackage();
+    RedundantFutureRemoval(builder, *chirPkg, opts.chirDebugOptimizer).RunOnPackage();
     DumpCHIRToFile("RedundantFutureOpt");
 }
 
@@ -1064,9 +1061,7 @@ bool ToCHIR::ComputeAnnotations(std::vector<const AST::Decl*>&& annoOnly)
     }
 #ifdef CANGJIE_CODEGEN_CJNATIVE_BACKEND
     if (opts.outputMode == GlobalOptions::OutputMode::CHIR) {
-        auto fileName =
-            FileUtil::JoinPath(opts.output, chirPkg->GetName()) + std::string(CHIR_SERIALIZATION_FILE_EXTENSION);
-        CHIRSerializer::Serialize(*chirPkg, fileName, CHIR::ToCHIR::RAW);
+        EmitCHIR(outputPath, *chirPkg, Phase::RAW, opts.NeedDumpCHIR());
         return true;
     }
 #endif
@@ -1136,9 +1131,7 @@ bool ToCHIR::Run()
     }
     // 2. for cjmp, while compiling common package, just be here and save CHIR to file.
     if (opts.outputMode == GlobalOptions::OutputMode::CHIR) {
-        auto fileName =
-            FileUtil::JoinPath(opts.output, chirPkg->GetName()) + std::string(CHIR_SERIALIZATION_FILE_EXTENSION);
-        CHIRSerializer::Serialize(*chirPkg, fileName, CHIR::ToCHIR::RAW);
+        EmitCHIR(outputPath, *chirPkg, Phase::RAW, opts.NeedDumpCHIR());
         return true;
     }
     // 3. run plugin for CHIR

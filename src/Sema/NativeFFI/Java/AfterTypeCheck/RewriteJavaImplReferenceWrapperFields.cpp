@@ -120,7 +120,7 @@ void RewriteJavaImplReferenceWrapperFields::RelocateFields(AfterTypeCheckContext
         // Original reference wrapper field
         auto& field = *StaticAs<ASTKind::VAR_DECL>(member.get());
 
-        if (IsJavaImplRegistryCompanionReferenceField(field)) {
+        if (IsJavaExportRegistryCompanionReferenceField(field)) {
             continue;
         }
 

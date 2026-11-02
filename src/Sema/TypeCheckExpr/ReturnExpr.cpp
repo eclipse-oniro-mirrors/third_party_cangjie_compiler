@@ -51,8 +51,7 @@ Ptr<Ty> TypeChecker::TypeCheckerImpl::SynReturnExpr(ASTContext& ctx, ReturnExpr&
         }
     }
 
-    // Generic decls imported from foreign code and created by auto-sdk have no body, no need to check return.
-    if (!isWellTyped && NeedCheckBodyReturn(*re.refFuncBody)) {
+    if (!isWellTyped) {
         re.SetTy(TypeManager::GetInvalidTy());
     } else {
         re.SetTy(TypeManager::GetNothingTy());
@@ -65,14 +64,4 @@ bool TypeChecker::TypeCheckerImpl::CheckReturnInConstructors(ASTContext& ctx, co
 {
     CJC_NULLPTR_CHECK(re.expr);
     return Check(ctx, TypeManager::GetPrimitiveTy(TypeKind::TYPE_UNIT), re.expr.get());
-}
-
-bool TypeChecker::TypeCheckerImpl::NeedCheckBodyReturn(const FuncBody& fb) const
-{
-    if (fb.parentClassLike && HasJavaAttr(*fb.parentClassLike) &&
-        fb.parentClassLike->TestAttr(Attribute::GENERIC, Attribute::IMPORTED)) {
-        return false;
-    }
-    return !(fb.funcDecl && HasJavaAttr(*fb.funcDecl) &&
-        fb.funcDecl->TestAttr(Attribute::GENERIC, Attribute::IMPORTED));
 }

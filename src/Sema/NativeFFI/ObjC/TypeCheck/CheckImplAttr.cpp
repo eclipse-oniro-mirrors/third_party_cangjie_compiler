@@ -22,14 +22,18 @@ using namespace Cangjie::Interop::ObjC;
 void CheckImplAttr::HandleImpl(TypeCheckContext& ctx)
 {
     auto& ty = *ctx.target.GetTy();
-    if (!IsObjCMirrorSubtype(ty)) {
+    if (!IsObjCForeignSubtype(ty)) {
         return;
     }
 
-    if (IsObjCMirror(ty) || IsObjCImpl(ty)) {
+    if (IsObjCForeign(ty) || IsObjCExport(ty)) {
         return;
     }
 
-    ctx.diag.DiagnoseRefactor(DiagKindRefactor::sema_objc_mirror_subtype_must_be_annotated, ctx.target);
+    // An interface cannot be @ObjCImpl, so @ObjCMirror is the only annotation to suggest for it.
+    auto kind = ty.IsInterface() ? DiagKindRefactor::sema_objc_mirror_interface_subtype_must_be_annotated
+                                 : DiagKindRefactor::sema_objc_mirror_subtype_must_be_annotated;
+    auto builder = ctx.diag.DiagnoseRefactor(kind, ctx.target);
+    builder.AddMainHintArguments(ctx.target.identifier);
     ctx.target.EnableAttr(Attribute::IS_BROKEN);
 }

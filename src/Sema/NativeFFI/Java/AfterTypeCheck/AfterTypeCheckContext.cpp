@@ -142,10 +142,12 @@ void AfterTypeCheckContext::FlushGeneratedDecls()
 
 
 AfterTypeCheckContext::AfterTypeCheckContext(const ImportManager& importManager, TypeManager& typeManager,
-    AST::Package& pkg) : importManager(importManager), typeManager(typeManager), pkg(pkg),
-    javaMirrors(Native::FFI::Java::GetJavaMirrors(pkg)),
-    javaImplReferenceWrappers(Native::FFI::Java::GetJavaImpls(pkg)),
-    javaImplRegistryCompanions(Native::FFI::Java::GetJavaImplRegistryCompanions(pkg))
+    AST::Package& pkg, bool hasMirrorOrImpl, Triple::Info target) : importManager(importManager),
+    typeManager(typeManager), pkg(pkg), target(target),
+    javaMirrors(hasMirrorOrImpl? Native::FFI::Java::GetJavaMirrors(pkg): std::vector<Ptr<ClassLikeDecl>> {}),
+    javaImplReferenceWrappers(hasMirrorOrImpl? Native::FFI::Java::GetJavaImpls(pkg): std::vector<Ptr<ClassDecl>> {}),
+    javaImplRegistryCompanions(hasMirrorOrImpl?
+        Native::FFI::Java::GetJavaImplRegistryCompanions(pkg): std::vector<Ptr<ClassDecl>> {})
 {
 }
 

@@ -329,16 +329,6 @@ void ParserImpl::CheckDeprecatedAnnotation(const Annotation& anno)
     }
 }
 
-void ParserImpl::CheckObjCMirrorAnnotation(Annotation& anno) const
-{
-    static const std::string OBJ_C_MIRROR_NAME = "@ObjCMirror";
-    static const std::string OBJ_C_IMPL_NAME = "@ObjCImpl";
-
-    const auto& annotationName =
-        anno.kind == AnnotationKind::OBJ_C_MIRROR ? OBJ_C_MIRROR_NAME : OBJ_C_IMPL_NAME;
-    ffiParser->CheckZeroOrSingleStringLitArgAnnotation(anno, annotationName);
-}
-
 OwnedPtr<Annotation> ParserImpl::ParseAnnotation()
 {
     if (this->enableCustomAnno && SeeingMacroCallDecl()) {
@@ -375,7 +365,8 @@ OwnedPtr<Annotation> ParserImpl::ParseAnnotation()
             break;
         }
         case AnnotationKind::JAVA_MIRROR:
-        case AnnotationKind::JAVA_IMPL: {
+        case AnnotationKind::JAVA_IMPL:
+        case AnnotationKind::JAVA: {
             ParseAnnotationArguments(*annotation);
             break;
         }
@@ -386,9 +377,9 @@ OwnedPtr<Annotation> ParserImpl::ParseAnnotation()
             break;
         }
         case AnnotationKind::OBJ_C_MIRROR:
-        case AnnotationKind::OBJ_C_IMPL: {
+        case AnnotationKind::OBJ_C_IMPL:
+        case AnnotationKind::OBJ_C: {
             ParseAnnotationArguments(*annotation);
-            CheckObjCMirrorAnnotation(*annotation);
             break;
         }
         default: {

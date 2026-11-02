@@ -15,7 +15,6 @@
 #ifndef CANGJIE_SEMA_DESUGAR_OBJ_C_INTEROP_INTEROP_CONTEXT
 #define CANGJIE_SEMA_DESUGAR_OBJ_C_INTEROP_INTEROP_CONTEXT
 
-#include "InheritanceChecker/MemberSignature.h"
 #include "NativeFFI/ObjC/AfterTypeCheck/Utils/AfterTypeCheckASTTransformer.h"
 #include "NativeFFI/ObjC/Utils/ASTInserter.h"
 #include "NativeFFI/ObjC/Utils/DeclarationCache.h"
@@ -36,7 +35,6 @@ struct InteropContext {
     explicit InteropContext(AST::Package& pkg, TypeManager& typeManager, ImportManager& importManager,
         DiagnosticEngine& diag, const BaseMangler& mangler, const std::string& cjLibOutputPath,
         const std::string& outputObjCGenDir,
-        const std::unordered_map<Ptr<const AST::InheritableDecl>, MemberMap>& structMemberSignatures,
         const Triple::OSType targetOsType, std::function<void(AST::Node&)> desugarPropRef)
         : pkg(pkg),
           desugarPropRef(std::move(desugarPropRef)),
@@ -52,7 +50,6 @@ struct InteropContext {
           astTransformer(importManager, typeManager, diag, astInserter),
           cjLibOutputPath(cjLibOutputPath),
           outputObjCGenDir(outputObjCGenDir),
-          structMemberSignatures(structMemberSignatures),
           sharedLibraryExtension(GlobalOptions::GetSharedLibraryExtension(targetOsType))
     {
     }
@@ -83,6 +80,8 @@ struct InteropContext {
     std::vector<Ptr<AST::ClassLikeDecl>> mirrors;
     std::vector<Ptr<AST::FuncDecl>> mirrorTopLevelFuncs;
     std::vector<Ptr<AST::ClassDecl>> impls;
+    /// Interfaces that inherit an @ObjCMirror interface without being annotated themselves, to be diagnosed.
+    std::vector<Ptr<AST::InterfaceDecl>> unannotatedMirrorSubtypeInterfaces;
     std::vector<Ptr<AST::ClassDecl>> mirrorInterfaceHandleWrappers;
     std::vector<Ptr<AST::ClassDecl>> regCompanions;
     /// W: MapImplToRegCompanion
@@ -108,7 +107,6 @@ struct InteropContext {
     ASTInserter astInserter;
     const std::string& cjLibOutputPath;
     const std::string& outputObjCGenDir;
-    const std::unordered_map<Ptr<const AST::InheritableDecl>, MemberMap>& structMemberSignatures;
     const std::string sharedLibraryExtension;
 };
 

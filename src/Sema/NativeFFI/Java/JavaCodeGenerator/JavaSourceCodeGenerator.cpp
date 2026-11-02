@@ -119,7 +119,7 @@ void JavaSourceCodeGenerator::ConstructResult()
 
 bool JavaSourceCodeGenerator::IsMemberExportable(const AST::Decl& member) const
 {
-    CJC_ASSERT(member.outerDecl && member.outerDecl->IsJavaImpl());
+    CJC_ASSERT(member.outerDecl && member.outerDecl->IsJavaExport());
     return member.TestAnyAttr(Attribute::PUBLIC, Attribute::PROTECTED);
 }
 

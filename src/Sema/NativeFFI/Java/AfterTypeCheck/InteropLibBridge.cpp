@@ -50,6 +50,7 @@ constexpr auto INTEROPLIB_CFFI_GET_INSTANCE_FIELD_ID = "Java_CFFI_getInstanceFie
 constexpr auto INTEROPLIB_CFFI_GET_STATIC_FIELD_ID = "Java_CFFI_getStaticFieldId";
 constexpr auto INTEROPLIB_JNI_HANDLE_PENDING_EXCEPTION_DECL_ID = "handlePendingException";
 constexpr auto INTEROPLIB_CFFI_SWAP_LOCAL_WITH_GLOBAL_REF_ID = "Java_CFFI_swapLocalWithGlobalRef";
+constexpr auto INTEROPLIB_CFFI_NEW_GLOBAL_REF_ID = "Java_CFFI_newGlobalRef";
 constexpr auto INTEROPLIB_CFFI_DELETE_GLOBAL_REF_ID = "Java_CFFI_deleteGlobalRef";
 constexpr auto INTEROPLIB_CFFI_NEW_JAVA_ARRAY_ID = "Java_CFFI_newJavaArray";
 constexpr auto INTEROPLIB_CFFI_JAVA_ARRAY_GET_ID = "Java_CFFI_arrayGet";
@@ -114,6 +115,11 @@ Decl& InteropLibBridge::GetJavaEntityKindJObject()
 {
     auto entityKindDecl = GetJavaEntityKindDecl();
     return *LookupEnumMember(entityKindDecl, INTEROPLIB_JAVA_ENTITY_KIND_JOBJECT);
+}
+
+Ptr<FuncDecl> InteropLibBridge::GetNewGlobalRefDecl()
+{
+    return GetInteropLibDecl<ASTKind::FUNC_DECL>(INTEROPLIB_CFFI_NEW_GLOBAL_REF_ID);
 }
 
 Ptr<FuncDecl> InteropLibBridge::GetDeleteGlobalRefDecl() const
@@ -512,13 +518,13 @@ OwnedPtr<Expr> InteropLibBridge::CreateJavaEntityCall(OwnedPtr<Expr> arg)
     }
 
     if (auto classLTy = DynamicCast<ClassLikeTy*>(arg->GetTy())) {
-        if (auto decl = classLTy->commonDecl; decl && (decl->IsJavaMirror() || decl->IsJavaImpl())) {
+        if (auto decl = classLTy->commonDecl; decl && (decl->IsJavaForeign() || decl->IsJavaExport())) {
             return CreateJavaRefCall(std::move(arg));
         }
     } else if (arg->GetTy()->IsCoreOptionType()) {
         CJC_ASSERT_WITH_MSG(!arg->GetTy()->typeArgs.empty(), "Option type must be generic");
         if (auto classALTy = DynamicCast<ClassLikeTy*>(arg->GetTy()->typeArgs[0])) {
-            if (auto decl = classALTy->commonDecl; decl && (decl->IsJavaMirror() || decl->IsJavaImpl())) {
+            if (auto decl = classALTy->commonDecl; decl && (decl->IsJavaForeign() || decl->IsJavaExport())) {
                 return CreateJavaEntityFromOptionMirror(std::move(arg), *decl);
             }
         }
@@ -697,6 +703,12 @@ Ptr<FuncDecl> InteropLibBridge::FindArrayJavaEntitySetDecl(ClassDecl& jArrayDecl
         }
     }
     return nullptr;
+}
+
+OwnedPtr<CallExpr> InteropLibBridge::CreateNewGlobalRefCall(OwnedPtr<Expr> env, OwnedPtr<Expr> obj)
+{
+    auto curFile = obj->curFile;
+    return CreateCall(GetNewGlobalRefDecl(), curFile, std::move(env), std::move(obj));
 }
 
 OwnedPtr<CallExpr> InteropLibBridge::CreateSwapLocalWithGlobalRefCall(OwnedPtr<Expr> env, OwnedPtr<Expr> localRef) const
@@ -1127,7 +1139,7 @@ OwnedPtr<Expr> InteropLibBridge::UnwrapJavaMirrorOption(
     CJC_ASSERT_WITH_MSG(!ty->typeArgs.empty(), "Option type must be generic");
     auto declTy = ty->typeArgs[0];
     auto decl = Ty::GetDeclOfTy(declTy);
-    CJC_ASSERT(decl->IsJavaMirror() || declTy->IsString() || (toRaw && decl->IsJavaImpl()));
+    CJC_ASSERT(decl->IsJavaForeign() || declTy->IsString() || (toRaw && decl->IsJavaExport()));
 
     auto actualTy = toRaw ? Ptr(&GetJniJobjectTy()) : ty;
 
@@ -1278,7 +1290,7 @@ OwnedPtr<Expr> InteropLibBridge::UnwrapJavaEntity(OwnedPtr<Expr> entity, Ptr<Ty>
         CJC_ASSERT_WITH_MSG(!ty->typeArgs.empty(), "Option type must be generic");
         auto actualTy = ty->typeArgs[0];
         auto actualDecl = Ty::GetDeclOfTy(actualTy);
-        if (actualDecl->IsJavaMirror() || actualTy->IsString()) {
+        if (actualDecl->IsJavaForeign() || actualTy->IsString()) {
             return UnwrapJavaMirrorOption(std::move(entity), ty, scope, toRaw);
         }
 
@@ -1302,7 +1314,7 @@ OwnedPtr<Expr> InteropLibBridge::UnwrapJavaEntity(OwnedPtr<Expr> entity, Ptr<Ty>
         return nullptr;
     }
 
-    if (decl->IsJavaMirror()) {
+    if (decl->IsJavaForeign()) {
         return CreateMirrorConstructorCall(importManager, std::move(entity), ty);
     } else {
         CJC_ASSERT(IsImpl(*decl));
@@ -1361,11 +1373,6 @@ bool InteropLibBridge::IsInteropLibAccessible() const
 void InteropLibBridge::CheckInteropLibVersion()
 {
     auto versionDecl = GetInteropLibVersionVarDecl();
-
-    if (!versionDecl && !IsInteropLibAccessible()) {
-        diag.DiagnoseRefactor(DiagKindRefactor::sema_java_mirror_interoplib_must_be_imported, DEFAULT_POSITION);
-        return;
-    }
 
     if (!versionDecl || !versionDecl->initializer || versionDecl->initializer->astKind != ASTKind::LIT_CONST_EXPR ||
         versionDecl->initializer->TyKind() != TypeKind::TYPE_INT64) {

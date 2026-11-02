@@ -175,7 +175,8 @@ CGType* CGType::GetOrCreate(CGModule& cgModule, const Cangjie::CHIR::Type* chirT
     cgType->CalculateSizeAndAlign();
     return cgType;
 }
-CGType* CGType::GetOrCreateWithNode(CGModule& cgModule, const CHIR::Value* chirNode, bool allowBasePtr)
+CGType* CGType::GetOrCreateWithNode(
+    CGModule& cgModule, const CHIR::Value* chirNode, bool allowBasePtr, bool forWithTIWrapper)
 {
     bool flag = chirNode->IsFunc() && chirNode->Get<CHIR::OverrideSrcFuncType>();
     auto chirTy = flag ? chirNode->Get<CHIR::OverrideSrcFuncType>() : chirNode->GetType();
@@ -185,6 +186,7 @@ CGType* CGType::GetOrCreateWithNode(CGModule& cgModule, const CHIR::Value* chirN
         cgType = CGTypeMgr::GetConcreteCGTypeFor(cgModule, *chirTy, TypeExtraInfo{0, true, false, false, {}});
     } else if (auto fb = DynamicCast<const CHIR::Function*>(chirNode)) {
         TypeExtraInfo typeExtraInfo(0, false, false, allowBasePtr, {});
+        typeExtraInfo.forWithTIWrapper = forWithTIWrapper;
         for (auto gt : fb->GetGenericTypeParams()) {
             typeExtraInfo.instantiatedParamTypes.emplace_back(gt);
         }
@@ -670,7 +672,12 @@ void CGType::GenTypeInfo()
         if (cgMod.GetCGContext().GetCompileOptions().target.os == Triple::OSType::WINDOWS) {
             typeInfo->setLinkage(llvm::GlobalValue::InternalLinkage);
         } else {
+            // A static GI typeInfo has no unique owning package: every package that uses the
+            // instantiation emits its own copy, so LinkOnceODR is kept for linker dedup.
+            // It is never referenced across DSOs (each DSO has its own copy), so hide it to
+            // keep it out of .dynsym and make in-DSO references non-preemptible.
             typeInfo->setLinkage(llvm::GlobalValue::LinkOnceODRLinkage);
+            typeInfo->setVisibility(llvm::GlobalValue::HiddenVisibility);
         }
     } else { // For Concrete type:
         // Note: The chirType that enters this branch is expected to be of CustomType.

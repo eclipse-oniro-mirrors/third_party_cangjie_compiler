@@ -30,7 +30,6 @@ public:
     void CheckAnnotation(Annotation& anno) const;
     void CheckMirrorSignature(ClassLikeDecl& decl, const PtrVector<Annotation>& annos) const;
     void CheckImplSignature(ClassLikeDecl& decl, const PtrVector<Annotation>& annos) const;
-    void CheckJavaHasDefaultAnnotation(Annotation& anno) const;
     bool IsAbstractFunction(const FuncDecl& fd, const Decl& outerDecl) const;
 
     void DiagJavaMirrorCannotHaveFinalizer(const Node& node) const;
@@ -40,15 +39,21 @@ public:
     void DiagJavaImplCannotBeGeneric(const Node& node) const;
     void DiagJavaImplCannotBeAbstract(const Node& node) const;
     void DiagJavaImplCannotBeSealed(const Node& node) const;
+    void DiagJavaImplCannotBeCommonOrSpecific(const Node& node) const;
     void DiagJavaMirrorCannotBeSealed(const Node& node) const;
+    void DiagJavaMirrorCannotBeCommonOrSpecific(const Node& node) const;
     void DiagJavaImplCannotHaveStaticInit(const Node& node) const;
 
 private:
     void CheckMirrorAnnoArgs(Annotation& anno) const;
     void CheckImplAnnoArgs(Annotation& anno) const;
+    void CheckJavaAnnoArgs(Annotation& anno) const;
+    void CheckJavaHasDefaultAnnoArgs(Annotation& anno) const;
 
     void CheckMirrorAnnoTarget(Annotation& anno) const;
     void CheckImplAnnoTarget(Annotation& anno) const;
+    void CheckJavaAnnoTarget(Annotation& anno) const;
+    void CheckJavaHasDefaultAnnoTarget(Annotation& anno) const;
 
     // Diag report
     void DiagOuterDeclMissMatch(const Node& node,

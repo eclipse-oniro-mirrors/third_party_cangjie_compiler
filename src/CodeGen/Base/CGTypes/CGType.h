@@ -289,6 +289,7 @@ public:
         bool isMethod = false;
         bool isStaticMethod = false;
         bool allowBasePtr = true;
+        bool forWithTIWrapper = false;
         std::vector<CHIR::Type*> instantiatedParamTypes;
         TypeExtraInfo()
         {
@@ -309,7 +310,7 @@ public:
         {
             bool ret = instantiatedParamTypes.size() == rhs.instantiatedParamTypes.size() &&
                 addrspace == rhs.addrspace && isMethod == rhs.isMethod && isStaticMethod == rhs.isStaticMethod &&
-                allowBasePtr == rhs.allowBasePtr;
+                allowBasePtr == rhs.allowBasePtr && forWithTIWrapper == rhs.forWithTIWrapper;
             if (ret) {
                 for (std::size_t idx = 0; idx < instantiatedParamTypes.size(); ++idx) {
                     if (instantiatedParamTypes[idx] != rhs.instantiatedParamTypes[idx]) {
@@ -327,7 +328,8 @@ public:
             size_t ret = (extraInfo.addrspace << 4U) |
                 (static_cast<size_t>(extraInfo.isMethod) << 3U) |
                 (static_cast<size_t>(extraInfo.isStaticMethod) << 2U) |
-                (static_cast<size_t>(extraInfo.allowBasePtr) << 1U);
+                (static_cast<size_t>(extraInfo.allowBasePtr) << 1U) |
+                static_cast<size_t>(extraInfo.forWithTIWrapper);
             std::string tmp = std::to_string(ret);
             for (auto paramType : extraInfo.instantiatedParamTypes) {
                 tmp += paramType->ToString();
@@ -349,7 +351,7 @@ public:
     /// For getting CGType of chirFunc, the properties(`mut`, method or not, .etc) of the function
     /// are additionally considered.
     static CGType* GetOrCreateWithNode(
-        CGModule& cgModule, const CHIR::Value* chirNode, bool allowBasePtr = true);
+        CGModule& cgModule, const CHIR::Value* chirNode, bool allowBasePtr = true, bool forWithTIWrapper = false);
 
     static CGType* GetObjectCGType(CGModule& cgMod);
     /// For specified numeric type

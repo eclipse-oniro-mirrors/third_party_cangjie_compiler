@@ -38,7 +38,7 @@ void GenerateInitCJObjectMethods::HandleImpl(InteropContext& ctx)
                 continue;
             }
 
-            if (!IsObjCImplRegDataCtor(*ctorDecl)) {
+            if (!IsObjCExportRegDataCtor(*ctorDecl)) {
                 continue;
             }
 

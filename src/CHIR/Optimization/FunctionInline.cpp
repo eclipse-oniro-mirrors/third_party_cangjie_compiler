@@ -255,7 +255,7 @@ bool FunctionInline::CheckCanRewrite(const Apply& apply)
     // @ObjCMirror functions are generated and always have the same body
     // that calls relevant native code
     // according to benchmarks, they can always be inlined
-    if (func->TestAttr(Attribute::OBJ_C_MIRROR)) {
+    if (func->TestAttr(Attribute::OBJ_C_FOREIGN)) {
         return true;
     }
     // Determine if we can inline by checking the size of callee exceed the threshold

@@ -17,6 +17,8 @@
 
 #include <unordered_set>
 
+#include "CJMP/MPTypeCheckerImpl.h"
+#include "InheritanceChecker/MemberSignature.h"
 #include "Promotion.h"
 #include "ScopeManager.h"
 #include "TypeCheckUtil.h"
@@ -30,8 +32,6 @@
 #include "cangjie/Sema/TypeChecker.h"
 #include "cangjie/Sema/TypeManager.h"
 #include "cangjie/Utils/ProfileRecorder.h"
-#include "CJMP/MPTypeCheckerImpl.h"
-#include "InheritanceChecker/MemberSignature.h"
 
 namespace Cangjie {
 class Synthesizer;
@@ -569,6 +569,26 @@ private:
      * Desugar APIs during sema check.
      */
     void DesugarArrayCall(ASTContext& ctx, AST::CallExpr& ce);
+    /**
+     * Desugar static reference calls to member access expressions in CFunc lambda.
+     * Ensure that no dynamic dispatch occurs in the CFunc.
+     * For example:
+     * *************** before desugar ****************
+     * interface I {
+     *     static func g(): Unit
+     *     func f() {
+     *         var fn: CFunc<()->Unit> = { => g() }
+     *     }
+     * }
+     * *************** after desugar ****************
+     * interface I {
+     *     static func g(): Unit
+     *     func f() {
+     *         var fn: CFunc<()->Unit> = { => I.g() }
+     *     }
+     * }
+     * */
+    void DesugarStaticRefCall2MemberAccessInCFuncLam(AST::LambdaExpr& le, Ptr<AST::Ty> curTopDeclTy);
     void DesugarPointerCall(ASTContext& ctx, AST::CallExpr& ce);
     /** Desugar 'propDecl' after typecheck but still inside 'Sema' stage. Keep this order for cjLint usage. */
     void DesugarForPropDecl(AST::Node& pkg);
@@ -631,17 +651,6 @@ private:
     void DesugarTokenCallExpr(ASTContext& ctx, AST::CallExpr& ce);
     void DesugarSpawnExpr(const ASTContext& ctx, AST::SpawnExpr& se);
     void DesugarSpawnArgExpr(const ASTContext& ctx, const AST::SpawnExpr& se);
-
-    /** Get decls with symbol by context searcher. */
-    std::vector<AST::Symbol*> GetToplevelDecls(const ASTContext& ctx) const;
-    std::vector<AST::Symbol*> GetAllDecls(const ASTContext& ctx) const;
-    std::vector<AST::Symbol*> GetGenericCandidates(const ASTContext& ctx) const;
-    std::vector<AST::Symbol*> GetAllStructDecls(const ASTContext& ctx) const;
-
-    void WarmupCache(const ASTContext& ctx) const;
-
-    std::vector<AST::Symbol*> GetSymsByASTKind(
-        const ASTContext& ctx, AST::ASTKind astKind, const Order& order = Sort::posDesc) const;
 
     /**
      * Get the target members for the extends of @param ty.

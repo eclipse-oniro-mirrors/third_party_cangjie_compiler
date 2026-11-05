@@ -143,6 +143,62 @@ protected:
     DiagnosticEngine diag;
     CompilerInvocation invocation;
     std::unique_ptr<TestCompilerInstance> instance;
+
+    void CheckInvalidVariadicOverload(const std::string& code, bool expectResolvedFunction)
+    {
+        instance->code = code;
+        instance->invocation.globalOptions.implicitPrelude = true;
+        instance->Compile(CompileStage::SEMA);
+
+        Ptr<CallExpr> memberCall{nullptr};
+        Walker walker(instance->GetSourcePackages()[0]->files[0].get(), [&memberCall](Ptr<Node> node) {
+            auto call = DynamicCast<CallExpr*>(node);
+            auto memberAccess = call ? DynamicCast<MemberAccess*>(call->baseFunc.get()) : nullptr;
+            if (memberAccess && memberAccess->field == "f") {
+                memberCall = call;
+            }
+            return VisitAction::WALK_CHILDREN;
+        });
+        walker.Walk();
+
+        ASSERT_TRUE(memberCall);
+        EXPECT_EQ(diag.GetErrorCount(), 2);
+        if (!expectResolvedFunction) {
+            EXPECT_FALSE(memberCall->resolvedFunction);
+            return;
+        }
+        ASSERT_TRUE(memberCall->resolvedFunction);
+        EXPECT_FALSE(memberCall->resolvedFunction->TestAttr(Attribute::IS_BROKEN));
+        EXPECT_FALSE(memberCall->resolvedFunction->hasVariableLenArg);
+        auto memberAccess = StaticAs<ASTKind::MEMBER_ACCESS>(memberCall->baseFunc.get());
+        EXPECT_EQ(memberAccess->target, memberCall->resolvedFunction);
+    }
+
+    void CheckInvalidVariadicFunctionReference(const std::string& code)
+    {
+        instance->code = code;
+        instance->invocation.globalOptions.implicitPrelude = true;
+        instance->Compile(CompileStage::SEMA);
+
+        Ptr<MemberAccess> functionReference{nullptr};
+        Walker walker(instance->GetSourcePackages()[0]->files[0].get(), [&functionReference](Ptr<Node> node) {
+            auto memberAccess = DynamicCast<MemberAccess*>(node);
+            if (memberAccess && memberAccess->field == "f") {
+                functionReference = memberAccess;
+            }
+            return VisitAction::WALK_CHILDREN;
+        });
+        walker.Walk();
+
+        ASSERT_TRUE(functionReference);
+        EXPECT_EQ(diag.GetErrorCount(), 2);
+        auto target = DynamicCast<FuncDecl*>(functionReference->target);
+        ASSERT_TRUE(target);
+        EXPECT_FALSE(target->TestAttr(Attribute::IS_BROKEN));
+        EXPECT_FALSE(target->hasVariableLenArg);
+        ASSERT_EQ(functionReference->targets.size(), 1);
+        EXPECT_EQ(functionReference->targets[0], target);
+    }
 };
 
 TEST_F(TypeCheckerTest, TypecheckTest)
@@ -169,6 +225,88 @@ main() {
     });
     walker.Walk();
     EXPECT_EQ(diag.GetErrorCount(), 0);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicFunctionIsNotCallTarget)
+{
+    CheckInvalidVariadicOverload(R"(
+class H {
+    func f(...x: Int64): Unit
+}
+main() { H().f(1) }
+    )", false);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicAfterValidOverloadDoesNotAffectCallTarget)
+{
+    CheckInvalidVariadicOverload(R"(
+class H {
+    func f(x: Int64): Unit
+    func f(...x: Int64): Unit
+}
+main() { H().f(1) }
+    )", true);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicBeforeValidOverloadDoesNotAffectCallTarget)
+{
+    CheckInvalidVariadicOverload(R"(
+class H {
+    func f(...x: Int64): Unit
+    func f(x: Int64): Unit
+}
+main() { H().f(1) }
+    )", true);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicAfterValidOverloadDoesNotAffectFunctionReference)
+{
+    CheckInvalidVariadicFunctionReference(R"(
+class H {
+    func f(x: Int64): Unit
+    func f(...x: Int64): Unit
+}
+main() { let functionReference = H().f }
+    )");
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicBeforeValidOverloadDoesNotAffectFunctionReference)
+{
+    CheckInvalidVariadicFunctionReference(R"(
+class H {
+    func f(...x: Int64): Unit
+    func f(x: Int64): Unit
+}
+main() { let functionReference = H().f }
+    )");
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicAfterValidImplementationDoesNotAffectInterfaceConformance)
+{
+    CheckInvalidVariadicOverload(R"(
+interface I {
+    func f(x: Int64): Unit
+}
+class H <: I {
+    func f(x: Int64): Unit {}
+    func f(...x: Int64): Unit
+}
+main() { H().f(1) }
+    )", true);
+}
+
+TEST_F(TypeCheckerTest, InvalidVariadicBeforeValidImplementationDoesNotAffectInterfaceConformance)
+{
+    CheckInvalidVariadicOverload(R"(
+interface I {
+    func f(x: Int64): Unit
+}
+class H <: I {
+    func f(...x: Int64): Unit
+    func f(x: Int64): Unit {}
+}
+main() { H().f(1) }
+    )", true);
 }
 
 TEST_F(TypeCheckerTest, MacroDeclTest)
@@ -500,4 +638,182 @@ main() {}
         }
     }
     EXPECT_EQ(foundDiag, 2);
+}
+
+TEST_F(TypeCheckerTest, OrderOfInitializationCheck)
+{
+    // Source files are passed in through bufferCache, exercising the loadSrcFilesFromCache branch
+    // (lines 374-385) of FullCompileStrategy::ParseOnePackage.
+    srcPath = projectPath + "/unittests/Sema/SemaCangjieFiles/InitializationCheck/";
+    std::string fileA = srcPath + "a.cj";
+    std::string fileB = srcPath + "b.cj";
+    std::string failedReason;
+    auto contentA = FileUtil::ReadFileContent(fileA, failedReason);
+    ASSERT_TRUE(contentA.has_value());
+    auto contentB = FileUtil::ReadFileContent(fileB, failedReason);
+    ASSERT_TRUE(contentB.has_value());
+
+    instance->invocation.globalOptions.implicitPrelude = true;
+    instance->invocation.globalOptions.outputMode = GlobalOptions::OutputMode::STATIC_LIB;
+    instance->loadSrcFilesFromCache = true;
+    instance->bufferCache[fileB] = CompilerInstance::SrcCodeCacheInfo(
+        CompilerInstance::SrcCodeChangeState::ADDED, contentB.value());
+    instance->bufferCache[fileA] = CompilerInstance::SrcCodeCacheInfo(
+        CompilerInstance::SrcCodeChangeState::ADDED, contentA.value());
+
+    // The bufferCache is an unordered_map whose iteration order is unspecified, so the fileID assigned
+    // during the cache iteration is not guaranteed by insertion order. Pre-register b.cj before a.cj in
+    // the SourceManager so their fileIDs are locked (b.cj < a.cj) regardless of the cache iteration order.
+    auto& sourceManager = instance->GetSourceManager();
+    unsigned int preBFileID = sourceManager.AddSource(fileB, contentB.value());
+    unsigned int preAFileID = sourceManager.AddSource(fileA, contentA.value());
+    EXPECT_LT(preBFileID, preAFileID);
+
+    instance->Compile(CompileStage::SEMA);
+    // Sema should finish without any error.
+    EXPECT_EQ(diag.GetErrorCount(), 0);
+
+    // Verify that in the created AST, the fileID of b.cj is smaller than the fileID of a.cj.
+    auto packages = instance->GetSourcePackages();
+    ASSERT_FALSE(packages.empty());
+    unsigned int astAFileID = 0;
+    unsigned int astBFileID = 0;
+    bool foundA = false;
+    bool foundB = false;
+    for (auto& file : packages[0]->files) {
+        if (file->fileName == "a.cj") {
+            astAFileID = file->begin.fileID;
+            foundA = true;
+        } else if (file->fileName == "b.cj") {
+            astBFileID = file->begin.fileID;
+            foundB = true;
+        }
+    }
+    EXPECT_TRUE(foundA);
+    EXPECT_TRUE(foundB);
+    EXPECT_LT(astBFileID, astAFileID);
+}
+
+TEST_F(TypeCheckerTest, NeedRuntimeCheck)
+{
+    std::string code = R"(
+main() {
+    let x = 3 is Nothing
+}
+    )";
+
+    instance->code = code;
+    instance->invocation.globalOptions.implicitPrelude = true;
+    auto ret = instance->Compile(CompileStage::DESUGAR_AFTER_SEMA);
+    ret = ret && instance->PerformDesugarAfterSema();
+    ASSERT_TRUE(ret);
+    // should finish without any error.
+    EXPECT_EQ(diag.GetErrorCount(), 0);
+
+    // Walk the AST to find the TypePattern and verify needRuntimeTypeCheck is false for "3 is Nothing".
+    Walker walker(instance->GetSourcePackages()[0]->files[0].get(), [](Ptr<Node> node) -> VisitAction {
+        if (auto tp = DynamicCast<TypePattern>(node); tp) {
+            EXPECT_FALSE(tp->needRuntimeTypeCheck) << "3 is Nothing should not require runtime type check";
+        }
+        return VisitAction::WALK_CHILDREN;
+    });
+    walker.Walk();
+}
+
+TEST_F(TypeCheckerTest, VarWithPatternInConstFunctionProducesDiagnostic)
+{
+    std::string code = R"(
+struct S {
+    const S() {}
+    const func f(): Int64 {
+        var (a, b) = (1, 2)
+        return 0
+    }
+}
+
+main(): Int64 {
+    return 0
+}
+)";
+
+    instance->code = code;
+    instance->invocation.globalOptions.implicitPrelude = false;
+    instance->Compile(CompileStage::SEMA);
+
+    auto diagnostics = diag.GetCategoryDiagnostic(DiagCategory::SEMA);
+    bool foundDiagnostic = false;
+    for (auto& diagnostic : diagnostics) {
+        if (diagnostic.rKind == DiagKindRefactor::sema_cannot_define_var_in_const_funciton) {
+            foundDiagnostic = true;
+            EXPECT_FALSE(diagnostic.mainHint.range.HasZero());
+        }
+    }
+    EXPECT_TRUE(foundDiagnostic);
+    EXPECT_EQ(diag.GetErrorCount(), 1);
+}
+
+// The string interpolation literal is desugared into a StringBuilder-based block in
+// `DesugarStrInterpolationExpr`. Every synthesized node (the StringBuilder ctor call, the
+// `$tmp` var decl, the `append` calls and the final `toString` call) must carry a valid
+// source position copied from the original interpolation expression. Nodes with a zero
+// position used to trigger an ICE in `DiagnosticEngine::CheckRange` when a later phase
+// (e.g. recursive-constructor detection) emitted a diagnostic anchored on them.
+TEST_F(TypeCheckerTest, StrInterpolationDesugarNodesHaveValidPosition)
+{
+    // Cover both branches of `DesugarStrPartExpr` inside the InterpolationExpr arm:
+    //  - `count` (Int64) has a matching `append(Int64)` overload -> matchedAppend branch.
+    //  - `p` (user type P <: ToString) has no direct append overload -> toString() fallback
+    //    branch, which routes a Block through `CreateMemberAccess`/`CreateFuncArg` and is the
+    //    path that previously left a zero-position '$dummy' wrapper.
+    std::string code = R"(
+class P <: ToString {
+    public func toString(): String {
+        return "P"
+    }
+}
+main(): Int64 {
+    let count = 42
+    let p = P()
+    let s = "count is ${count}, p is ${p}."
+    return 0
+}
+)";
+
+    instance->code = code;
+    instance->invocation.globalOptions.implicitPrelude = true;
+    auto ret = instance->Compile(CompileStage::DESUGAR_AFTER_SEMA);
+    ret = ret && instance->PerformDesugarAfterSema();
+    ASSERT_TRUE(ret);
+    // The desugared interpolation must type-check without errors.
+    ASSERT_EQ(diag.GetErrorCount(), 0) << "interpolation desugar should not produce errors";
+
+    // Locate the desugared interpolation literal and walk its synthesized sub-tree.
+    Ptr<Expr> desugarRoot {nullptr};
+    Walker finder(instance->GetSourcePackages()[0]->files[0].get(), [&desugarRoot](Ptr<Node> node) -> VisitAction {
+        if (auto lce = DynamicCast<LitConstExpr>(node); lce && lce->siExpr && lce->desugarExpr) {
+            desugarRoot = lce->desugarExpr.get();
+            return VisitAction::SKIP_CHILDREN;
+        }
+        return VisitAction::WALK_CHILDREN;
+    });
+    finder.Walk();
+    ASSERT_NE(desugarRoot, nullptr) << "no desugared string interpolation found";
+
+    // `DesugarStrInterpolationExpr` synthesizes the StringBuilder ctor call, the `$tmp` var
+    // decl, the `append`/`toString` calls and their args, copying the source position of the
+    // original interpolation expression onto each. These synthesized nodes (Expr/Decl/Type)
+    // carry the COMPILER_ADD attribute. A zero position on one of them used to trigger an ICE
+    // in `DiagnosticEngine::CheckRange` when a later phase (e.g. recursive-constructor
+    // detection) emitted a diagnostic anchored on it, so every synthesized node is guarded.
+    Walker checker(desugarRoot.get(), [](Ptr<Node> node) -> VisitAction {
+        if (!node->TestAttr(Attribute::COMPILER_ADD)) {
+            return VisitAction::WALK_CHILDREN;
+        }
+        EXPECT_FALSE(node->begin.IsZero())
+            << "synthesized interpolation desugar node has zero begin position";
+        EXPECT_FALSE(node->end.IsZero())
+            << "synthesized interpolation desugar node has zero end position";
+        return VisitAction::WALK_CHILDREN;
+    });
+    checker.Walk();
 }

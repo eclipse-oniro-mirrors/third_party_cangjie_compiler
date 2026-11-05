@@ -48,7 +48,7 @@ void DiagExpectConstExpr(DiagnosticEngine& diag, const Expr& expr, bool isWeak)
 
 void DiagDefineVarInConstFunction(DiagnosticEngine& diag, const VarDeclAbstract& vda)
 {
-    auto range = MakeRange(vda.identifier);
+    auto range = MakeRangeForDeclIdentifier(vda);
     diag.DiagnoseRefactor(DiagKindRefactor::sema_cannot_define_var_in_const_funciton, vda, range);
 }
 
@@ -671,7 +671,13 @@ private:
 
     bool ChkCallExpr(const CallExpr& ce, bool isWeak)
     {
-        CJC_NULLPTR_CHECK(ce.baseFunc);
+        // The desugared call of an operator '()' may be desugared again (e.g. it is then treated as a possibly
+        // variadic call), which leaves this node with 'baseFunc' moved out and the new result in 'desugarExpr'.
+        if (ce.baseFunc == nullptr) {
+            CJC_NULLPTR_CHECK(ce.desugarExpr);
+            return ChkExpr(*ce.desugarExpr, isWeak);
+        }
+
         if (!ChkExpr(*ce.baseFunc, isWeak)) {
             return false;
         }

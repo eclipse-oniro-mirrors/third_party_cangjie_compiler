@@ -133,8 +133,7 @@ enum class Environment : uint8_t {
     NOT_AVAILABLE,
 };
 
-inline static const std::string DEFALUT_ANDROID_API {"31"};
-inline static const std::string MIN_ANDROID_API {"26"};
+inline static const std::string MIN_ANDROID_API {"23"};
 
 struct Info {
     ArchType arch;
@@ -666,7 +665,7 @@ public:
     LTOMode ltoMod = LTOMode::NO_LTO;
     bool enableCompileAsExe = false;
     bool ltoHideAllPkgs = false;
-    bool emitStaticLibInLTO = false;
+    std::optional<bool> emitStaticLibInLTO = std::nullopt;
 
     /**
      * @brief Checks whether LTO is enabled.
@@ -690,7 +689,7 @@ public:
 
     bool ShouldEmitStaticLibInLTO() const
     {
-        return emitStaticLibInLTO && outputMode == OutputMode::STATIC_LIB && IsLTOEnabled();
+        return emitStaticLibInLTO.value_or(false) && outputMode == OutputMode::STATIC_LIB && IsLTOEnabled();
     }
 
     /**

@@ -1049,6 +1049,9 @@ CGValue IRBuilder2::CreateGEP(
                     GetInsertFunction()->hasFnAttribute(THIS_PARAM_HAS_BP)) &&
                 **(cgMod | chirExpr->GetTopLevelFunc()->GetParam(0)) == ret) {
                 // It means this param doesn't have typeinfo, no need to add the offset.
+                // Mark the TypeInfo* as skipped so that the remaining subscripts (e.g. the
+                // inner generic struct field of `this.coords.x`) won't consume the budget.
+                hasSkippedTypeInfo = true;
             } else if (!hasSkippedTypeInfo) {
                 offset = CreateAdd(offset, llvm::ConstantInt::get(offset->getType(), GetPayloadOffset()));
                 hasSkippedTypeInfo = true;
@@ -1265,10 +1268,19 @@ llvm::Value* IRBuilder2::CallArrayIntrinsicInitWithContent(const CHIR::RawArrayL
 
 llvm::Value* IRBuilder2::CreateStringLiteral(const std::string& str)
 {
-    std::string cjStringName = GetCjStringLiteralName(str);
-    auto cachedCjString = cgMod.GetLLVMModule()->getNamedValue(cjStringName);
-    if (cachedCjString) {
-        return cachedCjString;
+    const std::string baseName = GetCjStringLiteralName(str);
+    std::string cjStringName = baseName;
+    auto& cjStrings = GetCGContext().GetCJStrings();
+    for (size_t collisionId = 1;; ++collisionId) {
+        auto cachedCjString = cgMod.GetLLVMModule()->getNamedValue(cjStringName);
+        if (!cachedCjString) {
+            break;
+        }
+        if (auto it = cjStrings.find(cjStringName);
+            llvm::isa<llvm::GlobalVariable>(cachedCjString) && it != cjStrings.end() && it->second == str) {
+            return cachedCjString;
+        }
+        cjStringName = baseName + "." + std::to_string(collisionId);
     }
 
     // Generate ArrayLayout.UInt8 here to ensure it is inserted to func for_keeping_some_types$

@@ -492,8 +492,9 @@ void DesugarCallExpr(ASTContext& ctx, CallExpr& ce)
     auto callExpr = MakeOwnedNode<CallExpr>();
     ctx.RemoveTypeCheckCache(*callExpr);
     callExpr->sourceExpr = &ce;
-    callExpr->begin = ce.begin;
-    callExpr->end = ce.end;
+    CopyBasicInfo(&ce, callExpr.get());
+    callExpr->leftParenPos = ce.leftParenPos;
+    callExpr->rightParenPos = ce.rightParenPos;
     auto ma = MakeOwnedNode<MemberAccess>();
     ctx.RemoveTypeCheckCache(*ma);
     ma->scopeName = ce.baseFunc->scopeName;
@@ -523,6 +524,8 @@ void DesugarVariadicCallExpr(ASTContext& ctx, CallExpr& ce, size_t fixedPosition
     ce.callKind = CallKind::CALL_VARIADIC_FUNCTION;
     callExpr->sourceExpr = &ce;
     CopyBasicInfo(&ce, callExpr.get());
+    callExpr->leftParenPos = ce.leftParenPos;
+    callExpr->rightParenPos = ce.rightParenPos;
     callExpr->baseFunc = std::move(ce.baseFunc);
     CJC_ASSERT(ce.args.size() >= fixedPositionalArity);
     size_t idx = 0;
@@ -642,6 +645,10 @@ void TypeChecker::TypeCheckerImpl::DesugarArrayCall(ASTContext& ctx, CallExpr& c
     arrayExpr->sourceExpr = &ce;
     arrayExpr->begin = ce.begin;
     arrayExpr->end = ce.end;
+    // Keep paren positions so diagnostics on the desugared ArrayExpr (e.g. VArray
+    // arg-number mismatch) carry a valid range instead of a zero position.
+    arrayExpr->leftParenPos = ce.leftParenPos;
+    arrayExpr->rightParenPos = ce.rightParenPos;
     ce.desugarExpr = std::move(arrayExpr);
     AddCurFile(ce, ce.curFile);
 }
@@ -687,5 +694,78 @@ void DesugarPrimaryCtor(Decl& decl, PrimaryCtorDecl& fd)
     }
     funcBody->paramLists.push_back(std::move(funcParamList));
     DesugarPrimaryCtorSetPrimaryFunc(decl, fd, funcBody);
+}
+
+OwnedPtr<MemberAccess> DesugarRef2MemberAccess(
+    TypeManager& typeManager, Ptr<Decl> target, Ptr<RefExpr> field, Ptr<Ty> curTopDeclTy)
+{
+    auto baseExpr = MakeOwned<RefExpr>();
+    baseExpr->ref.identifier = target->outerDecl->identifier;
+    // Get inst decl ty where the target static function in.
+    auto targetOuterDeclTy = Promotion(typeManager).Promote(*curTopDeclTy, *target->outerDecl->GetTy());
+    // Promote should not return an empty container. When there are multiple versions of the parent type, directly use
+    // the first element for the non-implementation check, and the uniqueness of the candidate should be guaranteed by
+    // other diagnostics.
+    if (targetOuterDeclTy.empty()) {
+        return nullptr;
+    }
+    baseExpr->SetTy(*targetOuterDeclTy.begin());
+    baseExpr->SetTarget(target->outerDecl);
+    baseExpr->isAlone = false; // Desugared not alone, it's a static member access by type name.
+    baseExpr->EnableAttr(AST::Attribute::COMPILER_ADD);
+    CopyBasicInfo(field, baseExpr);
+
+    auto baseFunc = MakeOwned<MemberAccess>();
+    baseFunc->baseExpr = std::move(baseExpr);
+    baseFunc->field = field->ref.identifier;
+    baseFunc->SetTy(field->GetTy());
+    baseFunc->SetTarget(target);
+    baseFunc->EnableAttr(AST::Attribute::COMPILER_ADD);
+    baseFunc->leftAnglePos = field->leftAnglePos;
+    baseFunc->typeArguments = std::move(field->typeArguments);
+    baseFunc->rightAnglePos = field->rightAnglePos;
+    baseFunc->instTys = std::move(field->instTys);
+    baseFunc->matchedParentTy = field->matchedParentTy;
+    baseFunc->aliasTarget = field->aliasTarget;
+    baseFunc->isAlone = field->isAlone;
+    baseFunc->compilerAddedTyArgs = field->compilerAddedTyArgs;
+    CopyBasicInfo(field, baseFunc);
+    AddCurFile(*baseFunc, field->curFile);
+    return baseFunc;
+}
+
+void TypeChecker::TypeCheckerImpl::DesugarStaticRefCall2MemberAccessInCFuncLam(LambdaExpr& le, Ptr<Ty> curTopDeclTy)
+{
+    if (!le.GetTy()->IsCFunc()) {
+        return;
+    }
+    auto preVisit = [this, &curTopDeclTy](Ptr<Node> node) -> VisitAction {
+        if (auto ce = DynamicCast<CallExpr*>(node);
+            ce && ce->baseFunc->astKind == ASTKind::REF_EXPR && !ce->desugarExpr) {
+            auto target = ce->baseFunc->GetTarget();
+            bool targetIsStaticInOpenDecl =
+                target && target->TestAttr(AST::Attribute::STATIC) && target->outerDecl && target->outerDecl->IsOpen();
+            if (!targetIsStaticInOpenDecl) {
+                return VisitAction::WALK_CHILDREN;
+            }
+            auto baseFunc = StaticCast<RefExpr>(ce->baseFunc.get());
+            auto callExpr = ASTCloner::Clone(Ptr(ce));
+            callExpr->baseFunc = DesugarRef2MemberAccess(typeManager, target, baseFunc, curTopDeclTy);
+            if (callExpr->baseFunc) {
+                ce->desugarExpr = std::move(callExpr);
+            }
+        } else if (auto re = DynamicCast<RefExpr*>(node); re && re->isAlone && !re->desugarExpr) {
+            // At this time, propDecl has not been desugared.
+            auto target = re->GetTarget();
+            bool targetIsStaticPropInOpenDecl = target && target->astKind == ASTKind::PROP_DECL &&
+                target->TestAttr(AST::Attribute::STATIC) && target->outerDecl && target->outerDecl->IsOpen();
+            if (!targetIsStaticPropInOpenDecl) {
+                return VisitAction::WALK_CHILDREN;
+            }
+            re->desugarExpr = DesugarRef2MemberAccess(typeManager, target, re, curTopDeclTy);
+        }
+        return VisitAction::WALK_CHILDREN;
+    };
+    Walker(&le, preVisit).Walk();
 }
 } // namespace Cangjie

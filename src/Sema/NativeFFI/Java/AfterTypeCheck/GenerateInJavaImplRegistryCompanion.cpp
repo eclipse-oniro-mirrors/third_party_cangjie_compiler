@@ -15,6 +15,7 @@
 #include "cangjie/AST/Node.h"
 #include "cangjie/AST/Types.h"
 #include "cangjie/AST/Utils.h"
+#include "cangjie/Sema/TypeManager.h"
 #include "cangjie/Utils/CheckUtils.h"
 
 namespace Cangjie::Native::FFI::Java {
@@ -73,8 +74,8 @@ void GenerateInJavaImplRegistryCompanion::Process(ClassDecl& companion) const
     companion.GetMemberDecls().push_back(GenerateConstructor(companion));
 }
 
-GenerateInJavaImplRegistryCompanion::GenerateInJavaImplRegistryCompanion(JavaDesugarManager& man)
-    : typeManager(man.typeManager), ilib(man.lib)
+GenerateInJavaImplRegistryCompanion::GenerateInJavaImplRegistryCompanion(TypeManager& typeManager,
+    InteropLibBridge& ilib) : typeManager(typeManager), ilib(ilib)
 {
 }
 

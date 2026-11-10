@@ -65,8 +65,8 @@ _cj_resolve_abs_path() {
 
     # Handle relative and absolute paths
     case "${input}" in
-        /*) p="$input" ;;
-        *) p="$PWD/$input" ;;
+        /*) path="$input" ;;
+        *) path="$PWD/$input" ;;
     esac
 
     # Try multiple tools to resolve absolute path, in order of preference:
@@ -76,38 +76,38 @@ _cj_resolve_abs_path() {
     # 4. python
     # 5. pure shell implementation
     if command -v realpath >/dev/null 2>&1; then
-        realpath "$p" 2>/dev/null && return 0
+        realpath "$path" 2>/dev/null && return 0
     fi
     if command -v readlink >/dev/null 2>&1; then
-        readlink -f "$p" 2>/dev/null && return 0
+        readlink -f "$path" 2>/dev/null && return 0
     fi
     if command -v python3 >/dev/null 2>&1; then
-        python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$p" 2>/dev/null && return 0
+        python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$path" 2>/dev/null && return 0
     fi
     if command -v python >/dev/null 2>&1; then
-        python -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$p" 2>/dev/null && return 0
+        python -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$path" 2>/dev/null && return 0
     fi
 
     # Pure shell implementation: cd to directory then pwd
-    d="${p%/*}"
-    b="${p##*/}"
+    d="${path%/*}"
+    b="${path##*/}"
     (cd -P "$d" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$b") || return 1
 }
 
 # Get absolute path of the script directory from the script path
 _cj_script_dir_from_path() {
-    p="$1"
-    [ -n "$p" ] || return 1
+    input_path="$1"
+    [ -n "$input_path" ] || return 1
 
     # First resolve to absolute path
-    abs="$(_cj_resolve_abs_path "$p" 2>/dev/null || true)"
-    [ -n "$abs" ] || abs="$p"
+    absolute_path="$(_cj_resolve_abs_path "$input_path" 2>/dev/null || true)"
+    [ -n "$absolute_path" ] || absolute_path="$input_path"
 
     # Get directory part
-    d="${abs%/*}"
-    [ -n "$d" ] || d="."
+    directory_part="${absolute_path%/*}"
+    [ -n "$directory_part" ] || directory_part="."
     # Change to directory and output absolute path
-    (cd -P "$d" 2>/dev/null && pwd -P) || return 1
+    (cd -P "$directory_part" 2>/dev/null && pwd -P) || return 1
 }
 
 # ==================== MAIN LOGIC ====================

@@ -7,7 +7,6 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "DesugarJArray.h"
-#include "JavaDesugarManager.h"
 #include "Utils.h"
 #include "NativeFFI/Utils.h"
 
@@ -165,15 +164,14 @@ void DesugarJArray::InsertConstructorBody(FuncDecl& constr) const
 {
     CJC_ASSERT_WITH_MSG(IsJArray(*constr.outerDecl), "Expected JArray decl");
 
-    auto jniEnvCall = ilib.CreateGetJniEnvCall(constr.curFile);
     auto jniEnvPtrDecl = ilib.GetJniEnvPtrDecl();
 
-    if (!jniEnvCall || !jniEnvPtrDecl) {
+    if (!jniEnvPtrDecl) {
         constr.EnableAttr(Attribute::IS_BROKEN);
         return;
     }
 
-    auto jniEnvVar = CreateTmpVarDecl(jniEnvPtrDecl->type, jniEnvCall);
+    auto jniEnvVar = CreateTmpVarDecl(jniEnvPtrDecl->type, ilib.CreateGetJniEnvCall(constr.curFile));
     auto newObjectCall = ilib.CreateCFFINewJavaArrayCall(
         WithinFile(CreateRefExpr(*jniEnvVar), constr.curFile), *constr.funcBody->paramLists[0]);
     std::vector<OwnedPtr<Node>> lambdaNodes = Nodes(std::move(jniEnvVar), std::move(newObjectCall));
@@ -308,8 +306,10 @@ void DesugarJArray::ReplaceCallsWithArrayJavaEntitySet(File& file) const
     }).Walk();
 }
 
-DesugarJArray::DesugarJArray(JavaDesugarManager& man)
-    : typeManager(man.typeManager), importManager(man.importManager), ilib(man.lib)
+DesugarJArray::DesugarJArray(
+    TypeManager& typeManager,
+    const ImportManager& importManager,
+    InteropLibBridge& ilib) : typeManager(typeManager), importManager(importManager), ilib(ilib)
 {
 }
 

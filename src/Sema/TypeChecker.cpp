@@ -24,11 +24,12 @@
 #include "Diags.h"
 #include "ExtraScopes.h"
 #include "JoinAndMeet.h"
-#include "NativeFFI/Java/BeforeTypeCheck/PreTypeCheck.h"
 #include "NativeFFI/Java/AfterTypeCheck/InteropLibBridge.h"
+#include "NativeFFI/Java/BeforeTypeCheck/PreTypeCheck.h"
 #include "NativeFFI/ObjC/BeforeTypeCheck/Desugar.h"
 #include "NativeFFI/ObjC/Utils/InteropLibBridge.h"
 #include "Plugin/PluginCustomAnnoChecker.h"
+#include "SearchSymbol.h"
 #include "TypeCheckUtil.h"
 
 #include "cangjie/AST/Clone.h"
@@ -2116,7 +2117,7 @@ void TypeChecker::TypeCheckerImpl::PrepareTypeCheck(ASTContext& ctx, Package& pk
     MarkParamWithInitialValue(pkg);
     Utils::ProfileRecorder::Stop("PrepareTypeCheck", "MarkAndPrepare");
     // Warmup cache to speed up search.
-    WarmupCache(ctx);
+    SearchSymbol::WarmupCache(ctx);
 }
 
 void TypeChecker::TypeCheckerImpl::TypeCheckTopLevelDecl(ASTContext& ctx, Decl& decl)
@@ -2129,7 +2130,7 @@ void TypeChecker::TypeCheckerImpl::TypeCheckTopLevelDecl(ASTContext& ctx, Decl& 
 // Check generic members declared inside non-generic inheritable decls.
 void TypeChecker::TypeCheckerImpl::TypeCheckImportedGenericMember(ASTContext& ctx)
 {
-    std::vector<Symbol*> syms = GetAllStructDecls(ctx);
+    std::vector<Symbol*> syms = SearchSymbol::GetAllStructDecls(ctx);
     for (auto sym : syms) {
         CJC_ASSERT(sym && sym->node);
         auto id = StaticCast<InheritableDecl*>(sym->node);
@@ -2147,7 +2148,7 @@ void TypeChecker::TypeCheckerImpl::TypeCheckImportedGenericMember(ASTContext& ct
 
 void TypeChecker::TypeCheckerImpl::TypeCheck(ASTContext& ctx, Package& pkg)
 {
-    std::vector<Symbol*> syms = GetToplevelDecls(ctx);
+    std::vector<Symbol*> syms = SearchSymbol::GetToplevelDecls(ctx);
     // 1. Check from toplevel decls.
     for (auto sym : syms) {
         CJC_ASSERT(sym && sym->node);

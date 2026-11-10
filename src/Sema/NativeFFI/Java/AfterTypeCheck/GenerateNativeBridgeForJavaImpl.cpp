@@ -6,9 +6,8 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "JavaDesugarManager.h"
 #include "GenerateNativeBridgeForJavaImpl.h"
-#include "NativeFFI/Java/AfterTypeCheck/Context.h"
+#include "NativeFFI/Java/AfterTypeCheck/JniBridge.h"
 #include "NativeFFI/Utils.h"
 #include "Utils.h"
 #include "InteropLibBridge.h"
@@ -27,9 +26,9 @@ namespace Cangjie::Native::FFI::Java {
 OwnedPtr<FuncParam> GenerateNativeBridgeForJavaImpl::ConvertJavaCompatibleToCTypeParam(
     FuncParam& sample, File& curFile) const
 {
-    auto jniTy = man.GetJNITy(sample.GetTy());
+    auto& jniTy = jni.ConvertCangjieToJniTy(*sample.GetTy());
     OwnedPtr<FuncParam> param = WithinFile(
-        CreateFuncParam(sample.identifier.GetRawText(), nullptr, nullptr, jniTy),
+        CreateFuncParam(sample.identifier.GetRawText(), nullptr, nullptr, &jniTy),
         &curFile);
     return param;
 }
@@ -53,26 +52,26 @@ OwnedPtr<Expr> GenerateNativeBridgeForJavaImpl::UnwrapCTypeExprAsJavaCompatible(
     OwnedPtr<Expr> resExpr;
 
     if (IsMirror(*javaCompatibleTy)) {
-        auto entity = man.lib.CreateJavaEntityJobjectCall(std::move(cexpr));
-        resExpr = CreateMirrorConstructorCall(man.importManager, std::move(entity), javaCompatibleTy);
+        auto entity = ilib.CreateJavaEntityJobjectCall(std::move(cexpr));
+        resExpr = CreateMirrorConstructorCall(importManager, std::move(entity), javaCompatibleTy);
     } else if (IsImpl(*javaCompatibleTy)) {
-        auto entity = man.lib.CreateJavaEntityJobjectCall(std::move(cexpr));
-        resExpr = man.lib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
+        auto entity = ilib.CreateJavaEntityJobjectCall(std::move(cexpr));
+        resExpr = ilib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
     } else if (javaCompatibleTy->IsCoreOptionType() && IsMirror(*javaCompatibleTy->typeArgs[0])) {
         // funcDecl(Java_CFFI_JavaEntity(arg)) // if arg is null (as jobject == 0) -> java entity will preserve it
-        auto entity = man.lib.CreateJavaEntityJobjectCall(std::move(cexpr));
-        resExpr = man.lib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
+        auto entity = ilib.CreateJavaEntityJobjectCall(std::move(cexpr));
+        resExpr = ilib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
     } else if (javaCompatibleTy->IsCoreOptionType() && IsImpl(*javaCompatibleTy->typeArgs[0])) {
-        auto entity = man.lib.CreateJavaEntityJobjectCall(std::move(cexpr));
-        resExpr = man.lib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
+        auto entity = ilib.CreateJavaEntityJobjectCall(std::move(cexpr));
+        resExpr = ilib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
     } else if (javaCompatibleTy->IsString()) {
         // Convert JNI jobject (jstring) to Cangjie String:
         // jobject -> JavaEntity -> Struct-String.
-        auto entity = man.lib.CreateJavaEntityJobjectCall(std::move(cexpr));
-        resExpr = man.lib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
+        auto entity = ilib.CreateJavaEntityJobjectCall(std::move(cexpr));
+        resExpr = ilib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
     } else if (javaCompatibleTy->IsCoreOptionType() && javaCompatibleTy->typeArgs[0]->IsString()) {
-        auto entity = man.lib.CreateJavaEntityJobjectCall(std::move(cexpr));
-        resExpr = man.lib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
+        auto entity = ilib.CreateJavaEntityJobjectCall(std::move(cexpr));
+        resExpr = ilib.UnwrapJavaEntity(std::move(entity), javaCompatibleTy, *outerDecl);
     } else {
         // C-compatible param. Just pass-through.
         resExpr = std::move(cexpr);
@@ -88,11 +87,11 @@ OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateConstructorBridge(
 {
     File& curFile = *companion.curFile;
     auto& userParams = refWrapperUserCtor.funcBody->paramLists[0]->params;
-    auto nativeFuncName = man.GetJniInitCjObjectFuncName(refWrapperUserCtor, false);
+    auto nativeFuncName = jni.GetJniInitCjObjectFuncName(refWrapperUserCtor, false);
 
-    auto func = CreateNativeJavaABIFunc(nativeFuncName,
+    auto func = jni.CreateNativeJavaABIFunc(nativeFuncName,
         ConvertJavaCompatibleToCTypeParams(userParams, curFile),
-        man.typeManager.GetPrimitiveTy(AST::TypeKind::TYPE_UNIT),
+        typeManager.GetPrimitiveTy(AST::TypeKind::TYPE_UNIT),
         curFile, companion.moduleName, companion.fullPackageName,
         [&](FuncDecl& f, FuncParam& jniEnv, FuncParam& jobject, std::vector<Ptr<FuncParam>> cTypeUserParams) {
             std::vector<OwnedPtr<FuncArg>> refWrapperCtorArgs;
@@ -100,14 +99,14 @@ OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateConstructorBridge(
             // Construct reference wrapper object.
             // argument 1: $obj -> Java_CFFI_JavaEntity($obj)
             refWrapperCtorArgs.emplace_back(CreateFuncArg(
-                man.lib.CreateJavaEntityJobjectCall(WithinFile(CreateRefExpr(jobject), &curFile))));
+                ilib.CreateJavaEntityJobjectCall(WithinFile(CreateRefExpr(jobject), &curFile))));
 
             // argument 2: $reg -> JavaImpl$reg(Java_CFFI_JavaEntity($obj))
             refWrapperCtorArgs.emplace_back(CreateFuncArg(WithinFile(
                 CreateCallExpr(
                     WithinFile(CreateRefExpr(registryCompanionCtor), &curFile),
                     Nodes<FuncArg>(CreateFuncArg(
-                        man.lib.CreateJavaEntityJobjectCall(WithinFile(CreateRefExpr(jobject), &curFile)))),
+                        ilib.CreateJavaEntityJobjectCall(WithinFile(CreateRefExpr(jobject), &curFile)))),
                     &registryCompanionCtor, companion.GetTy(), CallKind::CALL_OBJECT_CREATION),
                 &curFile)));
 
@@ -133,8 +132,8 @@ OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateConstructorBridge(
                 &refWrapperGeneratedCtor, refWrapper.GetTy(), CallKind::CALL_OBJECT_CREATION);
 
             f.funcBody->body->body.push_back(
-                man.lib.WrapExceptionHandling(WithinFile(CreateRefExpr(jniEnv), &curFile),
-                WrapUnitLambdaExpr(man.typeManager, Nodes(std::move(refWrapperCtorCall))))
+                ilib.WrapExceptionHandling(WithinFile(CreateRefExpr(jniEnv), &curFile),
+                WrapUnitLambdaExpr(typeManager, Nodes(std::move(refWrapperCtorCall))))
             );
     });
 
@@ -157,13 +156,13 @@ OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateInstanceMethodBridge(A
     auto& userParams = refWrapperFunc.funcBody->paramLists[0]->params;
 
     auto ctypeParams = ConvertJavaCompatibleToCTypeParams(userParams, curFile);
-    ctypeParams.insert(ctypeParams.begin(), man.CreateRegistryIdParam());
-    auto nativeFuncName = man.GetJniMethodName(refWrapperFunc);
+    ctypeParams.insert(ctypeParams.begin(), jni.CreateRegistryIdParam());
+    auto nativeFuncName = jni.GetJniMethodName(refWrapperFunc);
 
-    auto bridgeFunc = CreateNativeJavaABIFunc(
+    auto bridgeFunc = jni.CreateNativeJavaABIFunc(
         nativeFuncName,
         std::move(ctypeParams),
-        man.GetJNITy(retTy), curFile,
+        &jni.ConvertCangjieToJniTy(*retTy), curFile,
         refWrapperFunc.moduleName, refWrapperFunc.fullPackageName,
         [&](FuncDecl& f, FuncParam& jniEnv, [[maybe_unused]] FuncParam& obj,
             std::vector<Ptr<FuncParam>> ctypeUserParams) {
@@ -191,7 +190,7 @@ OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateInstanceMethodBridge(A
                 auto& ctor = ctx.GetJavaImplWrappingConstructor(refWrapper);
 
                 std::vector<OwnedPtr<FuncArg>> refWrapperCtorArgs;
-                refWrapperCtorArgs.push_back(CreateFuncArg(man.lib.CreateJavaEntityJobjectCall(
+                refWrapperCtorArgs.push_back(CreateFuncArg(ilib.CreateJavaEntityJobjectCall(
                     WithinFile(CreateRefExpr(obj), &curFile))));
                 refWrapperCtorArgs.push_back(CreateFuncArg(
                     WithinFile(CreateRefExpr(registryIdParam), &curFile)));
@@ -207,13 +206,13 @@ OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateInstanceMethodBridge(A
                     retTy, CallKind::CALL_DECLARED_FUNCTION);
                 auto methodCallRes = CreateTmpVarDecl(nullptr, std::move(methodCall));
                 methodCallRes->GetTy() = retTy;
-                OwnedPtr<Expr> retExpr = man.lib.UnwrapJavaEntity(
-                    man.lib.WrapJavaEntity(WithinFile(CreateRefExpr(*methodCallRes), &curFile)),
-                    man.GetJNITy(retTy), *(refWrapperFunc.outerDecl), true);
+                OwnedPtr<Expr> retExpr = ilib.UnwrapJavaEntity(
+                    ilib.WrapJavaEntity(WithinFile(CreateRefExpr(*methodCallRes), &curFile)),
+                    &jni.ConvertCangjieToJniTy(*retTy), *(refWrapperFunc.outerDecl), true);
 
                 f.funcBody->body->body.push_back(
-                    man.lib.WrapExceptionHandling(WithinFile(CreateRefExpr(jniEnv), &curFile),
-                    WrapReturningLambdaExpr(man.typeManager, Nodes(std::move(methodCallRes), std::move(retExpr))))
+                    ilib.WrapExceptionHandling(WithinFile(CreateRefExpr(jniEnv), &curFile),
+                    WrapReturningLambdaExpr(typeManager, Nodes(std::move(methodCallRes), std::move(retExpr))))
                 );
         });
 
@@ -226,12 +225,12 @@ OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateStaticMethodBridge(
     File& curFile = *companion.curFile;
     Ptr<Ty> retTy = StaticCast<FuncTy*>(refWrapperFunc.GetTy())->retTy;
     auto& userParams = refWrapperFunc.funcBody->paramLists[0]->params;
-    auto nativeFuncName = man.GetJniMethodName(refWrapperFunc);
+    auto nativeFuncName = jni.GetJniMethodName(refWrapperFunc);
 
-    auto bridgeFunc = CreateNativeJavaABIFunc(
+    auto bridgeFunc = jni.CreateNativeJavaABIFunc(
         nativeFuncName,
         ConvertJavaCompatibleToCTypeParams(userParams, curFile),
-        man.GetJNITy(retTy), curFile,
+        &jni.ConvertCangjieToJniTy(*retTy), curFile,
         refWrapperFunc.moduleName, refWrapperFunc.fullPackageName,
         [&](FuncDecl& f, FuncParam& jniEnv, [[maybe_unused]] FuncParam& jclass,
             std::vector<Ptr<FuncParam>> ctypeUserParams) {
@@ -260,13 +259,13 @@ OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateStaticMethodBridge(
                     retTy, CallKind::CALL_DECLARED_FUNCTION);
                 auto methodCallRes = CreateTmpVarDecl(nullptr, std::move(methodCall));
                 methodCallRes->GetTy() = retTy;
-                OwnedPtr<Expr> retExpr = man.lib.UnwrapJavaEntity(
-                    man.lib.WrapJavaEntity(WithinFile(CreateRefExpr(*methodCallRes), &curFile)),
-                    man.GetJNITy(retTy), *(refWrapperFunc.outerDecl), true);
+                OwnedPtr<Expr> retExpr = ilib.UnwrapJavaEntity(
+                    ilib.WrapJavaEntity(WithinFile(CreateRefExpr(*methodCallRes), &curFile)),
+                    &jni.ConvertCangjieToJniTy(*retTy), *(refWrapperFunc.outerDecl), true);
 
                 f.funcBody->body->body.push_back(
-                    man.lib.WrapExceptionHandling(WithinFile(CreateRefExpr(jniEnv), &curFile),
-                    WrapReturningLambdaExpr(man.typeManager, Nodes(std::move(methodCallRes), std::move(retExpr)))));
+                    ilib.WrapExceptionHandling(WithinFile(CreateRefExpr(jniEnv), &curFile),
+                    WrapReturningLambdaExpr(typeManager, Nodes(std::move(methodCallRes), std::move(retExpr)))));
         });
 
         return bridgeFunc;
@@ -274,30 +273,25 @@ OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateStaticMethodBridge(
 
 OwnedPtr<Decl> GenerateNativeBridgeForJavaImpl::CreateFinalizationBridge(ClassDecl& refWrapper) const
 {
-    return man.GenerateNativeDeleteCjObjectFunc(refWrapper);
-}
+    static Ptr<Ty> unitTy = typeManager.GetPrimitiveTy(TypeKind::TYPE_UNIT);
+    std::vector<OwnedPtr<FuncParam>> ctypeParams;
+    auto& registryIdParam = *ctypeParams.emplace_back(jni.CreateRegistryIdParam());
 
-OwnedPtr<FuncDecl> GenerateNativeBridgeForJavaImpl::CreateNativeJavaABIFunc(std::string& name,
-    std::vector<OwnedPtr<FuncParam>> userParams, Ptr<Ty> retTy,
-    File& curFile, std::string& moduleName, std::string& fullPackageName,
-    std::function<void(
-        FuncDecl& f, FuncParam& jniEnv, FuncParam& objOrClass, std::vector<Ptr<FuncParam>> userParams)> builder) const
-{
-    std::vector<Ptr<FuncParam>> userParamsView;
-    for (auto& userParam : userParams) {
-        userParamsView.push_back(userParam.get());
-    }
+    return jni.CreateNativeJavaABIFunc(
+        jni.GetJniDeleteCjObjectFuncName(refWrapper),
+        std::move(ctypeParams),
+        unitTy,
+        *refWrapper.curFile, refWrapper.moduleName, refWrapper.fullPackageName,
+        [&](FuncDecl& fn, [[maybe_unused]] FuncParam& jniEnvParam, [[maybe_unused]] FuncParam& jobjParam,
+            [[maybe_unused]] std::vector<Ptr<FuncParam>> cTypeUserParams) {
+                auto removeFromRegistryCall = ilib.CreateRemoveFromRegistryCall(
+                    WithinFile(CreateRefExpr(registryIdParam), refWrapper.curFile));
 
-    auto params = std::move(userParams);
-    auto& jniEnvParam = **params.insert(params.begin(), man.CreateJniEnvParam());
-    auto& objOrClassParam = **params.insert(params.begin() + 1, man.CreateJniJobjectOrJclassParam());
-
-    auto func = man.utils.CreateNativeFunc(name, std::move(params), retTy, {}, curFile, moduleName,
-        fullPackageName);
-
-    builder(*func, jniEnvParam, objOrClassParam, userParamsView);
-
-    return func;
+                auto& body = fn.funcBody->body->body;
+                body.push_back(ilib.WrapExceptionHandling(
+                    WithinFile(CreateRefExpr(jniEnvParam), refWrapper.curFile),
+                    WrapReturningLambdaExpr(typeManager, Nodes(std::move(removeFromRegistryCall)))));
+    });
 }
 
 void GenerateNativeBridgeForJavaImpl::Process(ClassDecl& companion, ClassDecl& refWrapper,
@@ -333,6 +327,14 @@ void GenerateNativeBridgeForJavaImpl::Process(ClassDecl& companion, ClassDecl& r
 
     ctx.AddGeneratedDecl(CreateFinalizationBridge(refWrapper));
 }
+
+GenerateNativeBridgeForJavaImpl::GenerateNativeBridgeForJavaImpl(
+    TypeManager& typeManager,
+    const ImportManager& importManager,
+    InteropLibBridge& ilib,
+    JniBridge& jni)
+    : typeManager(typeManager), importManager(importManager), ilib(ilib), jni(jni)
+{}
 
 void GenerateNativeBridgeForJavaImpl::Process(AfterTypeCheckContext& ctx)
 {

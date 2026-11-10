@@ -8,6 +8,7 @@
 
 #include "JavaDesugarManager.h"
 #include "GenerateJavaImplApiStub.h"
+#include "JniBridge.h"
 #include "NativeFFI/Utils.h"
 #include "InteropLibBridge.h"
 
@@ -17,7 +18,7 @@
 
 namespace Cangjie::Native::FFI::Java {
 
-OwnedPtr<AST::FuncDecl> GenerateJavaImplWrappingConstructorStub::CreateWrappingConstructorStub(
+OwnedPtr<AST::FuncDecl> GenerateJavaImplApiStub::CreateWrappingConstructorStub(
     ClassDecl& refWrapper) const
 {
     auto ctor = CreateFuncDecl("init", CreateFuncBody({}, CreateRefType(refWrapper), CreateBlock({})));
@@ -36,7 +37,7 @@ OwnedPtr<AST::FuncDecl> GenerateJavaImplWrappingConstructorStub::CreateWrappingC
     auto& entityParam = *params[0];
 
     // regId: RegistryId (Int64)
-    auto& regIdParam = man.PushSelfParams(params);
+    auto& regIdParam = *params.emplace_back(jni.CreateRegistryIdParam());
 
     std::vector<Ptr<Ty>> paramTys;
     paramTys.push_back(entityParam.GetTy());
@@ -54,7 +55,7 @@ OwnedPtr<AST::FuncDecl> GenerateJavaImplWrappingConstructorStub::CreateWrappingC
     return ctor;
 }
 
-FuncDecl& GenerateJavaImplWrappingConstructorStub::InsertWrappingConstructor(ClassDecl& refWrapper) const
+FuncDecl& GenerateJavaImplApiStub::InsertWrappingConstructor(ClassDecl& refWrapper) const
 {
     auto ctor = WithinFile(CreateWrappingConstructorStub(refWrapper), refWrapper.curFile);
     auto& res = *ctor;
@@ -69,12 +70,12 @@ FuncDecl& GenerateJavaImplWrappingConstructorStub::InsertWrappingConstructor(Cla
     return res;
 }
 
-GenerateJavaImplWrappingConstructorStub::GenerateJavaImplWrappingConstructorStub(JavaDesugarManager& man)
-    : man(man), typeManager(man.typeManager), ilib(man.lib)
+GenerateJavaImplApiStub::GenerateJavaImplApiStub(
+    TypeManager& typeManager, InteropLibBridge& ilib, JniBridge& jni) : typeManager(typeManager), ilib(ilib), jni(jni)
 {
 }
 
-void GenerateJavaImplWrappingConstructorStub::Process(AfterTypeCheckContext& ctx)
+void GenerateJavaImplApiStub::Process(AfterTypeCheckContext& ctx)
 {
     for (auto refWrapper : ctx.GetJavaImplReferenceWrappers()) {
         auto& ctor = InsertWrappingConstructor(*refWrapper);

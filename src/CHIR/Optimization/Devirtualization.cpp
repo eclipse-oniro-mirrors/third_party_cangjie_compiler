@@ -230,15 +230,14 @@ void Devirtualization::RewriteToApply(CHIRBuilder& builder, std::vector<RewriteI
         Type* thisType = builder.GetType<RefType>(rewriteInfo->thisType);
         auto& realFunc = rewriteInfo->realCallee;
 
-        if ((rewriteInfo->thisType->IsStruct() || rewriteInfo->thisType->IsEnum()) &&
-            rewriteInfo->realCallee->Get<WrappedRawMethod>()) {
-            thisType = rewriteInfo->thisType;
-            bool isMutFunc =
-                realFunc->TestAttr(Attribute::MUT) || IsConstructor(*realFunc) || IsInstanceVarInit(*realFunc);
-            if (isMutFunc) {
-                thisType = builder.GetType<RefType>(thisType);
+        if (auto rawFunc = rewriteInfo->realCallee->Get<WrappedRawMethod>()) {
+            if (rewriteInfo->thisType->IsValueType()) {
+                thisType = rewriteInfo->thisType;
+                if (realFunc->TestAttr(Attribute::MUT) || IsConstructor(*realFunc) || IsInstanceVarInit(*realFunc)) {
+                    thisType = builder.GetType<RefType>(thisType);
+                }
             }
-            realFunc = rewriteInfo->realCallee->Get<WrappedRawMethod>();
+            realFunc = rawFunc;
         }
         auto args = invoke->GetOperands();
         auto thisDerefType = thisType->StripAllRefs();
@@ -247,7 +246,10 @@ void Devirtualization::RewriteToApply(CHIRBuilder& builder, std::vector<RewriteI
         if (thisDerefType->IsClassOrArray() || realFunc->TestAttr(Attribute::MUT)) {
             instThisType = builder.GetType<RefType>(instThisType);
         }
-        if (rewriteInfo->thisType->IsBuiltinType()) {
+        // Wrapper of a builtin type (e.g. `extend Unit <: I`) takes `Any&` as `this`.
+        // After unwrapping to the raw method, keep the builtin value type instead of Any&.
+        auto rawThisTy = realFunc->GetFuncType()->GetParamTypes()[0]->StripAllRefs();
+        if (rewriteInfo->thisType->IsBuiltinType() && rawThisTy->IsAny()) {
             instThisType = builder.GetType<RefType>(builder.GetAnyTy());
         }
         auto instRetTy = invoke->GetResultType();
@@ -526,7 +528,11 @@ std::pair<Function*, Type*> Devirtualization::FindRealCallee(
         // The specific type is an interface or a class, and the state kind is SUBCLASS_OF.
         ClassType* specificType1 = StaticCast<ClassType*>(typeState->GetSpecificType());
         std::pair<Function*, Type*> res{nullptr, nullptr};
-        CollectCandidates(builder, specificType1, res, method);
+        bool resBeenCleared = false;
+        CollectCandidates(builder, specificType1, res, method, resBeenCleared);
+        if (resBeenCleared) {
+            return {nullptr, nullptr};
+        }
         return res;
     }
 }
@@ -551,8 +557,8 @@ Function* Devirtualization::GetCandidateFromSpecificType(
     return nullptr;
 }
 
-void Devirtualization::CollectCandidates(
-    CHIRBuilder& builder, ClassType* specific, std::pair<Function*, Type*>& res, const FuncSig& method) const
+void Devirtualization::CollectCandidates(CHIRBuilder& builder, ClassType* specific,
+    std::pair<Function*, Type*>& res, const FuncSig& method, bool& resBeenCleared) const
 {
     auto specificDef = specific->GetClassDef();
     if (specificDef->CanBeInherited() && !devirtFuncInfo.CheckCustomTypeInternal(*specificDef)) {
@@ -565,6 +571,7 @@ void Devirtualization::CollectCandidates(
         if (res.first == nullptr) {
             res = {targetFromSpecificType, specific};
         } else if (res.first != targetFromSpecificType) {
+            resBeenCleared = true;
             res = {nullptr, nullptr};
             return;
         }
@@ -603,6 +610,7 @@ void Devirtualization::CollectCandidates(
                         if (res.first == nullptr) {
                             res = {target, subtypeCustom};
                         } else if (res.first != target) {
+                            resBeenCleared = true;
                             res = {nullptr, nullptr};
                             return;
                         }
@@ -611,7 +619,10 @@ void Devirtualization::CollectCandidates(
             }
         }
         if (subtypeCustom && subtypeCustom->IsClass()) {
-            CollectCandidates(builder, StaticCast<ClassType*>(subtypeCustom), res, method);
+            CollectCandidates(builder, StaticCast<ClassType*>(subtypeCustom), res, method, resBeenCleared);
+            if (resBeenCleared) {
+                return;
+            }
         }
     }
 }

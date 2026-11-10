@@ -46,20 +46,6 @@ bool FuncDeclIsOpen(const AST::FuncDecl& funcDecl)
         funcDecl.TestAttr(AST::Attribute::STATIC) && !funcDecl.TestAttr(AST::Attribute::PRIVATE);
     return instanceMethodIsOpen || staticMethodIsOpen;
 }
-
-bool IsInsideCFuncLambda(const CHIR::Block& bl)
-{
-    auto expr = bl.GetParentBlockGroup()->GetOwnerExpression();
-    while (expr) {
-        if (auto lambda = Cangjie::DynamicCast<Lambda>(expr)) {
-            if (lambda->GetFuncType()->IsCFunc()) {
-                return true;
-            }
-        }
-        expr = expr->GetParentBlockGroup()->GetOwnerExpression();
-    }
-    return false;
-}
 } // namespace
 
 // `obj.foo()` is a virtual func call ?
@@ -78,7 +64,7 @@ bool Translator::IsVirtualFuncCall(
      *      }
      *  }
      */
-    if (baseExprIsSuper || IsInsideCFuncLambda(*GetCurrentBlock())) {
+    if (baseExprIsSuper) {
         return false;
     }
     if (obj.CanBeInherited() && FuncDeclIsOpen(funcDecl)) {
@@ -212,6 +198,7 @@ Translator::InstCalleeInfo Translator::GetInstCalleeInfoFromVarInit(const AST::R
         .thisType = parentType,
         .instParamTys = paramTys,
         .instRetTy = funcType->GetReturnType(),
+        .instantiatedTypeArgs = TranslateASTTypes(expr.instTys),
         .isVirtualFuncCall = false
     };
 }
